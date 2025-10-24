@@ -8,6 +8,7 @@ use App\Http\Resources\V1\UserResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Passport\Token;
 
 class AuthController extends Controller
 {
@@ -36,9 +37,11 @@ class AuthController extends Controller
     }
 
     public function logout(Request $request)
-    {
-        // إلغاء التوكن الحالي
-        $request->user()->token()->revoke();
-        return response()->json(['message' => 'Logged out']);
-    }
+{
+    /** @var Token $token */
+    $token = $request->user()->token();
+    $token->revoke();
+
+    return response()->json(['message' => 'Logged out']);
+}
 }
