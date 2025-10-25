@@ -3,8 +3,10 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-class SettingsSeeder extends Seeder {
-    public function run(): void {
+class SettingsSeeder extends Seeder
+{
+    public function run(): void
+    {
         DB::table('settings')->updateOrInsert(
             ['key' => 'security.password'],
             [
@@ -15,8 +17,6 @@ class SettingsSeeder extends Seeder {
                     'require_numbers' => true,
                     'require_symbols' => false,
                 ]),
-                'created_at' => now(),
-                'updated_at' => now(),
             ]
         );
     }
