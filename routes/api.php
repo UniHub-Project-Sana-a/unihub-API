@@ -30,28 +30,28 @@ use App\Http\Controllers\Api\V1\NotificationsController;
 use App\Http\Controllers\Api\V1\AppVersionsController;
 use App\Http\Controllers\Api\V1\UserDevicesController;
 
-
 use App\Http\Controllers\Api\V1\Admin\SystemController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 
-use App\Http\Controllers\Api\V1\CollegesController; // <-- أضف هذا
-use App\Http\Controllers\Api\V1\DepartmentsController; // <-- أضف هذا
+use App\Http\Controllers\Api\V1\CollegesController;
+use App\Http\Controllers\Api\V1\DepartmentsController;
 
 Route::prefix('v1')->group(function () {
 
-    Route::get('v1/app-versions/latest', [AppVersionsController::class, 'latest']);
+    Route::get('app-versions/latest', [AppVersionsController::class, 'latest']);
 
     // Auth
     Route::post('auth/login',           [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('auth/forgot-password', [AuthPasswordController::class, 'forgot'])->middleware('throttle:forgot');
     Route::post('auth/reset-password',  [AuthPasswordController::class, 'reset'])->middleware('throttle:reset');
 
-    // المسارات المحمية
-    Route::middleware(['auth:api', 'activity:admin', 'throttle:60,1'])->group(function () {
+    // المسارات التي كانت محمية سابقًا
+    // Route::middleware(['auth:api', 'activity:admin', 'throttle:60,1'])->group(function () {
+    Route::middleware(['throttle:60,1'])->group(function () {
 
-        // Me/Logout
-        Route::get('auth/me',     [AuthController::class, 'me']);
-        Route::post('auth/logout',[AuthController::class, 'logout']);
+        // Me/Logout (سيسبب خطأ لأنه لا يوجد مستخدم)
+        // Route::get('auth/me', [AuthController::class, 'me']);
+        // Route::post('auth/logout',[AuthController::class, 'logout']);
 
         // Lookups (للقوائم المنسدلة فقط)
         Route::get('lookups/user-types', [LookupsController::class, 'userTypes']);
@@ -75,41 +75,38 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('lecture-sessions', LectureSessionsController::class);
         Route::apiResource('app-versions', AppVersionsController::class);
 
-        // QR & Attendance
-        Route::apiResource('qr-refresh-options', QRRefreshOptionsController::class);
-        Route::post('lecture-sessions/start', [LectureSessionsController::class, 'startSession']);
-        Route::post('qr-codes/refresh', [QrCodesController::class, 'refreshQrCode']);
-        Route::post('attendance/students/scan', [StudentAttendanceController::class, 'scan']);
-        Route::post('attendance/students/manual', [StudentAttendanceController::class, 'manualEntry']);
-        Route::post('attendance/lecturers/check-in', [LecturerAttendanceController::class, 'checkIn']);
+        // QR & Attendance (سيسبب خطأ لأنه لا يوجد مستخدم)
+        // Route::apiResource('qr-refresh-options', QRRefreshOptionsController::class);
+        // Route::post('lecture-sessions/start', [LectureSessionsController::class, 'startSession']);
+        // Route::post('qr-codes/refresh', [QrCodesController::class, 'refreshQrCode']);
+        // Route::post('attendance/students/scan', [StudentAttendanceController::class, 'scan']);
+        // Route::post('attendance/students/manual', [StudentAttendanceController::class, 'manualEntry']);
+        // Route::post('attendance/lecturers/check-in', [LecturerAttendanceController::class, 'checkIn']);
+        // Route::put('devices/{device}/enable-auto-attendance', [UserDevicesController::class, 'enableAutoAttendance']);
+        // Route::put('devices/{device}/disable-auto-attendance', [UserDevicesController::class, 'disableAutoAttendance']);
+        // Route::delete('devices/{device}', [UserDevicesController::class, 'destroy']);
 
-        Route::put('devices/{device}/enable-auto-attendance', [UserDevicesController::class, 'enableAutoAttendance']);
-        Route::put('devices/{device}/disable-auto-attendance', [UserDevicesController::class, 'disableAutoAttendance']);
-        Route::delete('devices/{device}', [UserDevicesController::class, 'destroy']);
-
-        // Notifications & Excuses
-        Route::post('makeup-lectures', [MakeupLecturesController::class, 'store']);
-        Route::put('makeup-lectures/{makeupLecture}/review', [MakeupLecturesController::class, 'review']);
-        Route::put('makeup-lectures/{makeupLecture}/approve', [MakeupLecturesController::class, 'approve']);
-        Route::put('makeup-lectures/{makeupLecture}/schedule', [MakeupLecturesController::class, 'schedule']);
-        
-        Route::post('student-excuses', [StudentExcusesController::class, 'store']);
-        Route::put('student-excuses/{excuse}/approve-by-head', [StudentExcusesController::class, 'approveByHead']);
-        Route::put('student-excuses/{excuse}/approve-by-lecturer', [StudentExcusesController::class, 'approveByLecturer']);
-        
-        Route::post('notifications', [NotificationsController::class, 'store']);
+        // Notifications & Excuses (سيسبب خطأ لأنه لا يوجد مستخدم)
+        // Route::post('makeup-lectures', [MakeupLecturesController::class, 'store']);
+        // Route::put('makeup-lectures/{makeupLecture}/review', [MakeupLecturesController::class, 'review']);
+        // Route::put('makeup-lectures/{makeupLecture}/approve', [MakeupLecturesController::class, 'approve']);
+        // Route::put('makeup-lectures/{makeupLecture}/schedule', [MakeupLecturesController::class, 'schedule']);
+        // Route::post('student-excuses', [StudentExcusesController::class, 'store']);
+        // Route::put('student-excuses/{excuse}/approve-by-head', [StudentExcusesController::class, 'approveByHead']);
+        // Route::put('student-excuses/{excuse}/approve-by-lecturer', [StudentExcusesController::class, 'approveByLecturer']);
+        // Route::post('notifications', [NotificationsController::class, 'store']);
 
         // UserTypes & Permissions
-        Route::post('user-types',              [UserTypeController::class, 'store']);
-        Route::put('user-types/{userType}',    [UserTypeController::class, 'update']);
+        Route::post('user-types', [UserTypeController::class, 'store']);
+        Route::put('user-types/{userType}', [UserTypeController::class, 'update']);
         Route::delete('user-types/{userType}', [UserTypeController::class, 'destroy']);
         Route::get('user-types/{userTypeId}/permissions', [UserTypePermissionController::class, 'index']);
         Route::post('user-types/{userType}/permissions/bulk-assign', [UserTypePermissionController::class, 'bulkAssign']);
 
         // Admin
-        Route::get('admin/sessions',         [SystemController::class, 'sessions']);
+        Route::get('admin/sessions', [SystemController::class, 'sessions']);
         Route::post('admin/sessions/revoke', [SystemController::class, 'revokeSession']);
-        Route::get('admin/audit-logs',       [SystemController::class, 'auditLogs']);
+        Route::get('admin/audit-logs', [SystemController::class, 'auditLogs']);
         Route::get('admin/security/policy', [SettingsController::class, 'getPolicy']);
         Route::put('admin/security/policy', [SettingsController::class, 'updatePolicy']);
     });
