@@ -1,8 +1,7 @@
 <?php
 namespace Database\Seeders;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
 use App\Models\User;
 use App\Models\UserType;
 use Illuminate\Support\Facades\Hash;
@@ -11,22 +10,17 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        Schema::disableForeignKeyConstraints();
-
-        // 1. حذف البيانات (طريقة بديلة)
-        DB::table('users')->truncate();
-        DB::table('user_types')->truncate();
-        DB::table('permissions')->truncate();
-        DB::table('settings')->truncate();
-        // ... أضف أسماء بقية الجداول هنا
-        
-        Schema::enableForeignKeyConstraints();
-
-        // 2. إعادة ملء البيانات الأساسية
+        // 1. إعادة ملء البيانات الأساسية
         $this->call([
             PermissionsSeeder::class,
             UserTypesSeeder::class,
             SettingsSeeder::class,
+        ]);
+
+        // 2. إنشاء عميل Passport
+        Artisan::call('passport:client', [
+            '--personal' => true,
+            '--name' => 'UniHub API Personal Access Client'
         ]);
 
         // 3. إنشاء المستخدم المشرف العام
@@ -40,6 +34,7 @@ class DatabaseSeeder extends Seeder
                 'academic_number' => 'ADM0001',
                 'gender' => 0,
                 'user_type_id' => $adminType->user_type_id,
+                'college_id' => null,
             ]);
         }
     }

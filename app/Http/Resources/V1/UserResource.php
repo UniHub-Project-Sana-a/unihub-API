@@ -18,6 +18,8 @@ class UserResource extends JsonResource
             'user_type_id'    => (int) $this->user_type_id,
             'created_at'      => optional($this->created_at)->toDateTimeString(),
             'updated_at'      => optional($this->updated_at)->toDateTimeString(),
+            'status' => $this->status,
+            'college_id' => $this->college_id,
         ];
     }
 }

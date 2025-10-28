@@ -19,6 +19,7 @@ class UpdateUserRequest extends FormRequest
             'academic_number' => ['sometimes','string','max:50','unique:users,academic_number,'.$id.',user_id'],
             'gender'          => ['sometimes','integer','in:0,1'],
             'user_type_id'    => ['sometimes','integer','exists:user_types,user_type_id'],
+            'college_id' => ['nullable', 'integer', 'exists:colleges,college_id'],
         ];
     }
 }

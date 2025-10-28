@@ -24,6 +24,7 @@ class User extends Authenticatable
         'academic_number',
         'gender',
         'user_type_id',
+        'college_id',
     ];
 
     protected $hidden = [
@@ -39,6 +40,9 @@ class User extends Authenticatable
     public function userType()
     {
         return $this->belongsTo(UserType::class, 'user_type_id', 'user_type_id');
+    }
+    public function college() {
+        return $this->belongsTo(College::class, 'college_id');
     }
 
     public function student()

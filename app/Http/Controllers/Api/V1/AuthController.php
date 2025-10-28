@@ -61,9 +61,11 @@ class AuthController extends Controller
     }
 }
 
-    public function me(Request $request)
-    {
-        return new UserResource($request->user());
+    public function me(Request $request) {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        $user->load('college'); // <-- أضف هذا
+        return new UserResource($user);
     }
 
     public function logout(Request $request)

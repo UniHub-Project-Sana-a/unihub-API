@@ -18,6 +18,7 @@ class StoreUserRequest extends FormRequest
             'academic_number' => ['required','string','max:50','unique:users,academic_number'],
             'gender'          => ['required','integer','in:0,1'],
             'user_type_id'    => ['required','integer','exists:user_types,user_type_id'],
+            'college_id' => ['nullable', 'integer', 'exists:colleges,college_id'],
         ];
     }
 }

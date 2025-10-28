@@ -94,11 +94,13 @@ return new class extends Migration
             $table->string('full_name', 100)->index();
             $table->string('email', 100)->unique();
             $table->string('phone', 20)->unique();
+            $table->unsignedInteger('college_id')->nullable();
             $table->string('password');
             $table->string('academic_number', 50)->unique();
             $table->tinyInteger('gender');
             $table->unsignedInteger('user_type_id');
             $table->foreign('user_type_id')->references('user_type_id')->on('user_types')->onDelete('cascade');
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('set null');
             $table->timestamps();
             $table->softDeletes();
         });
