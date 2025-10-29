@@ -19,11 +19,16 @@ class Course extends Model
         'course_code',
         'course_type',
         'is_active',
+        'semester_id',     // مهم
+        'credit_hours',
+        'is_elective',
+        'department_id',
+        'notes',
     ];
 
-    protected $casts = [
-        'course_type' => 'integer',
+     protected $casts = [
         'is_active'   => 'boolean',
+        'is_elective' => 'boolean',
     ];
 
     public function timetables()
@@ -39,5 +44,20 @@ class Course extends Model
     public function studentExcuseSubmissions()
     {
         return $this->hasMany(StudentExcuseSubmission::class, 'course_id', 'course_id');
+    }
+
+     public function getRouteKeyName()
+    {
+        return 'course_id';
+    }
+
+    public function semester()
+    {
+        return $this->belongsTo(Semester::class, 'semester_id', 'semester_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'department_id', 'department_id');
     }
 }

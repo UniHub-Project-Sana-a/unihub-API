@@ -14,18 +14,21 @@ class Program extends Model
     protected $primaryKey = 'program_id';
     public $timestamps = true;
 
-    protected $fillable = [
-        'program_name',
-        'is_active',
-    ];
+    protected $fillable = ['program_name','department_id','is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
-    public function departments()
+    public function department()
     {
-        return $this->belongsToMany(Department::class, 'department_programs', 'program_id', 'department_id')->withTimestamps();
+        return $this->belongsTo(Department::class, 'department_id', 'department_id');
+    }
+
+        // مستويات البرنامج
+    public function levels()
+    {
+        return $this->hasMany(Level::class, 'program_id', 'program_id');
     }
 
     public function students()

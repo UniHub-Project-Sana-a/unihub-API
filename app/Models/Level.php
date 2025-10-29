@@ -15,17 +15,23 @@ class Level extends Model
     public $timestamps = true;
 
     protected $fillable = [
+        'program_id',
+        'level_number',
         'level_name',
-        'department_id',
     ];
 
     protected $casts = [
         'department_id' => 'integer',
     ];
 
-    public function department()
+    public function getRouteKeyName()
     {
-        return $this->belongsTo(Department::class, 'department_id', 'department_id');
+        return 'level_id';
+    }
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class, 'program_id', 'program_id');
     }
 
     public function semesters()

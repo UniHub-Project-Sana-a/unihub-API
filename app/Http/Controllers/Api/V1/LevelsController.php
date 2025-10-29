@@ -7,22 +7,28 @@ use App\Models\Level;
 use Illuminate\Http\Request;
 
 class LevelsController extends Controller {
-    public function index(Request $request) {
-        $q = $request->query('q');
-        $query = Level::query()->with('department')->when($q, fn($qq) => $qq->where('level_name', 'like', "%{$q}%"));
-        return response()->json($query->get());
+    public function index(Request $r) {
+      $q = Level::query()->select(['level_id','program_id','level_number','level_name']);
+      if ($r->filled('program_id')) $q->where('program_id', (int)$r->program_id);
+      return response()->json($q->get());
     }
     public function store(StoreLevelRequest $request) {
-        $level = Level::create($request->validated());
-        return response()->json($level->load('department'), 201);
+      $data = $request->validated();
+      $level = Level::create([
+        'program_id'   => $data['program_id'],
+        'level_number' => $data['level_number'],
+        'level_name'   => $data['level_name'] ?? 'المستوى '.$data['level_number'],
+      ]);
+      return response()->json($level->fresh(), 201);
     }
     public function show(Level $level) {
-        return response()->json($level->load('department'));
-    }
-    public function update(UpdateLevelRequest $request, Level $level) {
-        $level->update($request->validated());
-        return response()->json($level->load('department'));
-    }
+    // لو تحب ترجع معلومات البرنامج والقسم أيضاً:
+    return response()->json($level->load('program.department'));
+}
+public function update(UpdateLevelRequest $request, Level $level) {
+    $level->update($request->validated());
+    return response()->json($level->load('program.department'));
+}
     public function destroy(Level $level) {
         $level->delete();
         return response()->json(['message' => 'Level deleted']);

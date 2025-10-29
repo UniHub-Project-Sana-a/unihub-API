@@ -7,15 +7,16 @@ use App\Models\Course;
 use Illuminate\Http\Request;
 
 class CoursesController extends Controller {
-    public function index(Request $request) {
-        $q = $request->query('q');
-        $query = Course::query()->when($q, fn($qq) => $qq->where('course_name', 'like', "%{$q}%")->orWhere('course_code', 'like', "%{$q}%"));
-        return response()->json($query->get());
-    }
-    public function store(StoreCourseRequest $request) {
-        $course = Course::create($request->validated());
-        return response()->json($course, 201);
-    }
+    public function index(Request $r) {
+  $q = Course::query()->select(['course_id','course_name','course_code','course_type','is_active','semester_id','credit_hours','is_elective','department_id','notes']);
+  if ($r->filled('semester_id')) $q->where('semester_id', (int)$r->semester_id);
+  return response()->json($q->get());
+}
+   public function store(StoreCourseRequest $request) {
+  $data = $request->validated();
+  $course = Course::create($data);
+  return response()->json($course->fresh(), 201);
+}
     public function show(Course $course) {
         return response()->json($course);
     }

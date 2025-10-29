@@ -7,24 +7,35 @@ use App\Models\Program;
 use Illuminate\Http\Request;
 
 class ProgramsController extends Controller {
-    public function index(Request $request) {
-        $q = $request->query('q');
-        $query = Program::query()->when($q, fn($qq) => $qq->where('program_name', 'like', "%{$q}%"));
-        return response()->json($query->get());
+    public function index(Request $r) {
+      $q = Program::query()->select(['program_id','program_name','is_active','department_id']);
+      if ($r->filled('department_id')) $q->where('department_id', (int)$r->department_id);
+      return response()->json($q->get());
     }
+
     public function store(StoreProgramRequest $request) {
-        $program = Program::create($request->validated());
-        return response()->json($program, 201);
+      $data = $request->validated();
+      $program = Program::create([
+        'program_name'  => $data['program_name'],
+        'department_id' => $data['department_id'],
+        'is_active'     => $data['is_active'] ?? true,
+      ]);
+      return response()->json($program->fresh(), 201);
     }
     public function show(Program $program) {
         return response()->json($program);
     }
     public function update(UpdateProgramRequest $request, Program $program) {
-        $program->update($request->validated());
-        return response()->json($program);
+      $data = $request->validated();
+      $program->update([
+        'program_name' => $data['program_name'] ?? $program->program_name,
+        'is_active'    => array_key_exists('is_active',$data) ? $data['is_active'] : $program->is_active,
+      ]);
+      return response()->json($program->fresh());
     }
-    public function destroy(Program $program) {
-        $program->delete();
-        return response()->json(['message' => 'Program deleted']);
+    public function destroy(Program $program)
+    {
+        $program->delete(); // Soft delete
+        return response()->json(['message' => 'Deleted']);
     }
 }

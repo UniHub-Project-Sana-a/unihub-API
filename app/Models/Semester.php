@@ -15,17 +15,28 @@ class Semester extends Model
     public $timestamps = true;
 
     protected $fillable = [
+        'level_id',
+        'term_number',
         'semester_name',
         'academic_year',
-        'level_id',
     ];
 
     protected $casts = [
         'level_id' => 'integer',
     ];
 
+    public function getRouteKeyName()
+    {
+        return 'semester_id';
+    }
+
     public function level()
     {
         return $this->belongsTo(Level::class, 'level_id', 'level_id');
+    }
+
+    public function courses()
+    {
+        return $this->hasMany(Course::class, 'semester_id', 'semester_id');
     }
 }

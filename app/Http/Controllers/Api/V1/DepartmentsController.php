@@ -7,15 +7,27 @@ use App\Models\Department;
 use Illuminate\Http\Request;
 
 class DepartmentsController extends Controller {
-    public function index(Request $request) {
-        $q = $request->query('q');
-        $query = Department::query()->with('college')->when($q, fn($qq) => $qq->where('department_name', 'like', "%{$q}%"));
-        return response()->json($query->get());
+    public function index(\Illuminate\Http\Request $r)
+{
+    $q = \App\Models\Department::query()
+        ->select(['department_id','department_name','department_code','college_id']);
+
+    if ($r->filled('college_id')) {
+        $q->where('college_id', (int) $r->college_id);
     }
-    public function store(StoreDepartmentRequest $request) {
-        $department = Department::create($request->validated());
-        return response()->json($department->load('college'), 201);
-    }
+
+    return response()->json($q->get());
+}
+    public function store(StoreDepartmentRequest $request)
+{
+    $data = $request->validated();
+    $dept = \App\Models\Department::create([
+        'department_name' => $data['department_name'],
+        'department_code' => $data['department_code'] ?? null,
+        'college_id'      => $data['college_id'],
+    ]);
+    return response()->json($dept->fresh(), 201);
+}
     public function show(Department $department) {
         return response()->json($department->load('college'));
     }

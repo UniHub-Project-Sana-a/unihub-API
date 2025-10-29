@@ -37,23 +37,6 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        Schema::create('programs', function (Blueprint $table) {
-            $table->increments('program_id');
-            $table->string('program_name', 50)->unique();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
-        Schema::create('courses', function (Blueprint $table) {
-            $table->increments('course_id');
-            $table->string('course_name', 150);
-            $table->string('course_code', 50)->unique();
-            $table->tinyInteger('course_type')->default(0);
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-            $table->softDeletes();
-        });
 
         Schema::create('days', function (Blueprint $table) {
             $table->increments('day_id');
@@ -115,6 +98,18 @@ return new class extends Migration
             $table->softDeletes();
         });
 
+        // بعد جدول departments مباشرة
+        Schema::create('programs', function (Blueprint $table) {
+            $table->increments('program_id');
+            $table->unsignedInteger('department_id');                   // البرنامج ينتمي لقسم
+            $table->string('program_name', 50);
+            $table->boolean('is_active')->default(true);
+            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
+            $table->unique(['department_id', 'program_name'], 'unique_program_per_department'); // منع تكرار الاسم داخل نفس القسم
+            $table->timestamps();
+            $table->softDeletes();
+        });
+
         Schema::create('academic_titles', function (Blueprint $table) {
             $table->increments('title_id');
             $table->unsignedInteger('college_id');
@@ -152,9 +147,11 @@ return new class extends Migration
         // 3. جداول تعتمد على ما سبق
         Schema::create('levels', function (Blueprint $table) {
             $table->increments('level_id');
-            $table->string('level_name', 50);
-            $table->unsignedInteger('department_id');
-            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
+            $table->string('level_name', 50)->nullable(); // اختياري للاسم الوصفي
+            $table->unsignedInteger('program_id');        // المستوى ينتمي لبرنامج
+            $table->tinyInteger('level_number');          // رقم المستوى (1,2,3, ...)
+            $table->foreign('program_id')->references('program_id')->on('programs')->onDelete('cascade');
+            $table->unique(['program_id', 'level_number'], 'unique_program_level_number'); // عدم تكرار رقم المستوى داخل نفس البرنامج
             $table->timestamps();
             $table->softDeletes();
         });
@@ -218,7 +215,30 @@ return new class extends Migration
             $table->string('semester_name', 50);
             $table->string('academic_year', 20);
             $table->unsignedInteger('level_id');
+            $table->tinyInteger('term_number'); // رقم الترم (1، 2، ..)
             $table->foreign('level_id')->references('level_id')->on('levels')->onDelete('cascade');
+            $table->unique(['level_id', 'term_number'], 'unique_level_term_number'); // لا يتكرر نفس رقم الترم داخل نفس المستوى
+            $table->timestamps();
+            $table->softDeletes();
+        });
+
+                Schema::create('courses', function (Blueprint $table) {
+            $table->increments('course_id');
+            $table->string('course_name', 150);
+            $table->string('course_code', 50)->unique();
+            $table->tinyInteger('course_type')->default(0);
+            $table->boolean('is_active')->default(true);
+        
+            // الربط الجديد مع الفصل
+            $table->unsignedInteger('semester_id');         // المادة تنتمي لفصل
+            $table->integer('credit_hours')->default(0);    // ساعات معتمدة
+            $table->boolean('is_elective')->default(false); // اختيارية؟
+            $table->unsignedInteger('department_id')->nullable(); // اختياري: قسم المادة
+            $table->string('notes', 500)->nullable();       // ملاحظات
+        
+            $table->foreign('semester_id')->references('semester_id')->on('semesters')->onDelete('cascade');
+            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('set null');
+        
             $table->timestamps();
             $table->softDeletes();
         });
