@@ -47,7 +47,14 @@ return new class extends Migration
 
         Schema::create('student_groups', function (Blueprint $table) {
             $table->increments('group_id');
+            $table->unsignedInteger('college_id');          // ربط المجموعة بكلية
             $table->string('group_name', 100);
+        
+            // قيود وإندكسات
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+            $table->unique(['college_id', 'group_name'], 'unique_group_per_college'); // منع تكرار الاسم داخل الكلية
+            $table->index('college_id');
+        
             $table->timestamps();
             $table->softDeletes();
         });
@@ -114,10 +121,19 @@ return new class extends Migration
             $table->increments('title_id');
             $table->unsignedInteger('college_id');
             $table->string('title_name', 100);
-            $table->string('title_code', 50)->unique();
+            $table->string('title_code', 50); // → بدون unique
             $table->decimal('hourly_price', 10, 2);
             $table->decimal('lecture_price', 10, 2)->default(0.00);
+        
+            // ربط المفتاح الأجنبي بالكلية
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+        
+            // منع تكرار title_code داخل نفس الكلية
+            $table->unique(['college_id', 'title_code']);
+        
+            // منع تكرار title_name داخل نفس الكلية
+            $table->unique(['college_id', 'title_name']);
+        
             $table->timestamps();
             $table->softDeletes();
         });

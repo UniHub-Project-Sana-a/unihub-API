@@ -15,6 +15,7 @@ class StudentGroup extends Model
     public $timestamps = true;
 
     protected $fillable = [
+        'college_id',
         'group_name',
     ];
 
@@ -25,7 +26,7 @@ class StudentGroup extends Model
 
     public function students()
     {
-        return $this->belongsToMany(Student::class, 'student_group_members', 'group_id', 'student_id')
+        return $this->belongsToMany(\App\Models\Student::class, 'student_group_members', 'group_id', 'student_id')
             ->withTimestamps();
     }
 

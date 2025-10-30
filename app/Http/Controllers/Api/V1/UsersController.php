@@ -26,15 +26,36 @@ class UsersController extends Controller
     {
         $q = $request->query('q');
         $perPage = (int)($request->query('per_page', 15));
+        $collegeId = $request->query('college_id');
+        $userTypeCode = $request->query('user_type_code');
     
-        $users = \App\Models\User::query()
-            ->when($q, function($qq) use ($q){
-                $qq->where('full_name','like',"%$q%")
-                   ->orWhere('email','like',"%$q%")
-                   ->orWhere('phone','like',"%$q%");
+        $usersQuery = \App\Models\User::query()
+            ->with('userType:user_type_id,user_type_name,user_type_code') // اختياري
+            ->when($q, function ($query_search) use ($q) {
+                $query_search->where(function ($sub_query) use ($q) {
+                    $sub_query->where('full_name', 'like', "%$q%")
+                        ->orWhere('email', 'like', "%$q%")
+                        ->orWhere('phone', 'like', "%$q%")
+                        ->orWhere('academic_number', 'like', "%$q%");
+                });
             })
-            ->orderBy('user_id','desc')
-            ->paginate($perPage);
+            ->when($collegeId, function ($query_college) use ($collegeId) {
+                $query_college->where('college_id', (int)$collegeId);
+            })
+            ->when($userTypeCode, function ($query_type) use ($userTypeCode) {
+                $query_type->whereHas('userType', function ($sub_query_type) use ($userTypeCode) {
+                    $sub_query_type->where('user_type_code', $userTypeCode);
+                });
+            })
+            ->orderBy('user_id', 'desc');
+    
+        // إذا لم يكن هناك pagination مطلوب، أرجع الكل
+        if ($perPage === 0 || $request->query('all') === 'true') {
+            return \App\Http\Resources\V1\UserResource::collection($usersQuery->get());
+        }
+        
+        // إذا تطلب pagination
+        $users = $usersQuery->paginate($perPage);
     
         return \App\Http\Resources\V1\UserResource::collection($users);
     }

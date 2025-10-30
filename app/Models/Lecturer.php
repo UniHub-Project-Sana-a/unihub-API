@@ -32,6 +32,11 @@ class Lecturer extends Model
         'status'        => 'boolean',
     ];
 
+    public function getRouteKeyName()
+    {
+        return 'lecturer_id';
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');

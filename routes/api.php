@@ -2,6 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AuthPasswordController;
+use App\Http\Controllers\Api\V1\AcademicTitlesController;
 use App\Http\Controllers\Api\V1\UsersController;
 use App\Http\Controllers\Api\V1\LookupsController;
 use App\Http\Controllers\Api\V1\UserTypeController;
@@ -30,6 +31,9 @@ use App\Http\Controllers\Api\V1\Admin\SystemController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\CollegesController;
 use App\Http\Controllers\Api\V1\DepartmentsController;
+use App\Http\Controllers\Api\V1\StudentsController;
+
+use App\Http\Controllers\Api\V1\LecturersController;
 
 Route::prefix('v1')->group(function () {
     Route::get('app-versions/latest', [AppVersionsController::class, 'latest']);
@@ -68,6 +72,13 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('timetables', TimetableController::class);
         Route::apiResource('lecture-sessions', LectureSessionsController::class);
         Route::apiResource('app-versions', AppVersionsController::class);
+        Route::apiResource('lecturers', LecturersController::class);
+        Route::apiResource('academic-titles', AcademicTitlesController::class);
+        Route::apiResource('students', StudentsController::class)->only(['index']);
+        Route::post('lecturers/import-csv', [LecturersController::class, 'importCsv']);
+        Route::post('student-groups/upsert-and-attach', [StudentGroupsController::class, 'upsertAndAttach']);
+        Route::post('student-groups/import-csv', [StudentGroupsController::class, 'importCsv']);
+        Route::post('student-groups/import-external', [StudentGroupsController::class, 'importExternal']);
 
         // QR & Attendance
         Route::apiResource('qr-refresh-options', QRRefreshOptionsController::class);
@@ -89,7 +100,7 @@ Route::prefix('v1')->group(function () {
         Route::put('student-excuses/{excuse}/approve-by-head', [StudentExcusesController::class, 'approveByHead']);
         Route::put('student-excuses/{excuse}/approve-by-lecturer', [StudentExcusesController::class, 'approveByLecturer']);
         Route::post('notifications', [NotificationsController::class, 'store']);
-
+        Route::get('student-groups/{student_group}/students', [StudentGroupsController::class, 'students']);
         // UserTypes & Permissions
         Route::post('user-types', [UserTypeController::class, 'store']);
         Route::put('user-types/{userType}', [UserTypeController::class, 'update']);

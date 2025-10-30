@@ -7,10 +7,17 @@ use App\Models\Classroom;
 use Illuminate\Http\Request;
 
 class ClassroomsController extends Controller {
-    public function index(Request $request) {
-        $q = $request->query('q');
-        $query = Classroom::query()->with('building')->when($q, fn($qq) => $qq->where('classroom_name', 'like', "%{$q}%"));
-        return response()->json($query->get());
+// App\Http\Controllers\Api\V1\ClassroomsController.php
+    public function index(Request $request)
+    {
+        $q = Classroom::query();
+    
+        if ($request->filled('building_id')) {
+            $q->where('building_id', $request->building_id);
+        }
+    
+        return $q->orderBy('classroom_name')->get();
+        // أو ClassroomResource::collection($q->paginate()) لو تستخدم pagination
     }
     public function store(StoreClassroomRequest $request) {
         $classroom = Classroom::create($request->validated());
