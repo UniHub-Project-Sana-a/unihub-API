@@ -18,6 +18,14 @@ use Illuminate\Support\Facades\Http;
 
 class StudentGroupsController extends Controller
 {
+
+    public function index(Request $r) {
+  $q = StudentGroup::query()
+      ->select(['group_id','group_name','college_id']);
+  if ($r->filled('college_id')) $q->where('college_id', (int)$r->college_id);
+  if ($r->boolean('with_counts')) $q->withCount('students');
+  return response()->json($q->get());
+}
     // إنشاء/إيجاد مجموعة وإلحاق طلاب بها عبر academic_numbers
     public function upsertAndAttach(Request $request)
     {
