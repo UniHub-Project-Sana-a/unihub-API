@@ -3,379 +3,660 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\StudentGroup;
-use App\Models\Student;
-use App\Models\User;
-use App\Models\UserType;
-use App\Models\Department;
-use App\Models\Program;
-use App\Models\Level;
-use App\Models\Semester;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+use Illuminate\Support\Str;
 
 class StudentGroupsController extends Controller
 {
 
-    public function index(Request $r) {
-  $q = StudentGroup::query()
-      ->select(['group_id','group_name','college_id']);
-  if ($r->filled('college_id')) $q->where('college_id', (int)$r->college_id);
-  if ($r->boolean('with_counts')) $q->withCount('students');
-  return response()->json($q->get());
+    private function makeUniquePhone(): string
+{
+    // مثال سعودي 059XXXXXXX (7 أرقام عشوائية) مع التحقق من التفرد
+    do {
+        $candidate = '059' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT);
+    } while (DB::table('users')->where('phone', $candidate)->exists());
+
+    return $candidate;
 }
-    // إنشاء/إيجاد مجموعة وإلحاق طلاب بها عبر academic_numbers
+
+private function makePlaceholderEmail(?string $academic): string
+{
+    $base = $academic
+        ? strtolower(preg_replace('/[^a-z0-9]/i', '', $academic))
+        : ('std' . random_int(1000, 9999));
+
+    $candidate = $base . '@students.local';
+    $i = 0;
+
+    while (DB::table('users')->where('email', $candidate)->exists()) {
+        $i++;
+        $candidate = $base . $i . '@students.local';
+        if ($i > 100) { // ملاذ أخير
+            $candidate = 'std' . Str::uuid() . '@students.local';
+            break;
+        }
+    }
+    return $candidate;
+}
+
+
+    // GET /api/v1/student-groups?college_id=&department_id=&level_id=&semester_id=&with_counts=1
+    public function index(Request $request)
+    {
+        $q = DB::table('student_groups as g')->whereNull('g.deleted_at');
+
+        if ($request->filled('college_id'))    $q->where('g.college_id',    $request->integer('college_id'));
+        if ($request->filled('department_id')) $q->where('g.department_id', $request->integer('department_id'));
+        if ($request->filled('level_id'))      $q->where('g.level_id',      $request->integer('level_id'));
+        if ($request->filled('semester_id'))   $q->where('g.semester_id',   $request->integer('semester_id'));
+
+        $withCounts = (bool) $request->get('with_counts', false);
+
+        if ($withCounts) {
+            $q->leftJoin(
+                DB::raw('(SELECT group_id, COUNT(*) as students_count FROM student_group_members GROUP BY group_id) sgm'),
+                'sgm.group_id',
+                '=',
+                'g.group_id'
+            )->select('g.*', DB::raw('COALESCE(sgm.students_count,0) as students_count'));
+        } else {
+            $q->select('g.*');
+        }
+
+        $perPage = (int) $request->get('per_page', 100);
+        return response()->json($q->orderBy('g.group_name')->paginate($perPage));
+    }
+
+    // POST /api/v1/student-groups
+    public function store(Request $request)
+    {
+        // تأكيد الحقول وربطها بالمفاتيح الأجنبية الصحيحة
+        $data = $request->validate([
+            'college_id'    => 'required|integer|exists:colleges,college_id',
+            'department_id' => 'required|integer|exists:departments,department_id',
+            'level_id'      => 'required|integer|exists:levels,level_id',
+            'semester_id'   => 'required|integer|exists:semesters,semester_id',
+            'group_name'    => 'required|string|max:100',
+        ]);
+    
+        // تجهيز مفاتيح المسار + تنظيف الاسم
+        $path = [
+            'college_id'    => (int) $data['college_id'],
+            'department_id' => (int) $data['department_id'],
+            'level_id'      => (int) $data['level_id'],
+            'semester_id'   => (int) $data['semester_id'],
+            'group_name'    => trim($data['group_name']),
+        ];
+    
+        // 1) فحص وجود مجموعة فعّالة بنفس المسار (تجاهل المحذوفة Soft)
+        $activeDup = DB::table('student_groups')
+            ->whereNull('deleted_at')
+            ->where($path)
+            ->first();
+    
+        if ($activeDup) {
+            return response()->json(['message' => 'Duplicate group for this path'], 409);
+        }
+    
+        // 2) فحص وجود مجموعة محذوفة Soft بنفس المسار → استرجاعها بدل إنشاء سجل جديد
+        $softDup = DB::table('student_groups')
+            ->whereNotNull('deleted_at')
+            ->where($path)
+            ->first();
+    
+        if ($softDup) {
+            DB::table('student_groups')
+                ->where('group_id', $softDup->group_id)
+                ->update([
+                    'deleted_at' => null,
+                    'updated_at' => now(),
+                ]);
+    
+            $restored = DB::table('student_groups')->where('group_id', $softDup->group_id)->first();
+    
+            return response()->json([
+                'status'  => 'restored',
+                'group'   => $restored,
+                'message' => 'Group restored from soft delete',
+            ], 200);
+        }
+    
+        // 3) الإدراج الفعلي
+        try {
+            $id = DB::table('student_groups')->insertGetId([
+                'college_id'    => $path['college_id'],
+                'department_id' => $path['department_id'],
+                'level_id'      => $path['level_id'],
+                'semester_id'   => $path['semester_id'],
+                'group_name'    => $path['group_name'],
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
+    
+            $group = DB::table('student_groups')->where('group_id', $id)->first();
+    
+            return response()->json([
+                'group_id' => $id,
+                'group'    => $group,
+            ], 201);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // تعارض المفتاح الفريد فعلاً (unique_group_per_path) → 409
+            if ($e->getCode() === '23000' && str_contains($e->getMessage(), 'unique_group_per_path')) {
+                return response()->json(['message' => 'Duplicate group for this path'], 409);
+            }
+            // أخطاء قاعدة بيانات أخرى → 500 مع تسجيل الحدث
+            Log::error('student_groups.store DB error', [
+                'code' => $e->getCode(),
+                'info' => $e->errorInfo,
+                'msg'  => $e->getMessage(),
+            ]);
+    
+            return response()->json([
+                'message'  => 'DB error',
+                'sqlstate' => $e->getCode(),
+            ], 500);
+        }
+    }
+
+    // GET /api/v1/student-groups/{group}
+    public function show($group)
+    {
+        $row = DB::table('student_groups')
+            ->where('group_id', (int)$group)
+            ->whereNull('deleted_at')
+            ->first();
+
+        return $row ? response()->json($row) : response()->json(['message' => 'Not found'], 404);
+    }
+
+    // PUT/PATCH /api/v1/student-groups/{group}
+    public function update(Request $request, $group)
+    {
+        $exists = DB::table('student_groups')
+            ->where('group_id', (int)$group)
+            ->whereNull('deleted_at')
+            ->exists();
+
+        if (!$exists) return response()->json(['message' => 'Not found'], 404);
+
+        $data = $request->validate([
+            'college_id'    => 'sometimes|integer|exists:colleges,college_id',
+            'department_id' => 'sometimes|integer|exists:departments,department_id',
+            'level_id'      => 'sometimes|integer|exists:levels,level_id',
+            'semester_id'   => 'sometimes|integer|exists:semesters,semester_id',
+            'group_name'    => 'sometimes|string|max:100',
+        ]);
+
+        $data['updated_at'] = now();
+
+        try {
+            DB::table('student_groups')->where('group_id', (int)$group)->update($data);
+            return response()->json(['message' => 'Updated']);
+        } catch (Throwable $e) {
+            return response()->json(['message' => 'Duplicate group for this path', 'error' => $e->getMessage()], 409);
+        }
+    }
+
+    // DELETE /api/v1/student-groups/{group}
+    public function destroy($group)
+    {
+        // Soft delete
+        $deleted = DB::table('student_groups')
+            ->where('group_id', (int)$group)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now(), 'updated_at' => now()]);
+
+        return $deleted ? response()->json(['message' => 'Deleted']) : response()->json(['message' => 'Not found'], 404);
+    }
+
+    // POST /api/v1/student-groups/upsert-and-attach
     public function upsertAndAttach(Request $request)
     {
+        // التحقق من صحة المُدخلات وربطها بالمفاتيح الأجنبية
         $data = $request->validate([
-            'college_id'         => ['required','integer','exists:colleges,college_id'],
-            'group_name'         => ['required','string','max:100'],
-            'academic_numbers'   => ['required','array','min:1'],
-            'academic_numbers.*' => ['string','max:50'],
+            'college_id'    => 'required|integer|exists:colleges,college_id',
+            'department_id' => 'required|integer|exists:departments,department_id',
+            'level_id'      => 'required|integer|exists:levels,level_id',
+            'semester_id'   => 'required|integer|exists:semesters,semester_id',
+            'group_name'    => 'required|string|max:100',
         ]);
-
-        $group = StudentGroup::firstOrCreate(
-            ['college_id' => $data['college_id'], 'group_name' => $data['group_name']],
-            []
-        );
-
-        $studentIds = Student::query()
-            ->where('college_id', $data['college_id'])
-            ->whereHas('user', fn($uq) => $uq->whereIn('academic_number', $data['academic_numbers']))
-            ->pluck('student_id')
-            ->all();
-
-        $group->students()->syncWithoutDetaching($studentIds);
-
-        return response()->json([
-            'message'   => 'Attached',
-            'group_id'  => $group->group_id,
-            'attached'  => count($studentIds),
-        ]);
-    }
-
-    // استيراد CSV: ينشئ Users (نوع student) + Students ثم يلحِقهم بالمجموعة
-    public function importCsv(Request $request)
-    {
-        $data = $request->validate([
-            'college_id'    => ['required','integer','exists:colleges,college_id'],
-            'department_id' => ['required','integer','exists:departments,department_id'],
-            'program_id'    => ['required','integer','exists:programs,program_id'],
-            'level_id'      => ['required','integer','exists:levels,level_id'],
-            'semester_id'   => ['nullable','integer','exists:semesters,semester_id'],
-            'course_id'     => ['nullable','integer'], // اختياري
-            'cohort'        => ['required','string','max:50'],
-            'group_name'    => ['required','string','max:100'],
-            'file'          => ['required','file','mimes:csv,txt','max:10240'],
-        ]);
-
-        $path = $request->file('file')->getRealPath();
-
-        $studentType = UserType::firstOrCreate(
-            ['user_type_code' => 'student'],
-            ['user_type_name' => 'طالب']
-        );
-
-        $imported = 0; $updated = 0; $skipped = 0; $errors = [];
-
-        if (($h = fopen($path, 'r')) === false) {
-            return response()->json(['message' => 'تعذر قراءة الملف'], 422);
-        }
-
-        $header = fgetcsv($h, 0, ',');
-        if (!$header) {
-            fclose($h);
-            return response()->json(['message' => 'ملف CSV بدون رؤوس أعمدة'], 422);
-        }
-
-        $header = array_map(fn($x) => trim(mb_strtolower($x)), $header);
-        $idx = [
-            'full_name'       => array_search('full_name', $header),
-            'email'           => array_search('email', $header),
-            'phone'           => array_search('phone', $header),
-            'academic_number' => array_search('academic_number', $header),
-            'gender'          => array_search('gender', $header),
-            'status'          => array_search('status', $header),
+    
+        // توحيد المسار + تنظيف الاسم
+        $path = [
+            'college_id'    => (int) $data['college_id'],
+            'department_id' => (int) $data['department_id'],
+            'level_id'      => (int) $data['level_id'],
+            'semester_id'   => (int) $data['semester_id'],
+            'group_name'    => trim($data['group_name']),
         ];
-
-        DB::beginTransaction();
+    
+        // 1) هل هناك مجموعة فعّالة (غير محذوفة) بهذا المسار؟
+        $existing = DB::table('student_groups')
+            ->whereNull('deleted_at')
+            ->where($path)
+            ->first();
+    
+        if ($existing) {
+            return response()->json([
+                'status'  => 'exists',
+                'group'   => $existing,
+                'message' => 'Group already exists for this path',
+            ], 200);
+        }
+    
+        // 2) هل هناك مجموعة محذوفة Soft بنفس المسار؟ إن وُجدت نعيد تفعيلها
+        $soft = DB::table('student_groups')
+            ->whereNotNull('deleted_at')
+            ->where($path)
+            ->first();
+    
+        if ($soft) {
+            DB::table('student_groups')
+                ->where('group_id', $soft->group_id)
+                ->update([
+                    'deleted_at' => null,
+                    'updated_at' => now(),
+                ]);
+    
+            $restored = DB::table('student_groups')->where('group_id', $soft->group_id)->first();
+    
+            return response()->json([
+                'status'  => 'restored',
+                'group'   => $restored,
+                'message' => 'Group restored from soft delete',
+            ], 200);
+        }
+    
+        // 3) إنشاء مجموعة جديدة
         try {
-            $studentIds = [];
-
-            $rowNum = 1;
-            while (($row = fgetcsv($h, 0, ',')) !== false) {
-                $rowNum++;
-                if (count(array_filter($row, fn($v) => trim((string)$v) !== '')) === 0) continue;
-
-                $get = function (string $k) use ($idx, $row) {
-                    $i = $idx[$k];
-                    return $i === false ? null : trim((string)($row[$i] ?? ''));
-                };
-
-                $fullName  = $get('full_name');
-                $email     = $get('email');
-                $phone     = $get('phone');
-                $acadNo    = $get('academic_number');
-                $genderVal = $get('gender');
-                $statusVal = $get('status');
-
-                if (!$fullName || !$email || !$phone || !$acadNo || !$genderVal) {
-                    $skipped++; $errors[] = "سطر {$rowNum}: حقول مطلوبة ناقصة (full_name,email,phone,academic_number,gender)";
-                    continue;
-                }
-
-                $gender = $this->mapGender($genderVal);     // 1/2
-                $status = $this->mapStatus($statusVal);     // true/false
-                if ($gender === null) {
-                    $skipped++; $errors[] = "سطر {$rowNum}: gender غير صالح";
-                    continue;
-                }
-
-                $res = $this->upsertUserAndStudent([
-                    'full_name'   => $fullName,
-                    'email'       => $email,
-                    'phone'       => $phone,
-                    'academic_no' => $acadNo,
-                    'gender'      => $gender,
-                    'status'      => $status,
-                    'college_id'  => (int) $data['college_id'],
-                    'department_id' => (int) $data['department_id'],
-                    'program_id'    => (int) $data['program_id'],
-                    'level_id'      => (int) $data['level_id'],
-                    // يمكنك تخزين cohort/semester_id/course_id في جداول أخرى عند الحاجة
-                ], $studentType->user_type_id, $rowNum);
-
-                if ($res['ok']) {
-                    $studentIds[] = $res['student_id'];
-                    $res['created'] ? $imported++ : $updated++;
-                } else {
-                    $skipped++; $errors[] = $res['error'];
-                }
+            $id = DB::table('student_groups')->insertGetId([
+                'college_id'    => $path['college_id'],
+                'department_id' => $path['department_id'],
+                'level_id'      => $path['level_id'],
+                'semester_id'   => $path['semester_id'],
+                'group_name'    => $path['group_name'],
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
+    
+            $group = DB::table('student_groups')->where('group_id', $id)->first();
+    
+            return response()->json([
+                'status'  => 'created',
+                'group'   => $group,
+                'message' => 'Group created successfully',
+            ], 201);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // في حال حصل تعارض فريد (بسبب سباق طلبات)، ارجع المجموعة الموجودة بدلاً من الخطأ
+            if ($e->getCode() === '23000' && str_contains($e->getMessage(), 'unique_group_per_path')) {
+                $dup = DB::table('student_groups')->whereNull('deleted_at')->where($path)->first()
+                    ?: DB::table('student_groups')->where($path)->first();
+    
+                return response()->json([
+                    'status'  => 'exists',
+                    'group'   => $dup,
+                    'message' => 'Group already exists for this path',
+                ], 200);
             }
-
-            // upsert group + attach students
-            $group = StudentGroup::firstOrCreate(
-                ['college_id' => (int)$data['college_id'], 'group_name' => $data['group_name']],
-                []
-            );
-            $group->students()->syncWithoutDetaching($studentIds);
-
-            DB::commit();
+    
+            Log::error('student_groups.upsertAndAttach DB error', [
+                'code' => $e->getCode(),
+                'info' => $e->errorInfo,
+                'msg'  => $e->getMessage(),
+            ]);
+    
+            return response()->json([
+                'message'  => 'DB error',
+                'sqlstate' => $e->getCode(),
+            ], 500);
         } catch (\Throwable $e) {
-            DB::rollBack();
-            fclose($h);
-            return response()->json(['message' => 'فشل الاستيراد', 'error' => $e->getMessage()], 500);
+            Log::error('student_groups.upsertAndAttach error', ['msg' => $e->getMessage()]);
+            return response()->json(['message' => 'Server error'], 500);
         }
-
-        fclose($h);
-
-        return response()->json([
-            'message'  => 'تمت عملية الاستيراد',
-            'imported' => $imported,
-            'updated'  => $updated,
-            'skipped'  => $skipped,
-            'errors'   => $errors,
-        ]);
     }
 
-    // استيراد من مصدر خارجي (JSON)
-    public function importExternal(Request $request)
+    // GET /api/v1/student-groups/{group}/students
+    public function students($group)
     {
-        $data = $request->validate([
-            'source_url'   => ['required','url'],
-            'college_id'   => ['required','integer','exists:colleges,college_id'],
-            'department_id'=> ['required','integer','exists:departments,department_id'],
-            'program_id'   => ['required','integer','exists:programs,program_id'],
-            'level_id'     => ['required','integer','exists:levels,level_id'],
-            'semester_id'  => ['nullable','integer','exists:semesters,semester_id'],
-            'course_id'    => ['nullable','integer'],
-            'cohort'       => ['required','string','max:50'],
-            'group_name'   => ['required','string','max:100'],
-        ]);
+        $rows = DB::table('student_group_members as sgm')
+            ->join('students as s', 's.student_id', '=', 'sgm.student_id')
+            ->join('users as u', 'u.user_id', '=', 's.user_id')
+            ->where('sgm.group_id', (int)$group)
+            ->select(
+                's.student_id',
+                'u.full_name',
+                'u.academic_number',
+                'u.gender'
+            )
+            ->orderBy('u.full_name')
+            ->get();
 
-        $studentType = UserType::firstOrCreate(
-            ['user_type_code' => 'student'],
-            ['user_type_name' => 'طالب']
-        );
-
-        $resp = Http::timeout(30)->get($data['source_url']);
-        if (!$resp->ok()) {
-            return response()->json(['message' => 'تعذر جلب البيانات من المصدر الخارجي'], 422);
-        }
-
-        $rows = $resp->json();
-        if (!is_array($rows)) {
-            return response()->json(['message' => 'تنسيق بيانات غير مدعوم من المصدر الخارجي'], 422);
-        }
-
-        $imported=0; $updated=0; $skipped=0; $errors=[];
-
-        DB::beginTransaction();
-        try {
-            $studentIds = [];
-
-            $rowNum = 0;
-            foreach ($rows as $row) {
-                $rowNum++;
-                $fullName  = trim((string)($row['full_name'] ?? ''));
-                $email     = trim((string)($row['email'] ?? ''));
-                $phone     = trim((string)($row['phone'] ?? ''));
-                $acadNo    = trim((string)($row['academic_number'] ?? ''));
-                $genderVal = trim((string)($row['gender'] ?? ''));
-                $statusVal = trim((string)($row['status'] ?? '1'));
-
-                if (!$fullName || !$email || !$phone || !$acadNo || !$genderVal) {
-                    $skipped++; $errors[] = "سطر {$rowNum}: حقول مطلوبة ناقصة";
-                    continue;
-                }
-
-                $gender = $this->mapGender($genderVal);
-                $status = $this->mapStatus($statusVal);
-                if ($gender === null) {
-                    $skipped++; $errors[] = "سطر {$rowNum}: gender غير صالح";
-                    continue;
-                }
-
-                $res = $this->upsertUserAndStudent([
-                    'full_name'   => $fullName,
-                    'email'       => $email,
-                    'phone'       => $phone,
-                    'academic_no' => $acadNo,
-                    'gender'      => $gender,
-                    'status'      => $status,
-                    'college_id'  => (int) $data['college_id'],
-                    'department_id' => (int) $data['department_id'],
-                    'program_id'    => (int) $data['program_id'],
-                    'level_id'      => (int) $data['level_id'],
-                ], $studentType->user_type_id, $rowNum);
-
-                if ($res['ok']) {
-                    $studentIds[] = $res['student_id'];
-                    $res['created'] ? $imported++ : $updated++;
-                } else {
-                    $skipped++; $errors[] = $res['error'];
-                }
-            }
-
-            $group = StudentGroup::firstOrCreate(
-                ['college_id' => (int)$data['college_id'], 'group_name' => $data['group_name']],
-                []
-            );
-            $group->students()->syncWithoutDetaching($studentIds);
-
-            DB::commit();
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'فشل الاستيراد', 'error' => $e->getMessage()], 500);
-        }
-
-        return response()->json([
-            'message'  => 'تمت عملية الاستيراد',
-            'imported' => $imported,
-            'updated'  => $updated,
-            'skipped'  => $skipped,
-            'errors'   => $errors,
-        ]);
-    }
-
-    // Helpers
-    private function upsertUserAndStudent(array $data, int $studentTypeId, int $rowNum): array
-    {
-        // ابحث المستخدم عبر academic_number أولًا
-        $user = User::where('academic_number', $data['academic_no'])->first();
-
-        // تحقق تضارب email/phone لمستخدم آخر
-        if ($user) {
-            $emailUsedByOther = User::where('email', $data['email'])->where('user_id', '!=', $user->user_id)->exists();
-            if ($emailUsedByOther) return ['ok'=>false, 'error'=>"سطر {$rowNum}: البريد مستخدم بواسطة مستخدم آخر"];
-            $phoneUsedByOther = User::where('phone', $data['phone'])->where('user_id', '!=', $user->user_id)->exists();
-            if ($phoneUsedByOther) return ['ok'=>false, 'error'=>"سطر {$rowNum}: رقم الجوال مستخدم بواسطة مستخدم آخر"];
-
-            $user->update([
-                'full_name'    => $data['full_name'],
-                'email'        => $data['email'],
-                'phone'        => $data['phone'],
-                'college_id'   => $data['college_id'],
-                'gender'       => $data['gender'],
-                'user_type_id' => $studentTypeId,
-            ]);
-            $created = false;
-        } else {
-            if (User::where('email', $data['email'])->exists())  return ['ok'=>false, 'error'=>"سطر {$rowNum}: البريد مستخدم بالفعل"];
-            if (User::where('phone', $data['phone'])->exists())  return ['ok'=>false, 'error'=>"سطر {$rowNum}: رقم الجوال مستخدم بالفعل"];
-
-            $user = User::create([
-                'full_name'       => $data['full_name'],
-                'email'           => $data['email'],
-                'phone'           => $data['phone'],
-                'college_id'      => $data['college_id'],
-                'password'        => Hash::make('12345678'),
-                'academic_number' => $data['academic_no'],
-                'gender'          => $data['gender'],
-                'user_type_id'    => $studentTypeId,
-            ]);
-            $created = true;
-        }
-
-        // upsert Student
-        $student = Student::where('user_id', $user->user_id)->first();
-        if ($student) {
-            $student->update([
-                'college_id'    => $data['college_id'],
-                'department_id' => $data['department_id'],
-                'program_id'    => $data['program_id'] ?? null,
-                'level_id'      => $data['level_id'],
-                'status'        => $data['status'],
-            ]);
-        } else {
-            $student = Student::create([
-                'user_id'       => $user->user_id,
-                'college_id'    => $data['college_id'],
-                'department_id' => $data['department_id'],
-                'program_id'    => $data['program_id'] ?? null,
-                'level_id'      => $data['level_id'],
-                'status'        => $data['status'],
-            ]);
-        }
-
-        return ['ok'=>true, 'created'=>$created, 'student_id'=>$student->student_id];
-    }
-
-    private function mapGender($val): ?int
-    {
-        if ($val === null) return null;
-        $v = mb_strtolower(trim((string)$val));
-        return match ($v) {
-            '1', 'm', 'ذكر' => 1,
-            '2', 'f', 'أنثى', 'انثى' => 2,
-            default => null,
-        };
-    }
-
-    private function mapStatus($val): bool
-    {
-        $v = mb_strtolower(trim((string)$val));
-        return in_array($v, ['1','true','نشط','active','yes','y'], true);
-    }
-
-    public function students(\App\Models\StudentGroup $student_group)
-{
-    $students = $student_group->students()
-        ->with(['user:user_id,full_name,gender,academic_number'])
-        ->get()
-        ->map(function ($s) {
+        // نعيد user ككائن متداخل كما تتوقع الواجهة
+        $out = $rows->map(function ($r) {
             return [
-                'student_id' => $s->student_id,
+                'student_id' => $r->student_id,
                 'user' => [
-                    'full_name' => $s->user?->full_name,
-                    'gender' => $s->user?->gender,
-                    'academic_number' => $s->user?->academic_number,
+                    'full_name'       => $r->full_name,
+                    'academic_number' => $r->academic_number,
+                    'gender'          => (int)$r->gender,
                 ],
             ];
         });
 
-    return response()->json($students);
-}
+        return response()->json($out);
+    }
+
+    // DELETE /api/v1/student-groups/{group}/students  body: { student_id: ... }
+    public function detachStudent(Request $request, $group)
+    {
+        $data = $request->validate([
+            'student_id' => 'required|integer|exists:students,student_id',
+        ]);
+
+        $deleted = DB::table('student_group_members')
+            ->where('group_id', (int)$group)
+            ->where('student_id', $data['student_id'])
+            ->delete();
+
+        return response()->json(['deleted' => (bool)$deleted]);
+    }
+
+    // POST /api/v1/student-groups/import-csv (form-data: file, group_id)
+    public function importCsv(\Illuminate\Http\Request $request)
+    {
+        // 1) التحقق من المدخلات (csv/txt + xlsx/xls)
+        $request->validate([
+            'file'     => 'required|file|mimes:csv,txt,xlsx,xls|max:20480',
+            'group_id' => 'required|integer|exists:student_groups,group_id',
+        ]);
+    
+        // Helpers محلية
+        $normalizeHeader = function (string $h): string {
+            $h = trim($h);
+            $h = preg_replace('/\s+/u', ' ', $h);
+            $h = mb_strtolower($h);
+            return match ($h) {
+                'student_id', 'id', 'رقم_الطالب', 'رقم الطالب' => 'student_id',
+                'academic_number', 'student_no', 'student number', 'رقم_جامعي', 'الرقم الجامعي', 'رقم الجامعي' => 'academic_number',
+                'full_name', 'name', 'الاسم', 'اسم' => 'full_name',
+                'email', 'البريد', 'البريد الالكتروني', 'البريد الإلكتروني', 'الإيميل', 'الايميل' => 'email',
+                'phone', 'رقم', 'الجوال', 'الهاتف', 'رقم الجوال', 'رقم الهاتف' => 'phone',
+                'gender', 'الجنس', 'sex', 'type' => 'gender',
+                default => $h,
+            };
+        };
+    
+        $parseGender = function ($v): int {
+            if ($v === null) return 0;
+            if (is_bool($v)) return $v ? 1 : 0;
+            if (is_numeric($v)) return ((int)$v) > 0 ? 1 : 0;
+            $s = mb_strtolower(trim((string)$v));
+            $s = strtr($s, ['أ'=>'ا','إ'=>'ا','آ'=>'ا','ى'=>'ي','ة'=>'ه','ـ'=>'']);
+            $maleSet   = ['1','m','male','man','boy','ذكر','ذ','ذكور'];
+            $femaleSet = ['0','f','female','woman','girl','انثى','انثي','انث','اناث','بنت','فتاه','فتاة','نساء','سيده','امرأه','امراه','ا'];
+            if (in_array($s, $maleSet, true)) return 1;
+            if (in_array($s, $femaleSet, true)) return 0;
+            $c = mb_substr($s, 0, 1);
+            if ($c === 'm' || $c === 'ذ') return 1;
+            if ($c === 'f' || $c === 'ا' || $c === 'ب') return 0;
+            return 0;
+        };
+    
+        $makeAcademicNumberFromEmail = function (string $email): string {
+            [$local] = explode('@', $email, 2);
+            $base = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $local));
+            if ($base === '') $base = 'STD' . random_int(1000, 9999);
+            $candidate = $base; $maxLen = 50; $i = 0;
+            while (\Illuminate\Support\Facades\DB::table('users')->where('academic_number', $candidate)->exists()) {
+                $i++;
+                $suffix = (string) $i;
+                $candidate = substr($base, 0, $maxLen - strlen($suffix)) . $suffix;
+                if ($i > 20) {
+                    $suffix = (string) random_int(1000, 999999);
+                    $candidate = substr($base, 0, $maxLen - strlen($suffix)) . $suffix;
+                }
+                if ($i > 40) {
+                    $suffix = date('ymdHis');
+                    $candidate = substr($base, 0, $maxLen - strlen($suffix)) . $suffix;
+                    break;
+                }
+            }
+            return $candidate;
+        };
+    
+        $groupId = (int) $request->group_id;
+    
+        // 2) مسار المجموعة + user_type للطلاب
+        $group = \Illuminate\Support\Facades\DB::table('student_groups')->where('group_id', $groupId)->first();
+        if (!$group) return response()->json(['message' => 'Group not found'], 404);
+    
+        $studentTypeId =
+            \Illuminate\Support\Facades\DB::table('user_types')->where('user_type_code', 'STUDENT')->value('user_type_id')
+            ?: \Illuminate\Support\Facades\DB::table('user_types')->where('user_type_name', 'طالب')->value('user_type_id');
+        if (!$studentTypeId) return response()->json(['message' => 'Student user type not configured (STUDENT/طالب)'], 422);
+    
+        // 3) قراءة الملف (Excel أو CSV)
+        $file = $request->file('file');
+        $path = $file->getPathname(); // أدق في بعض البيئات
+        $ext  = strtolower($file->getClientOriginalExtension());
+    
+        $rows = [];
+        if (in_array($ext, ['xlsx','xls'])) {
+            try {
+                if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
+                    return response()->json(['message' => 'PhpSpreadsheet not installed'], 500);
+                }
+                $type = \PhpOffice\PhpSpreadsheet\IOFactory::identify($path);
+                $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader($type);
+                $reader->setReadDataOnly(true);
+                $spreadsheet = $reader->load($path);
+                $sheet = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+    
+                if (!$sheet || count($sheet) < 2) {
+                    return response()->json(['message' => 'Empty Excel sheet'], 422);
+                }
+    
+                $header = array_map(fn($h) => $normalizeHeader((string)$h), array_values($sheet[1]));
+                $rowCount = count($sheet);
+                for ($i = 2; $i <= $rowCount; $i++) {
+                    $line = array_values($sheet[$i] ?? []);
+                    if (!array_filter($line, fn($v) => $v !== null && trim((string)$v) !== '')) continue;
+                    $row = [];
+                    foreach ($header as $idx => $key) {
+                        $row[$key] = isset($line[$idx]) ? trim((string)$line[$idx]) : null;
+                    }
+                    $rows[] = $row;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to read Excel', ['err' => $e->getMessage()]);
+                return response()->json([
+                    'message' => 'Failed to read Excel file',
+                    'error'   => $e->getMessage(),
+                ], 422);
+            }
+        } else {
+            // CSV/TXT
+            $handle = fopen($path, 'r');
+            if (!$handle) return response()->json(['message' => 'Cannot open file'], 422);
+            $first = fgets($handle);
+            if ($first === false) { fclose($handle); return response()->json(['message' => 'Empty file'], 422); }
+            $delimiter = str_contains($first, ';') ? ';' : ',';
+            $first = preg_replace('/^\xEF\xBB\xBF/', '', $first);
+            $header = array_map(fn($h) => $normalizeHeader($h), str_getcsv($first, $delimiter));
+            while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
+                if (count(array_filter($data, fn($v) => $v !== null && trim((string)$v) !== '')) === 0) continue;
+                $row = [];
+                foreach ($header as $i => $key) {
+                    $row[$key] = isset($data[$i]) ? trim((string)$data[$i]) : null;
+                }
+                $rows[] = $row;
+            }
+            fclose($handle);
+        }
+    
+        // 4) عدادات
+        $createdUsers = 0; $restoredUsers = 0; $createdStudents = 0; $restoredStudents = 0; $attached = 0; $skippedMissing = 0; $skippedConflicts = 0; $errors = [];
+        $defaultPassword = env('DEFAULT_STUDENT_PASSWORD', '12345678');
+    
+        // 5) معالجة كل صف (إنشاء/استرجاع User + Student + الربط بالمجموعة)
+        foreach ($rows as $row) {
+            $academic = $row['academic_number'] ?? null;
+            $email    = $row['email'] ?? null;
+            $phone    = $row['phone'] ?? null;
+            $fullName = $row['full_name'] ?? null;
+            $genderV  = $row['gender'] ?? null;
+    
+            if (!$academic && !$email && !$phone) {
+                $skippedMissing++; $errors[] = ['reason' => 'missing_keys', 'row' => $row]; continue;
+            }
+    
+            // ابحث عن المستخدم
+            $user = null;
+            if ($academic) $user = \Illuminate\Support\Facades\DB::table('users')->where('academic_number', $academic)->first();
+            if (!$user && $email) $user = \Illuminate\Support\Facades\DB::table('users')->where('email', $email)->first();
+            if (!$user && $phone) $user = \Illuminate\Support\Facades\DB::table('users')->where('phone', $phone)->first();
+    
+            // أنشئ User عند عدم الوجود
+            if (!$user) {
+                if (!$fullName || !$email || !$phone || $genderV === null) {
+                    $skippedMissing++; $errors[] = ['reason' => 'missing_user_fields', 'row' => $row]; continue;
+                }
+                $gender = $parseGender($genderV);
+                $academicNumber = $academic ?: $makeAcademicNumberFromEmail($email);
+    
+                try {
+                    $userId = \Illuminate\Support\Facades\DB::table('users')->insertGetId([
+                        'full_name'       => $fullName,
+                        'email'           => $email,
+                        'phone'           => $phone,
+                        'college_id'      => $group->college_id,
+                        'password'        => \Illuminate\Support\Facades\Hash::make($defaultPassword),
+                        'academic_number' => $academicNumber,
+                        'gender'          => $gender,
+                        'user_type_id'    => $studentTypeId,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ]);
+                    $user = \Illuminate\Support\Facades\DB::table('users')->where('user_id', $userId)->first();
+                    $createdUsers++;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    \Illuminate\Support\Facades\Log::warning('importCsv user insert failed', ['msg' => $e->getMessage(), 'row' => $row]);
+                    $skippedConflicts++; continue;
+                }
+            } else {
+                if (!is_null($user->deleted_at)) {
+                    \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->update([
+                        'deleted_at' => null,
+                        'updated_at' => now(),
+                    ]);
+                    $user = \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->first();
+                    $restoredUsers++;
+                }
+            }
+    
+            // تأكد من وجود سجل الطالب
+            $student = \Illuminate\Support\Facades\DB::table('students')->where('user_id', $user->user_id)->first();
+            if (!$student) {
+                try {
+                    \Illuminate\Support\Facades\DB::table('students')->insert([
+                        'user_id'       => $user->user_id,
+                        'college_id'    => $group->college_id,
+                        'department_id' => $group->department_id,
+                        'level_id'      => $group->level_id,
+                        'program_id'    => null,
+                        'status'        => 1,
+                        'created_at'    => now(),
+                        'updated_at'    => now(),
+                    ]);
+                    $student = \Illuminate\Support\Facades\DB::table('students')->where('user_id', $user->user_id)->first();
+                    $createdStudents++;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    \Illuminate\Support\Facades\Log::warning('importCsv student insert failed', ['msg' => $e->getMessage(), 'row' => $row]);
+                    $skippedConflicts++; continue;
+                }
+            } else {
+                if (!is_null($student->deleted_at)) {
+                    \Illuminate\Support\Facades\DB::table('students')->where('student_id', $student->student_id)->update([
+                        'deleted_at' => null,
+                        'updated_at' => now(),
+                    ]);
+                    $student = \Illuminate\Support\Facades\DB::table('students')->where('student_id', $student->student_id)->first();
+                    $restoredStudents++;
+                }
+            }
+    
+            // 6) ربط الطالب بالمجموعة
+            try {
+                \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
+                    'student_id' => $student->student_id,
+                    'group_id'   => $groupId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $attached++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('importCsv attach failed', ['msg' => $e->getMessage(), 'row' => $row]);
+                $skippedConflicts++;
+            }
+        }
+    
+        // 7) النتيجة
+        return response()->json([
+            'status'             => 'success',
+            'created_users'      => $createdUsers,
+            'restored_users'     => $restoredUsers,
+            'created_students'   => $createdStudents,
+            'restored_students'  => $restoredStudents,
+            'attached_to_group'  => $attached,
+            'skipped_missing'    => $skippedMissing,
+            'skipped_conflicts'  => $skippedConflicts,
+            'errors'             => $errors,
+        ]);
+    }
+
+    // POST /api/v1/student-groups/import-external (Placeholder)
+    public function importExternal(Request $request)
+    {
+        $request->validate([
+            'url'      => 'required|url',
+            'group_id' => 'required|integer|exists:student_groups,group_id',
+        ]);
+
+        return response()->json([
+            'message' => 'Import from external API is not enabled yet.',
+        ], 501);
+    }
+
+    private function normalizeHeader(string $h): string
+    {
+        // تنظيف مبسط للاسم
+        $h = trim($h);
+        $h = preg_replace('/\s+/u', ' ', $h);
+        $h = mb_strtolower($h);
+    
+        return match ($h) {
+            // معرف الطالب
+            'student_id', 'id', 'رقم_الطالب', 'رقم الطالب' => 'student_id',
+    
+            // الرقم الجامعي
+            'academic_number', 'student_no', 'student number', 'رقم_جامعي', 'الرقم الجامعي', 'رقم الجامعي' => 'academic_number',
+    
+            // الاسم
+            'full_name', 'name', 'الاسم', 'اسم' => 'full_name',
+    
+            // البريد الإلكتروني
+            'email', 'البريد', 'البريد الالكتروني', 'البريد الإلكتروني', 'الإيميل', 'الايميل' => 'email',
+    
+            // الجوال/الهاتف
+            'phone', 'رقم', 'الجوال', 'الهاتف', 'رقم الجوال', 'رقم الهاتف' => 'phone',
+    
+            // الجنس
+            'gender', 'الجنس', 'sex', 'type' => 'gender',
+    
+            default => $h,
+        };
+    }
 }

@@ -3,50 +3,82 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\LectureSession;
-use App\Models\QrCode;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\QrCode;
+use App\Models\TimetableEntry;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class QrCodesController extends Controller
 {
-    /**
-     * يقوم بتحديث رمز QR، حيث يبطل القديم وينشئ واحدًا جديدًا.
-     */
-    public function refreshQrCode(Request $request)
+    public function startSession(Request $request)
     {
-        $request->validate([
-            'session_code' => ['required', 'string', 'exists:lecture_sessions,session_code'],
-            'old_qr_code' => ['required', 'string', 'exists:qr_codes,qr_code_value'],
+        $data = $request->validate([
+            'entry_id'         => 'required|integer|exists:timetable_entries,entry_id',
+            'interval_seconds' => 'required|integer|min:5',
+            'valid_minutes'    => 'required|integer|min:1',
+            'latitude'         => 'required|numeric',
+            'longitude'        => 'required|numeric',
+            'allowed_distance' => 'required|numeric|min:1',
         ]);
 
-        // إبطال الرمز القديم
-        QrCode::where('qr_code_value', $request->old_qr_code)->update(['is_active' => false]);
+        $user = Auth::user();
+        if (!$user->lecturer) {
+            return response()->json(['message' => 'User is not a lecturer.'], 403);
+        }
 
-        $session = LectureSession::where('session_code', $request->session_code)->with('timetable.qrCode.refreshOption')->firstOrFail();
+        $entry = TimetableEntry::where('entry_id', $data['entry_id'])
+            ->where('lecturer_id', $user->lecturer->lecturer_id)
+            ->firstOrFail();
 
-        $interval = $session->timetable?->qrCode?->refreshOption?->interval_seconds ?? 15;
+        QrCode::where('entry_id', $data['entry_id'])->where('is_active', true)->update(['is_active' => false]);
+        
+        $qrCode = QrCode::create([
+            'entry_id'         => $data['entry_id'],
+            'qr_code_value'    => Str::random(32),
+            'expires_at'       => Carbon::now()->addMinutes($data['valid_minutes']),
+            'is_active'        => true,
+            'created_by'       => $user->lecturer->lecturer_id,
+            'latitude'         => $data['latitude'],
+            'longitude'        => $data['longitude'],
+            'allowed_distance' => $data['allowed_distance'],
+        ]);
 
-        // إنشاء رمز جديد
-        $newQrCode = $this->generateNewQrCode($session, $request, $interval);
-
-        return response()->json($newQrCode);
+        return response()->json($qrCode, 201);
     }
 
-    private function generateNewQrCode(LectureSession $session, Request $request, int $seconds = 15): QrCode
+    public function refresh(Request $request)
     {
-        $classroom = $session->timetable->classroom;
-        /** @var \App\Models\User $user */
-        $user = $request->user();
-
-        return QrCode::create([
-            'timetable_id' => $session->timetable_id,
-            'qr_code_value' => Str::random(40),
-            'expires_at' => now()->addSeconds($seconds),
-            'created_by' => $user->lecturer->lecturer_id,
-            'latitude' => $classroom->latitude,
-            'longitude' => $classroom->longitude,
-            'allowed_distance' => $classroom->allowed_distance,
+        $data = $request->validate([
+            'qr_code_value' => 'required|string|exists:qr_codes,qr_code_value', // <-- التغيير هنا
+            'valid_minutes' => 'required|integer|min:1',
         ]);
+        $oldQr = QrCode::where('qr_code_value', $data['qr_code_value'])->firstOrFail();
+    
+        $user = Auth::user();
+        // $oldQr = QrCode::findOrFail($data['qr_id']);
+    
+        // حماية: تأكد أن المحاضر هو من أنشأ الرمز القديم
+        if ($oldQr->created_by !== $user->lecturer->lecturer_id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+    
+        // إلغاء الرمز القديم
+        $oldQr->update(['is_active' => false]);
+    
+        // إنشاء رمز جديد بنفس بيانات الجلسة
+        $newQr = QrCode::create([
+            'entry_id'         => $oldQr->entry_id,
+            'qr_code_value'    => \Illuminate\Support\Str::random(32),
+            'expires_at'       => now()->addMinutes($data['valid_minutes']),
+            'is_active'        => true,
+            'created_by'       => $oldQr->created_by,
+            'latitude'         => $oldQr->latitude,
+            'longitude'        => $oldQr->longitude,
+            'allowed_distance' => $oldQr->allowed_distance,
+        ]);
+    
+        return response()->json($newQr, 201);
     }
 }

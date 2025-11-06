@@ -10,14 +10,27 @@ class ClassroomsController extends Controller {
 // App\Http\Controllers\Api\V1\ClassroomsController.php
     public function index(Request $request)
     {
-        $q = Classroom::query();
+        $query = Classroom::query();
     
-        if ($request->filled('building_id')) {
-            $q->where('building_id', $request->building_id);
+        // الفلترة حسب الكلية (عبر علاقة المبنى)
+        if ($request->filled('college_id')) {
+            $query->whereHas('building', function ($q) use ($request) {
+                $q->where('college_id', (int)$request->college_id);
+            });
         }
     
-        return $q->orderBy('classroom_name')->get();
-        // أو ClassroomResource::collection($q->paginate()) لو تستخدم pagination
+        // الفلترة حسب المبنى مباشرة (إذا تم تمريره)
+        if ($request->filled('building_id')) {
+            $query->where('building_id', (int)$request->building_id);
+        }
+        
+        // إذا كان الطلب يريد كل النتائج (للقوائم المنسدلة)
+        if ($request->query('all') === 'true') {
+            return response()->json($query->orderBy('classroom_name')->get());
+        }
+    
+        // الوضع الافتراضي مع pagination
+        return response()->json($query->orderBy('classroom_name')->paginate(15));
     }
     public function store(StoreClassroomRequest $request) {
         $classroom = Classroom::create($request->validated());

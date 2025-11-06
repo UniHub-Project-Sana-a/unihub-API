@@ -9,31 +9,45 @@ class OtpDeviceVerification extends Model
 {
     use HasFactory;
 
+    /**
+     * اسم الجدول في قاعدة البيانات.
+     */
     protected $table = 'otp_device_verifications';
-    protected $primaryKey = 'verification_id';
-    public $timestamps = true;
 
+    /**
+     * المفتاح الأساسي للجدول. Laravel يفترض أن يكون 'id' بشكل افتراضي.
+     * بما أن الـ migration تستخدم ->increments('verification_id')، يجب أن نحدده هنا.
+     */
+    protected $primaryKey = 'verification_id';
+
+    /**
+     * الحقول التي يمكن تعبئتها.
+     * يجب أن تطابق الأعمدة التي نرسلها في دالة create.
+     */
     protected $fillable = [
         'user_id',
         'otp_code',
         'device_name',
         'mac_address',
         'os_type',
-        'delivery_status',
-        'is_verified',
         'expires_at',
-        'created_at',
+        'is_verified', // نسمح بتحديث هذا الحقل
+        'delivery_status',
     ];
 
+    /**
+     * تحويل أنواع البيانات.
+     */
     protected $casts = [
-        'delivery_status' => 'integer',
         'is_verified' => 'boolean',
         'expires_at' => 'datetime',
-        'created_at' => 'datetime',
     ];
 
+    /**
+     * العلاقة مع المستخدم.
+     */
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id', 'user_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

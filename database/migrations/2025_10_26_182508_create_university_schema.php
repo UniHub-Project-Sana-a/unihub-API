@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. جداول أساسية لا تعتمد على غيرها
+        // 1) جداول أساسية
         Schema::create('colleges', function (Blueprint $table) {
             $table->increments('college_id');
             $table->string('college_name', 100);
@@ -37,24 +37,9 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-
         Schema::create('days', function (Blueprint $table) {
             $table->increments('day_id');
             $table->string('day_name', 20)->unique();
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
-        Schema::create('student_groups', function (Blueprint $table) {
-            $table->increments('group_id');
-            $table->unsignedInteger('college_id');          // ربط المجموعة بكلية
-            $table->string('group_name', 100);
-        
-            // قيود وإندكسات
-            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
-            $table->unique(['college_id', 'group_name'], 'unique_group_per_college'); // منع تكرار الاسم داخل الكلية
-            $table->index('college_id');
-        
             $table->timestamps();
             $table->softDeletes();
         });
@@ -78,7 +63,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 2. جداول تعتمد على الجداول الأساسية
+        // 2) جداول تعتمد على الأساسية
         Schema::create('users', function (Blueprint $table) {
             $table->increments('user_id');
             $table->string('full_name', 100)->index();
@@ -105,14 +90,13 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // بعد جدول departments مباشرة
         Schema::create('programs', function (Blueprint $table) {
             $table->increments('program_id');
-            $table->unsignedInteger('department_id');                   // البرنامج ينتمي لقسم
+            $table->unsignedInteger('department_id');
             $table->string('program_name', 50);
             $table->boolean('is_active')->default(true);
             $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
-            $table->unique(['department_id', 'program_name'], 'unique_program_per_department'); // منع تكرار الاسم داخل نفس القسم
+            $table->unique(['department_id', 'program_name'], 'unique_program_per_department');
             $table->timestamps();
             $table->softDeletes();
         });
@@ -121,19 +105,12 @@ return new class extends Migration
             $table->increments('title_id');
             $table->unsignedInteger('college_id');
             $table->string('title_name', 100);
-            $table->string('title_code', 50); // → بدون unique
+            $table->string('title_code', 50);
             $table->decimal('hourly_price', 10, 2);
             $table->decimal('lecture_price', 10, 2)->default(0.00);
-        
-            // ربط المفتاح الأجنبي بالكلية
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
-        
-            // منع تكرار title_code داخل نفس الكلية
             $table->unique(['college_id', 'title_code']);
-        
-            // منع تكرار title_name داخل نفس الكلية
             $table->unique(['college_id', 'title_name']);
-        
             $table->timestamps();
             $table->softDeletes();
         });
@@ -160,14 +137,14 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // 3. جداول تعتمد على ما سبق
+        // 3) مستويات ومحاضرون
         Schema::create('levels', function (Blueprint $table) {
             $table->increments('level_id');
-            $table->string('level_name', 50)->nullable(); // اختياري للاسم الوصفي
-            $table->unsignedInteger('program_id');        // المستوى ينتمي لبرنامج
-            $table->tinyInteger('level_number');          // رقم المستوى (1,2,3, ...)
+            $table->string('level_name', 50)->nullable();
+            $table->unsignedInteger('program_id');
+            $table->tinyInteger('level_number');
             $table->foreign('program_id')->references('program_id')->on('programs')->onDelete('cascade');
-            $table->unique(['program_id', 'level_number'], 'unique_program_level_number'); // عدم تكرار رقم المستوى داخل نفس البرنامج
+            $table->unique(['program_id', 'level_number'], 'unique_program_level_number');
             $table->timestamps();
             $table->softDeletes();
         });
@@ -204,7 +181,7 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // جداول الربط
+        // جداول ربط
         Schema::create('department_programs', function (Blueprint $table) {
             $table->unsignedInteger('department_id');
             $table->unsignedInteger('program_id');
@@ -225,36 +202,32 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 4. جداول تعتمد على المستويات والبرامج
+        // 4) فصول ومقررات وطلاب ومجموعات
         Schema::create('semesters', function (Blueprint $table) {
             $table->increments('semester_id');
             $table->string('semester_name', 50);
             $table->string('academic_year', 20);
             $table->unsignedInteger('level_id');
-            $table->tinyInteger('term_number'); // رقم الترم (1، 2، ..)
+            $table->tinyInteger('term_number');
             $table->foreign('level_id')->references('level_id')->on('levels')->onDelete('cascade');
-            $table->unique(['level_id', 'term_number'], 'unique_level_term_number'); // لا يتكرر نفس رقم الترم داخل نفس المستوى
+            $table->unique(['level_id', 'term_number'], 'unique_level_term_number');
             $table->timestamps();
             $table->softDeletes();
         });
 
-                Schema::create('courses', function (Blueprint $table) {
+        Schema::create('courses', function (Blueprint $table) {
             $table->increments('course_id');
             $table->string('course_name', 150);
             $table->string('course_code', 50)->unique();
             $table->tinyInteger('course_type')->default(0);
             $table->boolean('is_active')->default(true);
-        
-            // الربط الجديد مع الفصل
-            $table->unsignedInteger('semester_id');         // المادة تنتمي لفصل
-            $table->integer('credit_hours')->default(0);    // ساعات معتمدة
-            $table->boolean('is_elective')->default(false); // اختيارية؟
-            $table->unsignedInteger('department_id')->nullable(); // اختياري: قسم المادة
-            $table->string('notes', 500)->nullable();       // ملاحظات
-        
+            $table->unsignedInteger('semester_id');
+            $table->integer('credit_hours')->default(0);
+            $table->boolean('is_elective')->default(false);
+            $table->unsignedInteger('department_id')->nullable();
+            $table->string('notes', 500)->nullable();
             $table->foreign('semester_id')->references('semester_id')->on('semesters')->onDelete('cascade');
             $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('set null');
-        
             $table->timestamps();
             $table->softDeletes();
         });
@@ -275,47 +248,87 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
         });
-        
-        // 5. الجدول الدراسي (Timetable)
-        Schema::create('timetable', function (Blueprint $table) {
-            $table->increments('timetable_id');
+
+        Schema::create('student_groups', function (Blueprint $table) {
+            $table->increments('group_id');
+            $table->unsignedInteger('college_id');
+            $table->unsignedInteger('department_id');
+            $table->unsignedInteger('level_id');
+            $table->unsignedInteger('semester_id');
+            $table->string('group_name', 100);
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
+            $table->foreign('level_id')->references('level_id')->on('levels')->onDelete('cascade');
+            $table->foreign('semester_id')->references('semester_id')->on('semesters')->onDelete('cascade');
+            $table->unique(['college_id', 'department_id', 'level_id', 'semester_id', 'group_name'], 'unique_group_per_path');
+            $table->timestamps();
+            $table->softDeletes();
+        });
+
+        // 5) الجداول الخاصة بالجدول الدراسي (تصميم جديد)
+        // 5.1 حاوية الجدول
+        Schema::create('timetable_sets', function (Blueprint $table) {
+            $table->increments('schedule_id');
+            $table->unsignedInteger('college_id');
+            $table->unsignedInteger('semester_id')->nullable();
+            $table->unsignedInteger('department_id')->nullable(); // اختياري
+            $table->string('name', 100);
+            $table->date('start_date');
+            $table->date('end_date');
+            $table->unsignedTinyInteger('weeks_count')->default(12);
+            $table->enum('status', ['draft','published','archived'])->default('draft');
+            $table->boolean('is_primary')->default(false);
+            $table->string('notes', 255)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+            $table->foreign('semester_id')->references('semester_id')->on('semesters')->onDelete('cascade');
+            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
+
+            $table->index(['college_id','semester_id','department_id']);
+            $table->index(['status','is_primary']);
+        });
+
+        // 5.2 بنود الجدول الأسبوعية
+        Schema::create('timetable_entries', function (Blueprint $table) {
+            $table->increments('entry_id');
+            $table->unsignedInteger('schedule_id');
             $table->unsignedInteger('course_id');
             $table->unsignedInteger('lecturer_id');
             $table->unsignedInteger('group_id');
             $table->unsignedInteger('classroom_id');
             $table->unsignedInteger('day_id');
             $table->unsignedInteger('period_id');
-            $table->tinyInteger('lecture_type');
+            $table->tinyInteger('lecture_type')->default(0);
             $table->tinyInteger('status')->default(1);
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->string('academic_year', 20);
-            $table->unsignedInteger('college_id');
-            $table->unsignedInteger('department_id');
             $table->tinyInteger('gender_type')->default(0);
-            $table->decimal('lecture_hours', 4, 2);
+            $table->decimal('lecture_hours', 4, 2)->default(2.00);
+            $table->string('notes', 255)->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
-            // Foreign Keys
+            $table->foreign('schedule_id')->references('schedule_id')->on('timetable_sets')->onDelete('cascade');
             $table->foreign('course_id')->references('course_id')->on('courses')->onDelete('cascade');
             $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
             $table->foreign('group_id')->references('group_id')->on('student_groups')->onDelete('cascade');
             $table->foreign('classroom_id')->references('classroom_id')->on('classrooms')->onDelete('cascade');
             $table->foreign('day_id')->references('day_id')->on('days')->onDelete('cascade');
             $table->foreign('period_id')->references('period_id')->on('periods')->onDelete('cascade');
-            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
-            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
 
-            // Unique Constraints
-            $table->unique(['classroom_id', 'day_id', 'period_id'], 'unique_classroom_slot');
-            $table->unique(['lecturer_id', 'day_id', 'period_id'], 'unique_lecturer_slot');
-            $table->unique(['group_id', 'day_id', 'period_id'], 'unique_group_slot');
+            // قيود فريدة ضمن نفس الجدول فقط
+            $table->unique(['schedule_id','classroom_id','day_id','period_id'], 'uq_room_slot_in_schedule');
+            $table->unique(['schedule_id','lecturer_id','day_id','period_id'], 'uq_lecturer_slot_in_schedule');
+            $table->unique(['schedule_id','group_id','day_id','period_id'], 'uq_group_slot_in_schedule');
+
+            $table->index(['schedule_id','day_id','period_id'], 'idx_schedule_day_period');
+            $table->index(['schedule_id','group_id'], 'idx_schedule_group');
         });
 
-        // 6. جداول تعتمد على Timetable و Students/Lecturers
+        // 6) الجلسات والحضور تربط بالـ entry_id (بدلاً من timetable_id)
         Schema::create('lecture_sessions', function (Blueprint $table) {
             $table->increments('session_id');
-            $table->unsignedInteger('timetable_id');
+            $table->unsignedInteger('entry_id'); // جديد: مرجع إلى timetable_entries
             $table->date('session_date');
             $table->time('start_time');
             $table->time('end_time');
@@ -325,15 +338,17 @@ return new class extends Migration
             $table->tinyInteger('status')->default(0);
             $table->boolean('attendance_overage_alert')->default(false);
             $table->integer('system_attendance_count')->default(0);
-            $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
-            $table->foreign('actual_classroom_id')->references('classroom_id')->on('classrooms')->onDelete('set null');
             $table->timestamps();
+
+            $table->foreign('entry_id')->references('entry_id')->on('timetable_entries')->onDelete('cascade');
+            $table->foreign('actual_classroom_id')->references('classroom_id')->on('classrooms')->onDelete('set null');
+            $table->index(['entry_id','session_date']);
         });
 
         Schema::create('lecturer_attendance', function (Blueprint $table) {
             $table->increments('attendance_id');
             $table->unsignedInteger('lecturer_id');
-            $table->unsignedInteger('timetable_id');
+            $table->unsignedInteger('entry_id'); // بدل timetable_id
             $table->date('attendance_date')->index();
             $table->tinyInteger('status')->default(0);
             $table->tinyInteger('notification_status')->default(0);
@@ -341,7 +356,7 @@ return new class extends Migration
             $table->decimal('lecture_hours', 4, 2);
             $table->string('session_code', 50);
             $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
-            $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
+            $table->foreign('entry_id')->references('entry_id')->on('timetable_entries')->onDelete('cascade');
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
             $table->unique(['lecturer_id', 'session_code'], 'unique_lecturer_session');
             $table->timestamps();
@@ -350,7 +365,7 @@ return new class extends Migration
         Schema::create('student_attendance', function (Blueprint $table) {
             $table->increments('attendance_id');
             $table->unsignedInteger('student_id');
-            $table->unsignedInteger('timetable_id');
+            $table->unsignedInteger('entry_id'); // بدل timetable_id
             $table->date('attendance_date');
             $table->tinyInteger('status')->default(0);
             $table->tinyInteger('notification_status')->default(0);
@@ -358,7 +373,7 @@ return new class extends Migration
             $table->unsignedInteger('department_id');
             $table->string('session_code', 50);
             $table->foreign('student_id')->references('student_id')->on('students')->onDelete('cascade');
-            $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
+            $table->foreign('entry_id')->references('entry_id')->on('timetable_entries')->onDelete('cascade');
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
             $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
             $table->unique(['student_id', 'session_code'], 'unique_student_session');
@@ -377,7 +392,7 @@ return new class extends Migration
 
         Schema::create('qr_codes', function (Blueprint $table) {
             $table->increments('qr_id');
-            $table->unsignedInteger('timetable_id');
+            $table->unsignedInteger('entry_id'); // بدل timetable_id
             $table->unsignedInteger('refresh_option_id')->nullable();
             $table->string('qr_code_value');
             $table->dateTime('generated_at')->useCurrent();
@@ -387,13 +402,13 @@ return new class extends Migration
             $table->decimal('latitude', 10, 7);
             $table->decimal('longitude', 10, 7);
             $table->decimal('allowed_distance', 5, 2);
-            $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
+            $table->foreign('entry_id')->references('entry_id')->on('timetable_entries')->onDelete('cascade');
             $table->foreign('refresh_option_id')->references('option_id')->on('qr_refresh_options')->onDelete('set null');
             $table->foreign('created_by')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
             $table->timestamps();
         });
-        
-        // 7. جداول الطلبات والإشعارات
+
+        // 7) الطلبات والإشعارات
         Schema::create('lecturer_group_notifications', function (Blueprint $table) {
             $table->increments('notification_id');
             $table->unsignedInteger('lecturer_user_id');
@@ -440,7 +455,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 8. جداول الأجهزة والتوثيق
+        // 8) الأجهزة والتوثيق والنشاط
         Schema::create('user_devices', function (Blueprint $table) {
             $table->increments('device_id');
             $table->unsignedInteger('user_id');
@@ -457,7 +472,7 @@ return new class extends Migration
         Schema::create('otp_device_verifications', function (Blueprint $table) {
             $table->increments('verification_id');
             $table->unsignedInteger('user_id');
-            $table->string('otp_code', 10);
+            $table->string('otp_code', 255);
             $table->string('device_name', 100);
             $table->string('mac_address', 100);
             $table->string('os_type', 50);
@@ -477,6 +492,19 @@ return new class extends Migration
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
             $table->timestamps();
         });
+
+        Schema::create('timetable_import_logs', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('source', 50);
+            $table->integer('items')->default(0);
+            $table->string('status', 20);
+            $table->string('notes', 255)->nullable();
+            $table->unsignedInteger('user_id')->nullable();
+            $table->timestamps();
+            $table->foreign('user_id')->references('user_id')->on('users')->onDelete('set null');
+            $table->index('source');
+            $table->index('created_at');
+        });
     }
 
     /**
@@ -484,7 +512,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // الحذف بترتيب عكسي لتجنب مشاكل المفاتيح الأجنبية
+        // حذف بترتيب عكسي لاحترام قيود FK
         Schema::dropIfExists('user_activities');
         Schema::dropIfExists('otp_device_verifications');
         Schema::dropIfExists('user_devices');
@@ -495,7 +523,11 @@ return new class extends Migration
         Schema::dropIfExists('student_attendance');
         Schema::dropIfExists('lecturer_attendance');
         Schema::dropIfExists('lecture_sessions');
-        Schema::dropIfExists('timetable');
+
+        // الجداول الجديدة للجدول الدراسي
+        Schema::dropIfExists('timetable_entries');
+        Schema::dropIfExists('timetable_sets');
+
         Schema::dropIfExists('students');
         Schema::dropIfExists('semesters');
         Schema::dropIfExists('lecturers');
@@ -507,15 +539,16 @@ return new class extends Migration
         Schema::dropIfExists('user_type_permissions');
         Schema::dropIfExists('department_programs');
         Schema::dropIfExists('departments');
+        Schema::dropIfExists('timetable_import_logs');
         Schema::dropIfExists('users');
         Schema::dropIfExists('app_versions');
         Schema::dropIfExists('qr_refresh_options');
-        Schema::dropIfExists('student_groups');
         Schema::dropIfExists('days');
         Schema::dropIfExists('courses');
         Schema::dropIfExists('programs');
         Schema::dropIfExists('permissions');
         Schema::dropIfExists('user_types');
         Schema::dropIfExists('colleges');
+        Schema::dropIfExists('student_groups');
     }
 };

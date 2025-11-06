@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             PermissionsSeeder::class,
             UserTypesSeeder::class,
             SettingsSeeder::class,
+            DaysSeeder::class,
         ]);
 
         // 2. إنشاء عميل Passport
@@ -27,9 +28,9 @@ class DatabaseSeeder extends Seeder
         $adminType = UserType::where('user_type_code', 'admin')->first();
         if ($adminType) {
             User::create([
-                'full_name' => 'علاء حسين سعيد',
+                'full_name' => 'علاء حسين سعيد زيد علي',
                 'email' => 'ala.hussein002@gmail.com',
-                'phone' => '737131058',
+                'phone' => '711155980',
                 'password' => Hash::make('Admin@12345'),
                 'academic_number' => 'ADM0001',
                 'gender' => 0,

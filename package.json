@@ -16,6 +16,7 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
-        "@fingerprintjs/fingerprintjs": "^5.0.1"
+        "@fingerprintjs/fingerprintjs": "^5.0.1",
+        "react-qr-code": "^2.0.18"
     }
 }
