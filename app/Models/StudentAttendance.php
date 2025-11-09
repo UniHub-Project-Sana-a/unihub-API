@@ -13,9 +13,16 @@ class StudentAttendance extends Model
     protected $primaryKey = 'attendance_id';
     public $timestamps = true;
 
-    protected $fillable = [
-        'student_id','timetable_id','attendance_date','status','notification_status',
-        'college_id','department_id','session_code',
+     protected $fillable = [
+        'student_id',
+        'timetable_id',
+        'level_id',
+        'attendance_date',
+        'status',
+        'notification_status',
+        'college_id',
+        'department_id',
+        'session_code',
     ];
 
     protected $casts = [

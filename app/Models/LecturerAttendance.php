@@ -13,9 +13,15 @@ class LecturerAttendance extends Model
     protected $primaryKey = 'attendance_id';
     public $timestamps = true;
 
-    protected $fillable = [
-        'lecturer_id','timetable_id','attendance_date','status','notification_status',
-        'college_id','lecture_hours','session_code',
+     protected $fillable = [
+        'lecturer_id',
+        'timetable_id',
+        'attendance_date',
+        'status',
+        'notification_status',
+        'college_id',
+        'lecture_hours',
+        'session_code',
     ];
 
     protected $casts = [

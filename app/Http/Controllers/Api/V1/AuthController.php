@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Passport\Token;
 use App\Models\UserDevice;
 use App\Models\OtpDeviceVerification;
-use App\Notifications\SendOtpNotification; // تأكد أن هذا الإشعار موجود
+use App\Notifications\SendOtpNotification;
+ // تأكد أن هذا الإشعار موجود
 
 class AuthController extends Controller
 {
@@ -57,8 +58,14 @@ class AuthController extends Controller
             'expires_at'  => now()->addMinutes(10),
         ]);
     
-        // أرسل OTP (اختياري)
-        // try { $user->notify(new SendOtpNotification($otp)); } catch (\Exception $e) { \Log::error('OTP Email failed: ' . $e->getMessage()); }
+        try {
+            // تأكد من استيراد الإشعار في الأعلى
+            // use App\Notifications\SendOtpNotification;
+            $user->notify(new SendOtpNotification($otp));
+        } catch (\Exception $e) {
+            Log::error('فشل إرسال بريد OTP: ' . $e->getMessage());
+            // لا توقف العملية، فالرمز متاح للتطوير
+        }
     
         // **التصحيح هنا**
         return response()->json([

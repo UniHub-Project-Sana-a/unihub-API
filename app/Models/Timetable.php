@@ -17,6 +17,7 @@ class Timetable extends Model
         'course_id','lecturer_id','group_id','classroom_id','day_id','period_id',
         'lecture_type','status','start_date','end_date','academic_year',
         'college_id','department_id','gender_type','lecture_hours',
+        'level_id', // ✅ قم بإضافة هذا السطر
     ];
 
     protected $casts = [

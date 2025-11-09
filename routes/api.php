@@ -44,6 +44,24 @@ use App\Http\Controllers\Api\V1\TimetableSetController;
 use App\Http\Controllers\Api\V1\TimetableEntryController;
 // لا حاجة لـ LectureSessionController جديد إذا كان القديم يفي بالغرض مع الـ alias
 
+// use Illuminate\Support\Facades\Route;
+use App\Models\User;
+
+Route::get('/debug/password-algo', function () {
+    $u = User::first();
+    if (! $u) return 'no user';
+
+    $hash = $u->password;
+    if (str_starts_with($hash, '$2y$') || str_starts_with($hash, '$2b$') || str_starts_with($hash, '$2a$')) {
+        return 'bcrypt';
+    }
+    if (str_starts_with($hash, '$argon2id$') || str_starts_with($hash, '$argon2i$')) {
+        return 'argon2';
+    }
+    return 'unknown';
+});
+
+
 // ========================== V1 Routes ==========================
 Route::prefix('v1')->group(function () {
     // --- Public Routes ---
@@ -65,6 +83,15 @@ Route::prefix('v1')->group(function () {
         Route::get('lookups/user-types', [LookupsController::class, 'userTypes']);
         Route::get('lookups/permissions', [LookupsController::class, 'permissions']);
         Route::get('lookups/colleges', [LookupsController::class, 'colleges']);
+           Route::post('attendance/finalize', [StudentAttendanceController::class, 'finalizeSession'])->name('attendance.finalize');
+    
+    // مسار جلب طلاب المجموعة
+    Route::get('groups/{studentGroup}/students', [StudentAttendanceController::class, 'getGroupStudents'])->name('groups.students');
+
+    // مسارات الـ QR
+    Route::post('qr-codes/start-session', [QrCodesController::class, 'startSession']);
+    Route::patch('qr-codes/{qrCode}/refresh', [QrCodesController::class, 'refresh']);
+    Route::patch('qr-codes/{qrCode}/end', [QrCodesController::class, 'endSession']);
 
         // --- Core CRUD Resources ---
         Route::apiResource('users', UsersController::class);
@@ -79,23 +106,42 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('periods', PeriodsController::class);
         Route::apiResource('days', DaysController::class);
         Route::apiResource('academic-titles', AcademicTitlesController::class);
+        Route::apiResource('students', StudentsController::class)->only(['index']);
+        Route::apiResource('student-groups', StudentGroupsController::class);
+        Route::apiResource('lecturers', LecturersController::class);
+        Route::apiResource('user-types', UserTypeController::class)->except(['index', 'show']);
+        Route::apiResource('timetable', TimetableController::class);
+        Route::post('sessions/finalize-attendance', [StudentAttendanceController::class, 'finalizeSession'])->name('sessions.finalize');
+    Route::apiResource('student-attendance', StudentAttendanceController::class);
+    Route::apiResource('lecturer-attendance', LecturerAttendanceController::class);
+        
+        // مسار لمصادقة الجلسة وإنشاء سجلات الحضور
+        
+        
+        // (اختياري) مسار لإنشاء سجل حضور المحاضر
+        Route::post('/lecturer-attendance', [LecturerAttendanceController::class, 'store']);
 
-        // --- QR Codes ---
-        Route::post('qr-codes/start-session', [QrCodesController::class, 'startSession']);
-        Route::post('qr-codes/refresh', [QrCodesController::class, 'refresh']);
+        // --- QR & Attendance ---
+        Route::patch('/qr-codes/{qrCode}/refresh', [QrCodesController::class, 'refresh']);
+        Route::apiResource('qr-refresh-options', QRRefreshOptionsController::class);
+        Route::post('qr-codes/start-session', [QrCodesController::class, 'startSession']); // <-- المسار الجديد
+        Route::patch('/qr-codes/{qrCode}/end', [QrCodesController::class, 'endSession']);
+        Route::post('attendance/students/scan', [StudentAttendanceController::class, 'scan']);
+        Route::post('attendance/students/manual', [StudentAttendanceController::class, 'manualEntry']);
+        Route::post('attendance/lecturers/check-in', [LecturerAttendanceController::class, 'checkIn']);
+        Route::post('attendance/finalize', [LecturerAttendanceController::class, 'finalizeSession']);
 
         // --- Student Attendance ---
         Route::post('attendance/scan', [StudentAttendanceController::class, 'scan']);
         Route::post('attendance/finalize', [LecturerAttendanceController::class, 'finalizeSession']);
         // --- Lecturers ---
-        Route::apiResource('lecturers', LecturersController::class);
+        
         Route::post('lecturers/import-csv', [LecturersController::class, 'importCsv']);
         Route::get('lecturer/schedule', [ScheduleController::class, 'getSchedule']);
  
  
         // --- Students & Groups ---
-        Route::apiResource('students', StudentsController::class)->only(['index']);
-        Route::apiResource('student-groups', StudentGroupsController::class);
+        
         Route::get('student-groups/{student_group}/students', [StudentGroupsController::class, 'students']);
         Route::delete('student-groups/{group}/students', [StudentGroupsController::class, 'detachStudent']);
         Route::post('student-groups/upsert-and-attach', [StudentGroupsController::class, 'upsertAndAttach']);
@@ -103,13 +149,7 @@ Route::prefix('v1')->group(function () {
         Route::post('student-groups/import-external', [StudentGroupsController::class, 'importExternal']);
 
         // --- Timetable & Sessions (القديم لديك) ---
-        Route::apiResource('timetable', TimetableController::class);
-        Route::prefix('timetable/import')->group(function () {
-            Route::post('excel', [TimetablesImportController::class, 'importExcel']);
-            Route::post('csv',   [TimetablesImportController::class, 'importCsv']);
-            Route::post('api',   [TimetablesImportController::class, 'importApi']);
-            Route::get('logs',  [TimetablesImportController::class, 'logs']);
-        });
+        
         
         Route::apiResource('lecture-sessions', LectureSessionsController::class);
         Route::post('lecture-sessions/start', [LectureSessionsController::class, 'startSession']);

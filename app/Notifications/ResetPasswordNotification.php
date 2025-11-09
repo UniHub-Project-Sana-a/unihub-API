@@ -1,34 +1,39 @@
 <?php
-
 namespace App\Notifications;
-
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Notifications\Messages\MailMessage;
 
-class ResetPasswordNotification extends Notification implements ShouldQueue
+class ResetPasswordNotification extends Notification
 {
     use Queueable;
+    public $token;
 
-    public function __construct(public string $token) {}
+    public function __construct($token)
+    {
+        $this->token = $token;
+    }
 
-    public function via(object $notifiable): array
+    public function via($notifiable)
     {
         return ['mail'];
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function toMail($notifiable)
     {
-        $frontend = config('app.frontend_url', 'http://localhost:5173');
-        $url = $frontend . '/reset-password?token=' . urlencode($this->token) . '&email=' . urlencode($notifiable->email);
+        $url = url(config('app.frontend_url', 'http://localhost:8080') . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email));
+
+        $frontendUrl = config('app.frontend_url', 'http://localhost:8080');
+
+        // 2. بناء الرابط الكامل
+        $resetUrl = $frontendUrl . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
 
         return (new MailMessage)
-            ->subject('إعادة تعيين كلمة المرور')
-            ->greeting('مرحباً،')
-            ->line('لقد استلمنا طلباً لإعادة تعيين كلمة المرور لحسابك.')
-            ->action('إعادة تعيين كلمة المرور', $url)
-            ->line('إذا لم تطلب ذلك، تجاهل هذه الرسالة.')
-            ->salutation('فريق النظام');
+                    ->subject('UniHub - إعادة تعيين كلمة المرور') // ✅ عنوان مخصص
+                    ->greeting('مرحبًا!')
+                    ->line('لقد طلبت إعادة تعيين كلمة المرور لحسابك في نظام UniHub.')
+                    ->action('إعادة تعيين كلمة المرور', $url) // ✅ زر مخصص
+                    ->line('إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة.')
+                    ->line('شكرًا لك.');
     }
 }

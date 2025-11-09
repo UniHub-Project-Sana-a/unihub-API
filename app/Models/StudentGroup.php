@@ -21,7 +21,8 @@ class StudentGroup extends Model
 
     public function members()
     {
-        return $this->hasMany(StudentGroupMember::class, 'group_id', 'group_id');
+        // student_group_members هو اسم الجدول الوسيط (pivot table)
+        return $this->belongsToMany(Student::class, 'student_group_members', 'group_id', 'student_id');
     }
 
     public function students()

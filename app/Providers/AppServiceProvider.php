@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate; // <-- 1. إضافة الاستيراد
 use App\Models\UserDevice; // <-- 2. إضافة الاستيراد
 use App\Policies\UserDevicePolicy; // <-- 3. إضافة الاستيراد
+use Laravel\Passport\Passport;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,5 +32,6 @@ class AppServiceProvider extends ServiceProvider
 
         // 4. تسجيل الـ Policy يدويًا
         Gate::policy(UserDevice::class, UserDevicePolicy::class);
+        // Passport::routes();
     }
 }

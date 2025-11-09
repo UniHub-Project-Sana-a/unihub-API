@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AuthPasswordController extends Controller
 {
@@ -24,10 +25,13 @@ class AuthPasswordController extends Controller
 
         // حاول إرسال البريد، وإن فشل نرجّع التوكن في بيئة التطوير
         $sent = true;
+        // ✅ 2. إرسال الإشعار المخصص بدلاً من النظام الافتراضي
         try {
             $user->notify(new ResetPasswordNotification($token));
-        } catch (\Throwable $e) {
-            $sent = false;
+        } catch (\Exception $e) {
+            Log::error('فشل إرسال بريد إعادة التعيين: ' . $e->getMessage());
+            // يمكنك إرجاع استجابة خطأ للـ API هنا إذا أردت
+            return response()->json(['message' => 'فشل إرسال البريد الإلكتروني، يرجى المحاولة مرة أخرى.'], 500);
         }
 
         return response()->json([
