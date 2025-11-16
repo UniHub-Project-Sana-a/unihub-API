@@ -13,14 +13,14 @@ class StudentGroupsController extends Controller
 {
 
     private function makeUniquePhone(): string
-{
-    // مثال سعودي 059XXXXXXX (7 أرقام عشوائية) مع التحقق من التفرد
-    do {
-        $candidate = '059' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT);
-    } while (DB::table('users')->where('phone', $candidate)->exists());
-
-    return $candidate;
-}
+    {
+        // مثال سعودي 059XXXXXXX (7 أرقام عشوائية) مع التحقق من التفرد
+        do {
+            $candidate = '059' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT);
+        } while (DB::table('users')->where('phone', $candidate)->exists());
+    
+        return $candidate;
+    }
 
 private function makePlaceholderEmail(?string $academic): string
 {

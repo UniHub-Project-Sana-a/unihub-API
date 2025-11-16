@@ -19,6 +19,8 @@ class LecturerAttendance extends Model
         'attendance_date',
         'status',
         'notification_status',
+        'hourly_rate_at_attendance',
+        'lecture_rate_at_attendance',
         'college_id',
         'lecture_hours',
         'session_code',

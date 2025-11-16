@@ -25,7 +25,7 @@ use App\Http\Controllers\Api\V1\StudentsController;
 use App\Http\Controllers\Api\V1\StudentGroupsController;
 use App\Http\Controllers\Api\V1\TimetableController;
 use App\Http\Controllers\Api\V1\TimetablesImportController;
-use App\Http\Controllers\Api\V1\LectureSessionsController;
+use App\Http\Controllers\Api\V1\LectureSessionController as LectureSessionsController;
 use App\Http\Controllers\Api\V1\QRRefreshOptionsController;
 use App\Http\Controllers\Api\V1\QrCodesController;
 use App\Http\Controllers\Api\V1\StudentAttendanceController;
@@ -88,6 +88,7 @@ Route::prefix('v1')->group(function () {
     // مسار جلب طلاب المجموعة
     Route::get('groups/{studentGroup}/students', [StudentAttendanceController::class, 'getGroupStudents'])->name('groups.students');
 
+    
     // مسارات الـ QR
     Route::post('qr-codes/start-session', [QrCodesController::class, 'startSession']);
     Route::patch('qr-codes/{qrCode}/refresh', [QrCodesController::class, 'refresh']);
@@ -112,10 +113,15 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('user-types', UserTypeController::class)->except(['index', 'show']);
         Route::apiResource('timetable', TimetableController::class);
         Route::post('sessions/finalize-attendance', [StudentAttendanceController::class, 'finalizeSession'])->name('sessions.finalize');
-    Route::apiResource('student-attendance', StudentAttendanceController::class);
-    Route::apiResource('lecturer-attendance', LecturerAttendanceController::class);
+        Route::apiResource('student-attendance', StudentAttendanceController::class);
+        Route::apiResource('lecturer-attendance', LecturerAttendanceController::class);
         
         // مسار لمصادقة الجلسة وإنشاء سجلات الحضور
+        // مسار لجلب المحاضرات القابلة للجدولة
+        Route::get('/schedulable-lectures', [LectureSessionsController::class, 'getSchedulableLectures']);
+        
+        // مسار لإنشاء جلسة جديدة
+        Route::post('/lecture-sessions', [LectureSessionsController::class, 'store']);
         
         
         // (اختياري) مسار لإنشاء سجل حضور المحاضر

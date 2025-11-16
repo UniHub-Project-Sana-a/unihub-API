@@ -320,21 +320,31 @@ return new class extends Migration
             $table->timestamps();
         });
 
-         Schema::create('lecturer_attendance', function (Blueprint $table) {
+        Schema::create('lecturer_attendance', function (Blueprint $table) {
             $table->increments('attendance_id');
             $table->unsignedInteger('lecturer_id');
             $table->unsignedInteger('timetable_id');
             $table->date('attendance_date')->index();
-            $table->tinyInteger('status')->default(0);
+            $table->tinyInteger('status')->default(0)->comment('0: غائب, 1: حاضر');
             $table->tinyInteger('notification_status')->default(0);
             $table->unsignedInteger('college_id');
             $table->decimal('lecture_hours', 4, 2);
+
+            // ✅ --- تمت إضافة الأعمدة الجديدة هنا --- ✅
+            $table->decimal('hourly_rate_at_attendance', 10, 2)->nullable()->default(0.00);
+            $table->decimal('lecture_rate_at_attendance', 10, 2)->nullable()->default(0.00);
+            // ✅ --- نهاية الإضافة --- ✅
+
             $table->string('session_code', 50);
+            $table->timestamps();
+
+            // Foreign Keys
             $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
             $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+
+            // Unique Constraints
             $table->unique(['lecturer_id', 'session_code'], 'unique_lecturer_session');
-            $table->timestamps();
         });
 
         Schema::create('student_attendance', function (Blueprint $table) {
@@ -471,18 +481,18 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('timetable_import_logs', function (Blueprint $table) {
-            $table->increments('id');
-            $table->string('source', 50);
-            $table->integer('items')->default(0);
-            $table->string('status', 20);
-            $table->string('notes', 255)->nullable();
-            $table->unsignedInteger('user_id')->nullable();
-            $table->timestamps();
-            $table->foreign('user_id')->references('user_id')->on('users')->onDelete('set null');
-            $table->index('source');
-            $table->index('created_at');
-        });
+        // Schema::create('timetable_import_logs', function (Blueprint $table) {
+        //     $table->increments('id');
+        //     $table->string('source', 50);
+        //     $table->integer('items')->default(0);
+        //     $table->string('status', 20);
+        //     $table->string('notes', 255)->nullable();
+        //     $table->unsignedInteger('user_id')->nullable();
+        //     $table->timestamps();
+        //     $table->foreign('user_id')->references('user_id')->on('users')->onDelete('set null');
+        //     $table->index('source');
+        //     $table->index('created_at');
+        // });
 
         // 9) جداول الرواتب والمدفوعات (جديد)
         Schema::create('college_payments', function (Blueprint $table) {
