@@ -58,7 +58,7 @@ class TimetableController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-        public function store(Request $request)
+    public function store(Request $request)
     {
         // 1. التحقق الأساسي من صحة البيانات
         $validator = Validator::make($request->all(), [
