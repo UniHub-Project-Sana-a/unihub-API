@@ -68,7 +68,7 @@ return new class extends Migration
             $table->increments('user_id');
             $table->string('full_name', 100)->index();
             $table->string('email', 100)->unique();
-            $table->string('phone', 20)->unique();
+            $table->string('phone', 20)->nullable()->unique();
             $table->unsignedInteger('college_id')->nullable();
             $table->string('password');
             $table->string('academic_number', 50)->unique();

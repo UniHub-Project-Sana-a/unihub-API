@@ -508,6 +508,9 @@ private function makePlaceholderEmail(?string $academic): string
             $phone    = $row['phone'] ?? null;
             $fullName = $row['full_name'] ?? null;
             $genderV  = $row['gender'] ?? null;
+
+            $phoneRaw = $row['phone'] ?? null;
+            $phone = ($phoneRaw !== null && trim((string)$phoneRaw) !== '') ? trim((string)$phoneRaw) : null;
     
             if (!$academic && !$email && !$phone) {
                 $skippedMissing++; $errors[] = ['reason' => 'missing_keys', 'row' => $row]; continue;
@@ -521,7 +524,7 @@ private function makePlaceholderEmail(?string $academic): string
     
             // أنشئ User عند عدم الوجود
             if (!$user) {
-                if (!$fullName || !$email || !$phone || $genderV === null) {
+                if (!$fullName || !$email || $genderV === null) {
                     $skippedMissing++; $errors[] = ['reason' => 'missing_user_fields', 'row' => $row]; continue;
                 }
                 $gender = $parseGender($genderV);
@@ -547,6 +550,9 @@ private function makePlaceholderEmail(?string $academic): string
                     $skippedConflicts++; continue;
                 }
             } else {
+                if (is_null($user->phone) && $phone) {
+                     \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->update(['phone' => $phone]);
+                }
                 if (!is_null($user->deleted_at)) {
                     \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->update([
                         'deleted_at' => null,
