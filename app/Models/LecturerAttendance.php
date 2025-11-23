@@ -27,16 +27,22 @@ class LecturerAttendance extends Model
     ];
 
     protected $casts = [
-        'lecturer_id'        => 'integer',
-        'timetable_id'       => 'integer',
-        'attendance_date'    => 'date',
-        'status'             => 'integer',
-        'notification_status'=> 'integer',
-        'college_id'         => 'integer',
-        'lecture_hours'      => 'decimal:2',
+        'attendance_date' => 'date',
+        'lecture_rate_at_attendance' => 'decimal:2',
+        'hourly_rate_at_attendance' => 'decimal:2',
     ];
 
-    public function lecturer()  { return $this->belongsTo(Lecturer::class, 'lecturer_id', 'lecturer_id'); }
-    public function timetable() { return $this->belongsTo(Timetable::class, 'timetable_id', 'timetable_id'); }
-    public function college()   { return $this->belongsTo(College::class, 'college_id', 'college_id'); }
+    public function lecturer()
+    {
+        return $this->belongsTo(Lecturer::class, 'lecturer_id', 'lecturer_id');
+    }
+
+    public function timetable()
+    {
+        return $this->belongsTo(Timetable::class, 'timetable_id', 'timetable_id');
+    }
+    public function college()
+    {
+        return $this->belongsTo(College::class, 'college_id', 'college_id'); 
+    }
 }

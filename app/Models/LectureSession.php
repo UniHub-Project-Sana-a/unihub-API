@@ -46,4 +46,9 @@ class LectureSession extends Model
     {
         return $this->belongsTo(Timetable::class, 'timetable_id', 'timetable_id');
     }
+
+    public function actualClassroom() 
+    {
+        return $this->belongsTo(Classroom::class, 'actual_classroom_id', 'classroom_id');
+    }
 }

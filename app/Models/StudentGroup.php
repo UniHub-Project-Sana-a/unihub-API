@@ -27,8 +27,7 @@ class StudentGroup extends Model
 
     public function students()
     {
-        return $this->belongsToMany(\App\Models\Student::class, 'student_group_members', 'group_id', 'student_id')
-            ->withTimestamps();
+        return $this->belongsToMany(\App\Models\Student::class, 'student_group_members', 'group_id', 'student_id');
     }
 
     public function timetables()

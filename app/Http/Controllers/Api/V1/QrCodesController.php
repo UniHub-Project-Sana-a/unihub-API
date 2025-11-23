@@ -4,109 +4,105 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use App\Models\QrCode;
-use App\Models\TimetableEntry;
-use Illuminate\Support\Facades\Validator;
+use App\Models\Lecturer; // ✅ استيراد موديل المحاضر
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth; // ✅ استيراد الواجهة للتوثيق
 
 class QrCodesController extends Controller
 {
     public function startSession(Request $request)
     {
-        // ✅ 1. تحديث قاعدة التحقق من الصحة
-        $validator = Validator::make($request->all(), [
-            'timetable_id'     => 'required|integer|exists:timetable,timetable_id', // <-- تم التصحيح هنا
-            'valid_minutes'    => 'required|integer|min:1',
-            'interval_seconds' => 'sometimes|integer|min:5',
-            'latitude'         => 'required|numeric',
-            'longitude'        => 'required|numeric',
+        $request->validate([
+            'timetable_id' => 'required|integer',
+            'session_id'   => 'required|integer|exists:lecture_sessions,session_id',
+            'latitude'     => 'required|numeric',
+            'longitude'    => 'required|numeric',
             'allowed_distance' => 'required|numeric',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['message' => $validator->errors()->first()], 422);
+        // ✅ إصلاح مشكلة created_by:
+        // 1. الحصول على المستخدم الحالي
+        $user = Auth::user(); 
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $validatedData = $validator->validated();
-        $user = Auth::user();
+        // 2. البحث عن سجل المحاضر المرتبط بهذا المستخدم
+        // نفترض أن user_id هو مفتاح الربط
+        $lecturer = Lecturer::where('user_id', $user->user_id)->first();
 
-        // التأكد من أن المستخدم الحالي هو محاضر
-        if (!$user || !$user->lecturer) {
-            return response()->json(['message' => 'Unauthorized. Not a lecturer.'], 403);
+        if (!$lecturer) {
+            return response()->json(['message' => 'عذراً، المستخدم الحالي ليس مسجلاً كمحاضر.'], 403);
         }
 
-        // إيقاف أي جلسات QR نشطة أخرى لنفس المحاضرة
-        QrCode::where('timetable_id', $validatedData['timetable_id'])
+        // تنظيف الجلسات السابقة
+        QrCode::where('session_id', $request->session_id)
               ->where('is_active', true)
-              ->update(['is_active' => false]);
-              
-        // 2. إنشاء أول رمز QR للجلسة
-        try {
-            $expiresAt = '2025-11-27 04:20:07';// استخدام قيمة افتراضية مؤقتة;
-            
-            // توليد قيمة فريدة للرمز
-            $qrValue = uniqid('qr_') . '_' . time();
+              ->update(['is_active' => false, 'expires_at' => Carbon::now()]);
 
-            $qrCode = QrCode::create([
-                'timetable_id'      => $validatedData['timetable_id'],
-                'qr_code_value'     => $qrValue,
-                'expires_at'        => $expiresAt,
-                'created_by'        => $user->lecturer->lecturer_id,
-                'latitude'          => $validatedData['latitude'],
-                'longitude'         => $validatedData['longitude'],
-                'allowed_distance'  => $validatedData['allowed_distance'],
-                'is_active'         => true,
-            ]);
+        $randomCode = Str::random(64);
 
-            // إرجاع بيانات الرمز الأول للواجهة
-            return response()->json([
-                'status'  => true,
-                'message' => 'QR session started successfully.',
-                'data'    => $qrCode
-            ], 201);
+        // ✅ تحديد تاريخ انتهاء بعيد (مثلاً: يوم كامل من الآن) بدلاً من null
+        // يمكنك جعله addYears(1) إذا أردت مدة أطول
+        $farExpiryDate = Carbon::now()->addDay(); 
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Failed to start QR session.',
-                'error'   => $e->getMessage()
-            ], 500);
+        $qrCode = QrCode::create([
+            'timetable_id'      => $request->timetable_id,
+            'session_id'        => $request->session_id,
+            'refresh_option_id' => null,
+            'qr_code_value'     => $randomCode,
+            'generated_at'      => Carbon::now(),
+            'expires_at'        => $farExpiryDate, // ✅ تم التعديل: قيمة بعيدة
+            'is_active'         => true,
+            'created_by'        => $lecturer->lecturer_id, // ✅ تم التعديل: استخدام ID المحاضر الصحيح
+            'latitude'          => $request->latitude,
+            'longitude'         => $request->longitude,
+            'allowed_distance'  => $request->allowed_distance,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'تم بدء جلسة الـ QR بنجاح',
+            'data' => $qrCode
+        ]);
+    }
+
+    public function refresh(Request $request, $id)
+    {
+        $qrCode = QrCode::findOrFail($id);
+
+        if (!$qrCode->is_active) {
+            return response()->json(['status' => false, 'message' => 'الجلسة منتهية بالفعل'], 400);
         }
+
+        $newCode = Str::random(64);
+        $qrCode->update([
+            'qr_code_value' => $newCode,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'qr_id' => $qrCode->qr_id,
+                'qr_code_value' => $newCode
+            ]
+        ]);
     }
 
-    public function refresh(QrCode $qrCode, Request $request)
-{
-    // التأكد من أن الرمز لا يزال نشطًا
-    if (!$qrCode->is_active) {
-        return response()->json(['message' => 'This QR session has already ended.'], 410); // 410 Gone
+    public function endSession(Request $request, $id)
+    {
+        $qrCode = QrCode::findOrFail($id);
+
+        $qrCode->update([
+            'is_active' => false,
+            'expires_at' => Carbon::now(), // عند الانتهاء نضع الوقت الفعلي
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'تم إنهاء الجلسة بنجاح'
+        ]);
     }
-
-    $qrCode->update([
-        'qr_code_value' => uniqid('qr_') . '_' . time(),
-        'expires_at' => Carbon::now()->addMinutes($request->input('valid_minutes', 2)) // استخدم القيمة القادمة أو قيمة افتراضية
-    ]);
-
-    return response()->json([
-        'status' => true,
-        'data' => $qrCode
-    ]);
-}
-
-/**
- * يقوم بإنهاء جلسة QR بتحديث is_active إلى false.
- */
-public function endSession(QrCode $qrCode)
-{
-    $qrCode->update([
-        'is_active' => false,
-        'expires_at' => Carbon::now(),
-    ]);
-
-    return response()->json([
-        'status' => true,
-        'message' => 'QR session ended successfully.'
-    ]);
-}
 }

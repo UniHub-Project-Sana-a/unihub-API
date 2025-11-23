@@ -60,4 +60,22 @@ class Course extends Model
     {
         return $this->belongsTo(Department::class, 'department_id', 'department_id');
     }
+
+        public function timetable()
+    {
+        return $this->hasMany(Timetable::class, 'course_id', 'course_id');
+    }
+    
+    // إذا كنت تستخدم studentAttendance في الكود (اختياري حسب الكنترولر)
+    public function studentAttendance()
+    {
+        return $this->hasManyThrough(
+            StudentAttendance::class,
+            Timetable::class,
+            'course_id',
+            'timetable_id',
+            'course_id',
+            'timetable_id'
+        );
+    }
 }

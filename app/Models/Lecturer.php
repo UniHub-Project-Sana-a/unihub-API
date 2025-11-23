@@ -21,6 +21,7 @@ class Lecturer extends Model
         'title_id',
         'hire_date',
         'status',
+        'can_teach_externally',
     ];
 
     protected $casts = [
@@ -75,5 +76,24 @@ class Lecturer extends Model
     public function makeupLectureRequests()
     {
         return $this->hasMany(MakeupLecturesRequest::class, 'lecturer_id', 'lecturer_id');
+    }
+
+      public function timetable()
+    {
+        return $this->hasMany(Timetable::class, 'lecturer_id', 'lecturer_id');
+    }
+
+    // علاقة المحاضر بجلساته الفعلية (عبر الجدول الدراسي)
+    // هذه هي التي تسبب الخطأ لأن الكنترولر يحاول عدها
+    public function lectureSessions()
+    {
+        return $this->hasManyThrough(
+            LectureSession::class,
+            Timetable::class,
+            'lecturer_id', // Foreign key on timetable table
+            'timetable_id', // Foreign key on lecture_sessions table
+            'lecturer_id', // Local key on lecturers table
+            'timetable_id' // Local key on timetable table
+        )->distinct();
     }
 }

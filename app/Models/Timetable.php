@@ -55,8 +55,15 @@ class Timetable extends Model
     {
         return $this->hasOne(LectureSession::class, 'timetable_id', 'timetable_id');
     }
-public function lectureSessions()
-{
-    return $this->hasMany(LectureSession::class, 'timetable_id', 'timetable_id');
-}
+    public function lectureSessions()
+    {
+        return $this->hasMany(LectureSession::class, 'timetable_id', 'timetable_id');
+    }
+    
+    public function department()
+    {
+        // جدول 'timetable' يحتوي على 'department_id'
+        // هذا يعرف علاقة "ينتمي إلى" مع موديل Department
+        return $this->belongsTo(Department::class, 'department_id');
+    }
 }

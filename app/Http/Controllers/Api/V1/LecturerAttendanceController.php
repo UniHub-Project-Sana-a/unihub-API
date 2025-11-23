@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\LecturerAttendance;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-
-// ✅ استيراد جميع الموديلات والفئات اللازمة
+use Illuminate\Support\Facades\DB;
+use App\Models\LecturerAttendance;
 use App\Models\StudentAttendance;
 use App\Models\LectureSession;
-use App\Models\StudentGroup;
-use Illuminate\Support\Facades\DB;
+use App\Models\Timetable;
+use App\Models\Student;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class LecturerAttendanceController extends Controller
 {
@@ -106,105 +106,121 @@ class LecturerAttendanceController extends Controller
      */
     public function finalizeSession(Request $request)
     {
-        // 1. التحقق من صحة البيانات القادمة من الواجهة
-        $validated = $request->validate([
-            'timetable_id' => 'required|integer|exists:timetable,timetable_id',
-            'group_id' => 'required|integer|exists:student_groups,group_id',
-            'present_student_ids' => 'present|array',
-            'present_student_ids.*' => 'integer|exists:students,student_id',
+        // 1. التحقق من صحة البيانات القادمة
+        $request->validate([
+            'timetable_id'        => 'required|integer|exists:timetable,timetable_id',
+            'session_id'          => 'required|integer|exists:lecture_sessions,session_id',
+            'group_id'            => 'required|integer|exists:student_groups,group_id',
+            'present_student_ids' => 'present|array', // present تعني يجب إرسال المصفوفة حتى لو فارغة
+            'present_student_ids.*' => 'integer|exists:students,student_id', // تأكد أن IDs هي student_id وليس academic_number
         ]);
 
-        // 2. البحث عن آخر جلسة تم إنشاؤها لهذه المحاضرة
-        $latestSession = LectureSession::where('timetable_id', $validated['timetable_id'])
-                                        ->with('timetable') // تحميل بيانات المحاضرة معها
-                                        ->latest()
-                                        ->first();
+        return DB::transaction(function () use ($request) {
+            // 2. جلب بيانات الجدول الدراسي مع المحاضر ورتبته الأكاديمية (للسعر)
+            $timetable = Timetable::with(['lecturer.academicTitle', 'course'])
+                                  ->findOrFail($request->timetable_id);
 
-        if (!$latestSession) {
-            return response()->json(['message' => 'لم يتم العثور على جلسة لهذه المحاضرة.'], 404);
-        }
+            // 3. جلب بيانات الجلسة الحالية (للحصول على session_code والتاريخ)
+            $session = LectureSession::findOrFail($request->session_id);
+            
+            $sessionCode = $session->session_code;
+            $attendanceDate = $session->session_date;
 
-        // 3. التحقق من أن بيانات المحاضرة (timetable) موجودة
-        $timetable = $latestSession->timetable;
-        if (!$timetable) {
-            return response()->json(['message' => 'خطأ في البيانات: الجلسة غير مرتبطة بجدول زمني صحيح.'], 500);
-        }
+            // ---------------------------------------------------------
+            // أولاً: معالجة حضور الطلاب (حاضر وغائب)
+            // ---------------------------------------------------------
+            
+            // أ) جلب جميع معرفات الطلاب في هذه المجموعة
+            $allGroupMembers = DB::table('student_group_members')
+                                 ->where('group_id', $request->group_id)
+                                 ->pluck('student_id'); // مصفوفة بكل الطلاب
 
-        // 4. جلب جميع الطلاب في المجموعة وحساب الغائبين
-        $allStudentsInGroup = StudentGroup::find($validated['group_id'])->members()->pluck('students.student_id');
-        $presentStudentIds = collect($validated['present_student_ids']);
-        $absentStudentIds = $allStudentsInGroup->diff($presentStudentIds);
+            // ب) تحويل قائمة الحضور القادمة من الفرونت إلى Collection لسهولة البحث
+            $presentIdsCollection = collect($request->present_student_ids);
 
-
-        // 5. تنفيذ جميع عمليات الحفظ داخل Transaction لضمان الأمان
-        try {
-            DB::transaction(function () use ($presentStudentIds, $absentStudentIds, $latestSession, $timetable) {
+            foreach ($allGroupMembers as $studentId) {
+                // جلب بيانات الطالب (للكلية والقسم)
+                // ملاحظة: لتحسين الأداء، يمكن جلب الطلاب دفعة واحدة خارج الـ loop باستخدام whereIn
+                $student = Student::find($studentId);
                 
-                // 5a. تسجيل الطلاب الحاضرين (status = 0)
-                foreach ($presentStudentIds as $studentId) {
-                    StudentAttendance::updateOrCreate(
-                        [
-                            'student_id' => $studentId,
-                            'session_code' => $latestSession->session_code,
-                        ],
-                        [
-                            'timetable_id' => $timetable->timetable_id,
-                            'level_id' => $timetable->level_id,
-                            'attendance_date' => $latestSession->session_date,
-                            'status' => 0, // 0 = حاضر
-                            'college_id' => $timetable->college_id,
-                            'department_id' => $timetable->department_id,
-                        ]
-                    );
-                }
+                if (!$student) continue;
 
-                // 5b. تسجيل الطلاب الغائبين (status = 1)
-                foreach ($absentStudentIds as $studentId) {
-                    StudentAttendance::updateOrCreate(
-                        [
-                            'student_id' => $studentId,
-                            'session_code' => $latestSession->session_code,
-                        ],
-                        [
-                            'timetable_id' => $timetable->timetable_id,
-                            'level_id' => $timetable->level_id,
-                            'attendance_date' => $latestSession->session_date,
-                            'status' => 1, // 1 = غائب
-                            'college_id' => $timetable->college_id,
-                            'department_id' => $timetable->department_id,
-                        ]
-                    );
-                }
+                // تحديد الحالة: إذا كان الـ ID موجود في مصفوفة الحاضرين = 1، غير ذلك = 0
+                $status = $presentIdsCollection->contains($studentId) ? 1 : 0;
 
-                // 5c. تسجيل حضور المحاضر (مع التأكد من عدم التكرار)
-                LecturerAttendance::updateOrCreate(
+                StudentAttendance::updateOrCreate(
                     [
-                        'lecturer_id'   => $timetable->lecturer_id,
-                        'session_code'  => $latestSession->session_code,
+                        'student_id'   => $studentId,
+                        'session_code' => $sessionCode, // المفتاح لعدم تكرار التسجيل لنفس الجلسة
                     ],
                     [
-                        'timetable_id'    => $timetable->timetable_id,
-                        'attendance_date' => $latestSession->session_date,
-                        'status'          => 1, // 1 = حاضر
-                        'college_id'      => $timetable->college_id,
-                        'lecture_hours'   => $timetable->lecture_hours,
+                        'timetable_id'        => $timetable->timetable_id,
+                        'level_id'            => $timetable->level_id,
+                        'attendance_date'     => $attendanceDate,
+                        'status'              => $status,
+                        'notification_status' => 0,
+                        'college_id'          => $student->college_id,
+                        'department_id'       => $student->department_id,
                     ]
                 );
+            }
 
-                // 5d. تحديث حالة الجلسة إلى "منفذة"
-                $latestSession->status = 1;
-                $latestSession->save();
-            });
+            // ---------------------------------------------------------
+            // ثانياً: معالجة حضور المحاضر والحسابات المالية
+            // ---------------------------------------------------------
+            
+            $lecturer = $timetable->lecturer;
+            
+            // جلب سعر الساعة من الرتبة الأكاديمية
+            // ملاحظة: تأكد أن العلاقة academicTitle موجودة في موديل Lecturer
+            $hourlyRate = 0;
+            if ($lecturer->academicTitle) {
+                $hourlyRate = $lecturer->academicTitle->hourly_price;
+            }
 
-        } catch (\Exception $e) {
-            // في حال حدوث أي خطأ أثناء عمليات قاعدة البيانات
+            // جلب عدد ساعات المحاضرة من الجدول الدراسي
+            $lectureHours = $timetable->lecture_hours ?? 0;
+
+            // حساب إجمالي المبلغ لهذه الجلسة
+            $totalSessionRate = $lectureHours * $hourlyRate;
+
+            LecturerAttendance::updateOrCreate(
+                [
+                    'lecturer_id'  => $lecturer->lecturer_id,
+                    'session_code' => $sessionCode,
+                ],
+                [
+                    'timetable_id'        => $timetable->timetable_id,
+                    'attendance_date'     => $attendanceDate,
+                    'status'              => 1, // المحاضر حاضر لأنه هو من صادق
+                    'notification_status' => 0,
+                    'college_id'          => $timetable->college_id,
+                    
+                    // البيانات المالية
+                    'lecture_hours'              => $lectureHours,
+                    'hourly_rate_at_attendance'  => $hourlyRate,
+                    'lecture_rate_at_attendance' => $totalSessionRate,
+                ]
+            );
+
+            // ---------------------------------------------------------
+            // ثالثاً: تحديث حالة الجلسة في جدول lecture_sessions
+            // ---------------------------------------------------------
+            
+            $session->update([
+                'status' => 1, // 1: مكتملة
+                'system_attendance_count' => $presentIdsCollection->count(), // عدد الحاضرين الفعلي
+            ]);
+
             return response()->json([
-                'message' => 'فشلت عملية المصادقة بسبب خطأ في الخادم.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-
-        // 6. إرجاع رسالة نجاح
-        return response()->json(['message' => 'تمت مصادقة جلسة الحضور بنجاح.']);
+                'status' => true, 
+                'message' => 'تمت مصادقة الجلسة وتسجيل الحضور والبيانات المالية بنجاح.',
+                'data' => [
+                    'present_count' => $presentIdsCollection->count(),
+                    'absent_count'  => $allGroupMembers->count() - $presentIdsCollection->count(),
+                    'lecturer_earnings' => $totalSessionRate
+                ]
+            ]);
+        });
     }
 }

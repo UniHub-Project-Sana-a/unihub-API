@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\Building;
 
 class Classroom extends Model
 {
@@ -37,7 +38,8 @@ class Classroom extends Model
 
     public function building()
     {
-        return $this->belongsTo(Building::class, 'building_id', 'building_id');
+        // افترض أن جدول `classrooms` يحتوي على `building_id`
+        return $this->belongsTo(Building::class, 'building_id');
     }
 
     public function timetables()

@@ -18,7 +18,7 @@ class StudentAttendanceController extends Controller
      * يعرض قائمة الحضور لجلسة محاضرة معينة بناءً على timetable_id.
      * هذا هو الـ endpoint الرئيسي الذي تستدعيه الواجهة بعد انتهاء الجلسة.
      */
-        public function index(Request $request)
+    public function index(Request $request)
     {
         $request->validate([
             'timetable_id' => 'required|integer|exists:timetable,timetable_id',
@@ -94,87 +94,6 @@ class StudentAttendanceController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-    }
-
-    /**
-     * المصادقة على جلسة حضور كاملة.
-     */
-    public function finalizeSession(Request $request)
-    {
-        $validated = $request->validate([
-            'timetable_id' => 'required|integer|exists:timetable,timetable_id',
-            'absent_student_ids' => 'present|array',
-            'absent_student_ids.*' => 'integer|exists:students,student_id',
-        ]);
-
-        // جلب الجلسة مع بيانات المحاضرة المرتبطة بها
-        $latestSession = LectureSession::where('timetable_id', $validated['timetable_id'])
-                                        ->with('timetable') // التحميل المسبق للعلاقة
-                                        ->latest()
-                                        ->first();
-
-        // تحقق من وجود الجلسة
-        if (!$latestSession) {
-            return response()->json(['message' => 'لم يتم العثور على جلسة نشطة لهذه المحاضرة.'], 404);
-        }
-
-        // ✅ تحقق من وجود بيانات المحاضرة المرتبطة
-        if (!$latestSession->timetable) {
-            return response()->json(['message' => 'خطأ في البيانات: الجلسة غير مرتبطة بجدول زمني صحيح.'], 500);
-        }
-
-        $absentStudents = $validated['absent_student_ids'];
-        $timetable = $latestSession->timetable;
-
-        try {
-            DB::transaction(function () use ($absentStudents, $latestSession, $timetable) {
-                // 1. تسجيل الطلاب الغائبين
-                foreach ($absentStudents as $studentId) {
-                    StudentAttendance::updateOrCreate(
-                        [
-                            'student_id' => $studentId,
-                            'session_code' => $latestSession->session_code,
-                        ],
-                        [
-                            'timetable_id' => $timetable->timetable_id,
-                            'level_id' => $timetable->level_id,
-                            'attendance_date' => $latestSession->session_date,
-                            'status' => 1, // 0 = غائب
-                            'college_id' => $timetable->college_id,
-                            'department_id' => $timetable->department_id,
-                        ]
-                    );
-                }
-
-                // 2. تسجيل حضور المحاضر (مع التأكد من عدم التكرار)
-                LecturerAttendance::firstOrCreate(
-                    [
-                        'session_code' => $latestSession->session_code,
-                        'lecturer_id' => $timetable->lecturer_id,
-                    ],
-                    [
-                        'timetable_id' => $timetable->timetable_id,
-                        'attendance_date' => $latestSession->session_date,
-                        'status' => 1, // 1 = حاضر
-                        'college_id' => $timetable->college_id,
-                        'lecture_hours' => $timetable->lecture_hours,
-                    ]
-                );
-
-                // 3. تحديث حالة الجلسة إلى "منفذة"
-                $latestSession->status = 1; // 1 = منفذة
-                $latestSession->save();
-            });
-
-        } catch (\Exception $e) {
-            // إرجاع رسالة خطأ واضحة جدًا للواجهة
-            return response()->json([
-                'message' => 'فشلت عملية المصادقة بسبب خطأ في الخادم.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-
-        return response()->json(['message' => 'تمت مصادقة جلسة الحضور بنجاح.']);
     }
 
     /**

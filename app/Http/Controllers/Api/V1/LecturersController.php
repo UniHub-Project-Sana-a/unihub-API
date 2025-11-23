@@ -18,19 +18,37 @@ class LecturersController extends Controller
     // GET /api/v1/lecturers?college_id=...
     public function index(Request $request)
     {
-        $q = Lecturer::query()
-            ->select(['lecturer_id','user_id','college_id','department_id','title_id','hire_date','status'])
-            ->with([
-                'user:user_id,full_name,email,phone,academic_number',
-                'academicTitle:title_id,title_name,title_code',
-                'department:department_id,department_name,department_code',
-            ]);
+        $query = Lecturer::query()->with([
+            'user:user_id,full_name,email,phone,academic_number',
+            'academicTitle:title_id,title_name,title_code',
+            'department:department_id,department_name,department_code',
+        ]);
 
-        if ($request->filled('college_id')) {
-            $q->where('college_id', (int)$request->college_id);
+        if ($request->filled('user_id')) {
+            $query->where('user_id', (int)$request->user_id);
         }
 
-        return response()->json($q->get());
+        // ✅ فلتر حسب can_teach_externally
+        if ($request->filled('can_teach_externally')) {
+            $canTeach = filter_var($request->query('can_teach_externally'), FILTER_VALIDATE_BOOLEAN);
+            $query->where('can_teach_externally', $canTeach);
+        }
+
+        // ✅ فلتر حسب college_id
+        if ($request->filled('college_id')) {
+            $query->where('college_id', (int)$request->college_id);
+        }
+        
+        // ✅ فلتر لاستثناء كلية معينة
+        if ($request->filled('exclude_college_id')) {
+            $query->where('college_id', '!=', (int)$request->query('exclude_college_id'));
+        }
+
+        // يمكنك إضافة فلاتر أخرى هنا مثل department_id لو احتجت
+
+        // تغيير بسيط: استخدم Resources لتنسيق الاستجابة بشكل أفضل (اختياري ولكن موصى به)
+        // return \App\Http\Resources\V1\LecturerResource::collection($query->get());
+        return response()->json($query->get());
     }
 
     // POST /api/v1/lecturers
@@ -43,6 +61,7 @@ class LecturersController extends Controller
             'title_id'      => ['nullable','integer','exists:academic_titles,title_id'],
             'hire_date'     => ['required','date'],
             'status'        => ['required','boolean'],
+            'can_teach_externally' => ['sometimes', 'boolean'], 
         ]);
 
         $lec = Lecturer::create($data);
@@ -59,6 +78,7 @@ class LecturersController extends Controller
             'title_id'      => ['nullable','integer','exists:academic_titles,title_id'],
             'hire_date'     => ['sometimes','date'],
             'status'        => ['sometimes','boolean'],
+            'can_teach_externally' => ['sometimes', 'boolean'],
         ]);
 
         $lecturer->update($data);
@@ -76,206 +96,170 @@ class LecturersController extends Controller
     public function importCsv(Request $request)
     {
         $request->validate([
-            'college_id' => ['required','integer','exists:colleges,college_id'],
-            'file'       => ['required','file','mimes:csv,txt','max:10240'],
+            'college_id' => ['required', 'integer', 'exists:colleges,college_id'],
+            'file'       => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
         ]);
-
+    
         $collegeId = (int) $request->college_id;
         $file = $request->file('file');
         $path = $file->getRealPath();
-
-        // تأكد من وجود نوع المستخدم "lecturer"
+    
         $lecturerType = UserType::firstOrCreate(
             ['user_type_code' => 'lecturer'],
             ['user_type_name' => 'محاضر']
         );
-
+    
         $imported = 0;
         $updated  = 0;
         $skipped  = 0;
         $errors   = [];
-
-        if (($h = fopen($path, 'r')) === false) {
+    
+        if (($handle = fopen($path, 'r')) === false) {
             return response()->json(['message' => 'تعذر قراءة الملف'], 422);
         }
-
-        $header = fgetcsv($h, 0, ',');
+    
+        $header = fgetcsv($handle, 0, ',');
         if (!$header) {
-            fclose($h);
+            fclose($handle);
             return response()->json(['message' => 'ملف CSV بدون رؤوس أعمدة'], 422);
         }
-
-        $header = array_map(fn($x) => trim(mb_strtolower($x)), $header);
-        $idx = [
-            'full_name'       => array_search('full_name', $header),
-            'email'           => array_search('email', $header),
-            'phone'           => array_search('phone', $header),
-            'academic_number' => array_search('academic_number', $header),
-            'gender'          => array_search('gender', $header),
-            'department_code' => array_search('department_code', $header),
-            'title_code'      => array_search('title_code', $header),
-            'hire_date'       => array_search('hire_date', $header),
-            'status'          => array_search('status', $header),
-        ];
-
+    
+        // تنظيف أسماء الأعمدة وفهرستها
+        $headerMap = array_flip(array_map(fn($h) => trim(mb_strtolower($h)), $header));
+        
         $rowNum = 1;
-
+    
         DB::beginTransaction();
         try {
-            while (($row = fgetcsv($h, 0, ',')) !== false) {
+            while (($row = fgetcsv($handle, 0, ',')) !== false) {
                 $rowNum++;
-
-                // تخطي الصفوف الفارغة
-                if (count(array_filter($row, fn($v) => trim((string)$v) !== '')) === 0) continue;
-
-                $get = function(string $k) use ($idx, $row) {
-                    $i = $idx[$k];
-                    return $i === false ? null : trim((string)($row[$i] ?? ''));
+    
+                // دالة مساعدة لجلب القيمة من الصف بناءً على اسم العمود
+                $get = function (string $key) use ($headerMap, $row) {
+                    $index = $headerMap[$key] ?? null;
+                    return ($index !== null && isset($row[$index])) ? trim($row[$index]) : null;
                 };
-
-                $fullName  = $get('full_name');
-                $email     = $get('email');
-                $phone     = $get('phone');
-                $acadNo    = $get('academic_number');
-                $genderVal = $get('gender');
-                $deptCode  = $get('department_code');
-                $titleCode = $get('title_code');
-                $hireDate  = $get('hire_date');
-                $statusVal = $get('status');
-
-                // الأعمدة المطلوبة طبقاً لقيود الجداول
-                if (!$fullName || !$email || !$phone || !$acadNo || !$genderVal || !$deptCode || !$hireDate) {
-                    $skipped++;
-                    $errors[] = "سطر {$rowNum}: أعمدة مطلوبة ناقصة (full_name,email,phone,academic_number,gender,department_code,hire_date)";
+    
+                // تخطي الصفوف الفارغة تمامًا
+                if (empty(array_filter($row, fn($val) => trim($val) !== ''))) {
                     continue;
                 }
-
-                // القسم (لنفس الكلية)
-                $department = Department::where('department_code', $deptCode)
-                    ->where('college_id', $collegeId)->first();
+    
+                // --- 1. جلب البيانات من الصف ---
+                $fullName              = $get('full_name');
+                $email                 = $get('email');
+                $phone                 = $get('phone');
+                $academicNumber        = $get('academic_number');
+                $genderVal             = $get('gender');
+                $departmentCode        = $get('department_code');
+                $titleCode             = $get('title_code');
+                $hireDate              = $get('hire_date');
+                $statusVal             = $get('status');
+                $canTeachExternallyVal = $get('can_teach_externally');
+    
+                // --- 2. التحقق من الحقول الإجبارية الأساسية ---
+                $requiredFields = compact('fullName', 'email', 'phone', 'academicNumber', 'genderVal', 'departmentCode', 'hireDate');
+                if (in_array(null, $requiredFields, true)) {
+                    $skipped++;
+                    $errors[] = "سطر {$rowNum}: الحقول الإجبارية (full_name, email, phone, academic_number, gender, department_code, hire_date) يجب أن تكون موجودة وتحتوي على قيمة.";
+                    continue;
+                }
+    
+                // --- 3. التحقق من الكيانات المرتبطة (القسم والدرجة) ---
+                $department = Department::where('department_code', $departmentCode)->where('college_id', $collegeId)->first();
                 if (!$department) {
                     $skipped++;
-                    $errors[] = "سطر {$rowNum}: department_code غير موجود أو لا يتبع الكلية المحددة ({$deptCode})";
+                    $errors[] = "سطر {$rowNum}: رمز القسم '{$departmentCode}' غير موجود أو لا يتبع هذه الكلية.";
                     continue;
                 }
-
-                // الدرجة الأكاديمية (اختياري)
+    
                 $title = null;
                 if ($titleCode) {
-                    $title = AcademicTitle::where('title_code', $titleCode)
-                        ->where('college_id', $collegeId)->first();
+                    $title = AcademicTitle::where('title_code', $titleCode)->where('college_id', $collegeId)->first();
                     if (!$title) {
                         $skipped++;
-                        $errors[] = "سطر {$rowNum}: title_code غير موجود أو لا يتبع الكلية المحددة ({$titleCode})";
+                        $errors[] = "سطر {$rowNum}: رمز الدرجة الأكاديمية '{$titleCode}' غير موجود أو لا يتبع هذه الكلية.";
                         continue;
                     }
                 }
-
-                // تحويلات
-                $gender = $this->mapGender($genderVal); // 1/2
+    
+                // --- 4. تحويل القيم ---
+                $gender = $this->mapGender($genderVal);
                 if ($gender === null) {
                     $skipped++;
-                    $errors[] = "سطر {$rowNum}: gender غير صالح";
+                    $errors[] = "سطر {$rowNum}: قيمة الجنس '{$genderVal}' غير صالحة.";
                     continue;
                 }
-                $status = $this->mapStatus($statusVal); // true/false
-
-                // ابحث عن المستخدم عبر academic_number (Unique)
-                $user = User::where('academic_number', $acadNo)->first();
-
-                if ($user) {
-                    // تحقق تضارب email/phone مع آخرين
-                    $emailUsedByOther = User::where('email', $email)->where('user_id', '!=', $user->user_id)->exists();
-                    if ($emailUsedByOther) {
-                        $skipped++;
-                        $errors[] = "سطر {$rowNum}: البريد مستخدم بواسطة مستخدم آخر";
-                        continue;
-                    }
-                    $phoneUsedByOther = User::where('phone', $phone)->where('user_id', '!=', $user->user_id)->exists();
-                    if ($phoneUsedByOther) {
-                        $skipped++;
-                        $errors[] = "سطر {$rowNum}: رقم الجوال مستخدم بواسطة مستخدم آخر";
-                        continue;
-                    }
-
-                    // تحديث المستخدم
-                    $user->update([
-                        'full_name'    => $fullName,
-                        'email'        => $email,
-                        'phone'        => $phone,
-                        'college_id'   => $collegeId,
-                        'gender'       => $gender,
-                        'user_type_id' => $lecturerType->user_type_id, // جعله محاضر
-                    ]);
-                } else {
-                    // تحقق من تضارب قبل الإنشاء
-                    if (User::where('email', $email)->exists()) {
-                        $skipped++;
-                        $errors[] = "سطر {$rowNum}: البريد مستخدم بالفعل";
-                        continue;
-                    }
-                    if (User::where('phone', $phone)->exists()) {
-                        $skipped++;
-                        $errors[] = "سطر {$rowNum}: رقم الجوال مستخدم بالفعل";
-                        continue;
-                    }
-
-                    // إنشاء مستخدم جديد (كمحاضر)
-                    $user = User::create([
-                        'full_name'       => $fullName,
-                        'email'           => $email,
-                        'phone'           => $phone,
-                        'college_id'      => $collegeId,
-                        'password'        => Hash::make('12345678'), // كلمة مرور افتراضية
-                        'academic_number' => $acadNo,
-                        'gender'          => $gender,
-                        'user_type_id'    => $lecturerType->user_type_id,
-                    ]);
+                $status = $this->mapStatus($statusVal);
+                $canTeachExternally = ($canTeachExternallyVal === null || $canTeachExternallyVal === '') ? false : $this->mapStatus($canTeachExternallyVal);
+    
+                // --- 5. التعامل مع سجل المستخدم (User) ---
+                $user = User::where('academic_number', $academicNumber)->first();
+                $userExists = (bool) $user;
+    
+                // التحقق من تضارب البريد الإلكتروني أو الهاتف مع مستخدمين آخرين
+                $conflictQuery = User::where(fn($q) => $q->where('email', $email)->orWhere('phone', $phone));
+                if($userExists) $conflictQuery->where('user_id', '!=', $user->user_id);
+                if($conflictQuery->exists()){
+                    $skipped++;
+                    $errors[] = "سطر {$rowNum}: البريد الإلكتروني أو رقم الهاتف مستخدم بالفعل من قبل مستخدم آخر.";
+                    continue;
                 }
-
-                // أنشئ/حدّث Lecturer (user_id فريد)
-                $lecturer = Lecturer::where('user_id', $user->user_id)->first();
-                if ($lecturer) {
-                    $lecturer->update([
-                        'college_id'    => $collegeId,
-                        'department_id' => $department->department_id,
-                        'title_id'      => $title?->title_id,
-                        'hire_date'     => $hireDate,
-                        'status'        => $status,
-                    ]);
-                    $updated++;
-                } else {
-                    Lecturer::create([
-                        'user_id'       => $user->user_id,
-                        'college_id'    => $collegeId,
-                        'department_id' => $department->department_id,
-                        'title_id'      => $title?->title_id,
-                        'hire_date'     => $hireDate,
-                        'status'        => $status,
-                    ]);
-                    $imported++;
+    
+                $userData = [
+                    'full_name'       => $fullName,
+                    'email'           => $email,
+                    'phone'           => $phone,
+                    'college_id'      => $collegeId,
+                    'gender'          => $gender,
+                    'user_type_id'    => $lecturerType->user_type_id,
+                ];
+                
+                if(!$userExists) {
+                    $userData['password'] = Hash::make('12345678'); // كلمة مرور افتراضية للجدد فقط
+                    $userData['academic_number'] = $academicNumber;
                 }
-            }
-
+                
+                $user = User::updateOrCreate(['academic_number' => $academicNumber], $userData);
+    
+                // --- 6. التعامل مع سجل المحاضر (Lecturer) ---
+                $lecturerData = [
+                    'college_id'           => $collegeId,
+                    'department_id'        => $department->department_id,
+                    'title_id'             => $title?->title_id,
+                    'hire_date'            => $hireDate,
+                    'status'               => $status,
+                    'can_teach_externally' => $canTeachExternally,
+                ];
+    
+                $lecturer = Lecturer::updateOrCreate(['user_id' => $user->user_id], $lecturerData);
+                
+                // تحديث العدادات
+                if ($lecturer->wasRecentlyCreated) $imported++;
+                elseif ($lecturer->wasChanged()) $updated++;
+    
+            } // نهاية حلقة while
+    
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
-            fclose($h);
+            fclose($handle);
             return response()->json([
-                'message' => 'فشل استيراد الملف',
+                'message' => 'حدث خطأ فادح أثناء الاستيراد.',
                 'error'   => $e->getMessage(),
+                'line'    => "Line {$e->getLine()} in {$e->getFile()}",
             ], 500);
         }
-
-        fclose($h);
-
+    
+        fclose($handle);
+    
         return response()->json([
-            'message'  => 'تمت عملية الاستيراد',
+            'message'  => 'تمت عملية الاستيراد بنجاح.',
             'imported' => $imported,
             'updated'  => $updated,
             'skipped'  => $skipped,
             'errors'   => $errors,
-        ]);
+        ], 200);
     }
 
     private function mapGender($val): ?int

@@ -157,6 +157,7 @@ return new class extends Migration
             $table->unsignedInteger('title_id')->nullable();
             $table->date('hire_date');
             $table->boolean('status')->default(true);
+            $table->boolean('can_teach_externally')->default(false);
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
             $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
@@ -380,6 +381,7 @@ return new class extends Migration
         Schema::create('qr_codes', function (Blueprint $table) {
             $table->increments('qr_id');
             $table->unsignedInteger('timetable_id'); 
+            $table->unsignedInteger('session_id');
             $table->unsignedInteger('refresh_option_id')->nullable();
             $table->string('qr_code_value');
             $table->dateTime('generated_at')->useCurrent();
@@ -390,6 +392,7 @@ return new class extends Migration
             $table->decimal('longitude', 10, 7);
             $table->decimal('allowed_distance', 5, 2);
             $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
+            $table->foreign('session_id')->references('session_id')->on('lecture_sessions')->onDelete('cascade');
             $table->foreign('refresh_option_id')->references('option_id')->on('qr_refresh_options')->onDelete('set null');
             $table->foreign('created_by')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
             $table->timestamps();

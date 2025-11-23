@@ -21,6 +21,7 @@ class QrCode extends Model
     // ✅ --- أضف أو تأكد من وجود هذه المصفوفة بالكامل --- ✅
      protected $fillable = [
         'timetable_id',
+        'session_id',
         'refresh_option_id',
         'qr_code_value',
         'expires_at',
@@ -38,6 +39,7 @@ class QrCode extends Model
      */
     protected $casts = [
         'expires_at' => 'datetime',
+        'generated_at' => 'datetime',
         'is_active' => 'boolean',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
@@ -60,5 +62,10 @@ class QrCode extends Model
     public function refreshOption()
     {
         return $this->belongsTo(QrRefreshOption::class, 'refresh_option_id', 'option_id');
+    }
+
+    public function session()
+    {
+        return $this->belongsTo(LectureSession::class, 'session_id', 'session_id');
     }
 }

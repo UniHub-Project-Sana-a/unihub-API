@@ -7,6 +7,12 @@ use App\Models\Timetable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+// --- ⬇️ أضف هذه الأسطر ⬇️ ---
+use App\Models\LectureSession;
+use App\Models\Period;
+use App\Models\StudentGroup;
+use Illuminate\Support\Str;
+// --- ⬆️ نهاية الإضافة ⬆️ ---
 
 class TimetableController extends Controller
 {
@@ -58,14 +64,17 @@ class TimetableController extends Controller
     /**
      * Store a newly created resource in storage.
      */
+        /**
+     * Store a newly created resource in storage.
+     */
     public function store(Request $request)
     {
-        // 1. التحقق الأساسي من صحة البيانات
+        // 1. التحقق الأساسي من صحة البيانات (لا تغيير هنا)
         $validator = Validator::make($request->all(), [
             'course_id'     => 'required|integer|exists:courses,course_id',
             'lecturer_id'   => 'required|integer|exists:lecturers,lecturer_id',
             'group_id'      => 'required|integer|exists:student_groups,group_id',
-            'level_id'      => 'required|integer|exists:levels,level_id', // تأكد من أن هذا الحقل يُرسل بشكل صحيح
+            'level_id'      => 'required|integer|exists:levels,level_id',
             'classroom_id'  => 'required|integer|exists:classrooms,classroom_id',
             'day_id'        => 'required|integer|exists:days,day_id',
             'period_id'     => 'required|integer|exists:periods,period_id',
@@ -84,7 +93,7 @@ class TimetableController extends Controller
             return response()->json(['status' => false, 'message' => 'خطأ في التحقق', 'errors' => $validator->errors()], 422);
         }
         
-        // 2. التحقق من التعارضات (Conflicts)
+        // 2. التحقق من التعارضات (لا تغيير هنا)
         $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $request->all());
         if (!empty($conflicts)) {
             return response()->json([
@@ -96,21 +105,47 @@ class TimetableController extends Controller
         
         // 3. إنشاء السجل
         try {
-            // استخدم البيانات التي تم التحقق منها
-            $timetableEntry = Timetable::create($validator->validated());
+            $validatedData = $validator->validated();
+            $timetableEntry = Timetable::create($validatedData);
+
+            // --- ✅ --- التعديل الرئيسي يبدأ هنا --- ✅ ---
+            
+            // 4. التحقق من شرط إنشاء جلسة تلقائية
+            if ($validatedData['start_date'] === $validatedData['end_date']) {
+                
+                // جلب البيانات اللازمة لإنشاء الجلسة
+                $period = Period::find($timetableEntry->period_id);
+                $studentGroup = StudentGroup::withCount('students')->find($timetableEntry->group_id);
+
+                // إنشاء الجلسة
+                LectureSession::create([
+                    'timetable_id' => $timetableEntry->timetable_id,
+                    'session_date' => $timetableEntry->start_date, // هو نفس end_date
+                    'start_time' => $period->start_time,
+                    'end_time' => $period->end_time,
+                    'actual_classroom_id' => $timetableEntry->classroom_id,
+                    'session_code' => 'SESS-' . Str::random(10) . '-' . time(), // كود فريد
+                    'status' => 0, // 0: لم تبدأ بعد
+                    'attendance_overage_alert' => false,
+                    // عدد الطلاب في المجموعة + المحاضر (1)
+                    'system_attendance_count' => 0, 
+                    'actual_attendance_count' => $studentGroup ? ($studentGroup->students_count) : 0, // عدد الحضور الفعلي يبدأ بصفر
+                ]);
+            }
+
+            // --- ✅ --- نهاية التعديل --- ✅ ---
 
             return response()->json([
                 'status' => true,
-                'message' => 'تم إنشاء بند الجدول بنجاح.',
+                'message' => 'تم إنشاء بند الجدول بنجاح.' . ($validatedData['start_date'] === $validatedData['end_date'] ? ' وتم إنشاء جلسة تلقائية له.' : ''),
                 'data' => $timetableEntry
             ], 201); // 201 Created
 
         } catch (\Exception $e) {
-            // ✅ التعديل هنا: إرجاع رسالة الخطأ الفعلية من الخادم
             return response()->json([
                 'status' => false,
                 'message' => 'حدث خطأ غير متوقع أثناء الحفظ في قاعدة البيانات.',
-                'error' => $e->getMessage() // <-- هذا السطر مهم جدًا للتشخيص
+                'error' => $e->getMessage()
             ], 500);
         }
     }

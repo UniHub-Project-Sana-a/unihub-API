@@ -14,6 +14,8 @@ use Laravel\Passport\Token;
 use App\Models\UserDevice;
 use App\Models\OtpDeviceVerification;
 use App\Notifications\SendOtpNotification;
+use Illuminate\Support\Facades\Http;
+
  // تأكد أن هذا الإشعار موجود
 
 class AuthController extends Controller
@@ -129,5 +131,28 @@ class AuthController extends Controller
         $token->revoke();
 
         return response()->json(['message' => 'تم تسجيل الخروج بنجاح.']);
+    }
+
+    public function refresh(Request $request)
+    {
+        $request->validate([
+            'refresh_token' => 'required|string',
+        ]);
+
+        // إرسال طلب داخلي إلى مسار التوكن الخاص بـ Passport
+        // هذا يحاكي طلب العميل للحصول على توكن جديد باستخدام الـ refresh_token
+        $response = Http::asForm()->post(config('app.url') . '/oauth/token', [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $request->refresh_token,
+            'client_id' => config('passport.personal_access_client.id'), // أو client_id الخاص بالتطبيق
+            'client_secret' => config('passport.personal_access_client.secret'), // Secret الخاص بالعميل
+            'scope' => '',
+        ]);
+
+        if ($response->failed()) {
+            return response()->json(['message' => 'Invalid refresh token'], 401);
+        }
+
+        return $response->json();
     }
 }
