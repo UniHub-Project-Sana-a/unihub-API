@@ -15,133 +15,244 @@ use Carbon\Carbon;
 class ReportsController extends Controller
 {
     /**
-     * 1. التقرير الرئيسي للوحة التحكم (Dashboard Data)
-     */
+       * عرض لوحة التقارير الشاملة (المالية، المحاضرين، المقررات)
+    */
     public function index(Request $request, $collegeId)
     {
-        $year = $request->get('year', date('Y'));
-        // يمكن إضافة فلتر للفصل الدراسي هنا إذا توفر في قاعدة البيانات
+        try {
+            // 1. استلام الفلاتر من الواجهة
+            $year = $request->get('academic_year');
+            $month = $request->get('month');
+            
+            $semesterId = $request->get('semester_id');
+            $departmentId = $request->get('department_id');
+            $programId = $request->get('program_id');
+            $levelId = $request->get('level_id');
 
-        // --- أ. التقارير المالية (Financial KPIs) ---
-        
-        // 1. المحاضرات المعتمدة (إجمالي الجلسات المجدولة لهذا العام)
-        $approvedSessions = LectureSession::whereHas('timetable', function($q) use ($collegeId) {
-            $q->where('college_id', $collegeId);
-        })->whereYear('session_date', $year)->count();
-
-        // 2. المحاضرات المنفذة (status = 1)
-        $executedSessions = LectureSession::whereHas('timetable', function($q) use ($collegeId) {
-            $q->where('college_id', $collegeId);
-        })->where('status', 1)->whereYear('session_date', $year)->count();
-
-        // 3. التعويض المقدر (مجموع المبالغ من جدول حضور المحاضر)
-        $compensation = LecturerAttendance::where('college_id', $collegeId)
-            ->whereYear('attendance_date', $year)
-            ->sum('lecture_rate_at_attendance');
-
-        // 4. الغياب/التأخير (جلسات فائتة ولم تنفذ)
-        $missedSessions = LectureSession::whereHas('timetable', function($q) use ($collegeId) {
-            $q->where('college_id', $collegeId);
-        })
-        ->where('status', 0)
-        ->where('session_date', '<', Carbon::now())
-        ->whereYear('session_date', $year)
-        ->count();
-
-
-        // --- ب. تقرير حضور المحاضرين (Instructor Attendance) ---
-        $instructors = Lecturer::where('college_id', $collegeId)
-            ->with(['user:user_id,full_name', 'department:department_id,department_name'])
-            ->withCount([
-                // 1. المعتمدة
-                'lectureSessions as approved_count' => function ($q) use ($year) {
-                    $q->whereYear('lecture_sessions.session_date', $year);
-                },
-                
-                // 2. المنفذة
-                'lectureSessions as delivered_count' => function ($q) use ($year) {
-                    $q->where('lecture_sessions.status', 1)
-                      ->whereYear('lecture_sessions.session_date', $year);
-                },
-
-                // 3. الغياب
-                'lectureSessions as absences_count' => function ($q) use ($year) {
-                    $q->where('lecture_sessions.status', 0)
-                      ->where('lecture_sessions.session_date', '<', Carbon::now())
-                      ->whereYear('lecture_sessions.session_date', $year);
-                },
-                
-                // 4. التعويضية
-                'lectureSessions as makeups_count' => function ($q) use ($year) {
-                    $q->where('lecture_sessions.status', 1)
-                      ->whereYear('lecture_sessions.session_date', $year)
-                      ->whereHas('timetable', function($t) {
-                          // هنا لا نحتاج لتحديد الجدول لأن lecture_type موجود فقط في timetable
-                          $t->where('lecture_type', 1);
-                      });
+            // دالة مساعدة (Closure) لتطبيق فلتر الشهر عند الحاجة
+            $applyMonthFilter = function($query) use ($month) {
+                if ($month && $month !== 'all') {
+                    $query->whereMonth('session_date', $month);
                 }
-            ])
-            ->get()
-            ->map(function ($lecturer) {
-                // ... (باقي كود الـ map كما هو بدون تغيير) ...
-                // جلب أسماء القاعات...
-                $rooms = DB::table('lecture_sessions')
-                    ->join('timetable', 'lecture_sessions.timetable_id', '=', 'timetable.timetable_id')
-                    ->join('classrooms', 'timetable.classroom_id', '=', 'classrooms.classroom_id')
-                    ->where('timetable.lecturer_id', $lecturer->lecturer_id)
-                    ->where('lecture_sessions.status', 1)
-                    ->distinct()
-                    ->pluck('classrooms.classroom_name')
-                    ->take(3)
-                    ->implode(', ');
+            };
 
-                return [
-                    'id' => $lecturer->lecturer_id,
-                    'name' => $lecturer->user->full_name ?? 'غير معروف',
-                    'department' => $lecturer->department->department_name ?? '-',
-                    'approved' => $lecturer->approved_count,
-                    'delivered' => $lecturer->delivered_count,
-                    'absences' => $lecturer->absences_count,
-                    'makeups' => $lecturer->makeups_count,
-                    'rooms' => $rooms ?: '-'
-                ];
-            });
-
-
-        // --- ج. تقرير المقررات (Course Attendance) ---
-        $courses = Course::whereHas('timetable', function($q) use ($collegeId) {
+            // ----------------------------------------------------------------
+            // أولاً: الفلاتر الهيكلية المشتركة (Scope) لتصفية الجداول الدراسية
+            // ----------------------------------------------------------------
+            $timetableScope = function($q) use ($collegeId, $year, $semesterId, $departmentId, $programId, $levelId) {
                 $q->where('college_id', $collegeId);
-            })
-            ->withCount('timetable as total_lectures') // عدد مرات ظهورها في الجدول
-            ->take(6)
-            ->get()
-            ->map(function ($course) {
-                // حساب نسبة الحضور (منطق تقريبي للعرض)
-                // في الواقع تحتاج لحساب: (مجموع حضور الطلاب / (عدد الطلاب المسجلين * عدد الجلسات))
-                $avgAttendance = 85; // قيمة افتراضية للعرض
-                $studentsCount = 45; // قيمة افتراضية
+                
+                // فلترة بالسنة الدراسية
+                if ($year && $year !== 'all') {
+                    $q->where('academic_year', $year);
+                }
 
-                return [
-                    'course' => $course->course_name,
-                    'total' => $course->total_lectures * 12, // إجمالي المحاضرات بالفصل
-                    'attendance' => $avgAttendance,
-                    'students' => $studentsCount
-                ];
-            });
+                // فلترة بالهيكل الأكاديمي
+                if ($departmentId) $q->where('department_id', $departmentId);
+                if ($levelId) $q->where('level_id', $levelId);
 
-        return response()->json([
-            'status' => true,
-            'data' => [
-                'financial' => [
-                    'approved' => $approvedSessions,
-                    'executed' => $executedSessions,
-                    'compensation' => $compensation,
-                    'missed' => $missedSessions
-                ],
-                'instructors' => $instructors,
-                'courses' => $courses
-            ]
-        ]);
+                // فلترة عبر المواد (للبرنامج والترم)
+                $q->whereHas('course', function($c) use ($programId, $semesterId) {
+                    if ($programId) $c->where('program_id', $programId);
+                    if ($semesterId) $c->where('semester_id', $semesterId);
+                });
+            };
+
+            // ----------------------------------------------------------------
+            // القسم (أ): التقارير المالية والمؤشرات (Financial KPIs)
+            // ----------------------------------------------------------------
+            
+            // استعلام أساسي للجلسات (Lecture Sessions) بناءً على فلاتر الجدول + الشهر
+            $sessionsQuery = \App\Models\LectureSession::whereHas('timetable', $timetableScope)
+                ->tap($applyMonthFilter);
+
+            // 1. المحاضرات المعتمدة (إجمالي الجلسات المجدولة في الفترة)
+            $approvedSessions = (clone $sessionsQuery)->count();
+
+            // 2. المحاضرات المنفذة (تم التحضير فيها)
+            $executedSessions = (clone $sessionsQuery)->where('status', 1)->count();
+
+            // 3. المحاضرات الفائتة/الغياب (لم تنفذ وانتهى وقتها)
+            $missedSessions = (clone $sessionsQuery)
+                ->where('status', 0)
+                ->where('session_date', '<', \Carbon\Carbon::now())
+                ->count();
+
+            // 4. التعويض المالي المقدر (من واقع سجلات الحضور المعتمدة)
+            // نستخدم جدول LecturerAttendance لأنه الأدق مالياً
+            $compensation = \App\Models\LecturerAttendance::whereHas('timetable', $timetableScope)
+                ->when($month && $month !== 'all', function($q) use ($month) {
+                    $q->whereMonth('attendance_date', $month);
+                })
+                ->sum('lecture_rate_at_attendance');
+
+
+            // ----------------------------------------------------------------
+            // القسم (ب): تقرير أداء ومستحقات المحاضرين (Instructors)
+            // ----------------------------------------------------------------
+            
+            $instructorsQuery = \App\Models\Lecturer::where('college_id', $collegeId);
+
+            if ($departmentId) {
+                $instructorsQuery->where('department_id', $departmentId);
+            }
+
+            $instructors = $instructorsQuery
+                ->with(['user:user_id,full_name', 'department:department_id,department_name', 'academicTitle'])
+                ->get() // نأخذ الكل لحساب الإجماليات بدقة، أو يمكن استخدام paginate في جداول منفصلة
+                ->map(function ($lecturer) use ($year, $applyMonthFilter) {
+                    
+                    // 1. تحديد جداول هذا المحاضر للسنة المحددة
+                    $timetableIds = DB::table('timetable')
+                        ->where('lecturer_id', $lecturer->lecturer_id)
+                        ->when($year && $year !== 'all', function($q) use ($year) {
+                            $q->where('academic_year', $year);
+                        })
+                        ->pluck('timetable_id');
+
+                    // 2. حساب إحصائيات الجلسات (مع تطبيق فلتر الشهر)
+                    $stats = DB::table('lecture_sessions')
+                        ->whereIn('timetable_id', $timetableIds)
+                        ->tap($applyMonthFilter)
+                        ->selectRaw('
+                            COUNT(*) as approved,
+                            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as delivered,
+                            SUM(CASE WHEN status = 0 AND session_date < NOW() THEN 1 ELSE 0 END) as absences
+                        ')
+                        ->first();
+
+                    // 3. حساب الساعات الفعلية (Total Hours) بدقة
+                    // يجب ضرب عدد الجلسات المنفذة لكل مقرر في عدد ساعات ذلك المقرر
+                    $totalHours = 0;
+                    
+                    // نجلب الجداول المرتبطة بهذا المحاضر
+                    $timetables = DB::table('timetable')
+                        ->whereIn('timetable_id', $timetableIds)
+                        ->select('timetable_id', 'lecture_hours')
+                        ->get();
+
+                    foreach($timetables as $tt) {
+                        // نعد الجلسات المنفذة لهذا الجدول بالتحديد (في الشهر المحدد)
+                        $count = DB::table('lecture_sessions')
+                            ->where('timetable_id', $tt->timetable_id)
+                            ->where('status', 1)
+                            ->tap($applyMonthFilter)
+                            ->count();
+                        
+                        $totalHours += ($count * (float)$tt->lecture_hours);
+                    }
+
+                    // 4. البيانات المالية (السعر والمبلغ)
+                    $academicTitle = $lecturer->academicTitle;
+                    
+                    // محاولة جلب الرتبة يدوياً إذا لم تأتِ مع العلاقة
+                    if (!$academicTitle && $lecturer->title_id) {
+                        $academicTitle = DB::table('academic_titles')->where('title_id', $lecturer->title_id)->first();
+                    }
+
+                    $hourlyPrice = $academicTitle ? (float)$academicTitle->hourly_price : 0;
+                    $totalAmount = $totalHours * $hourlyPrice;
+                    $rankName = $academicTitle ? ($academicTitle->title_name ?? 'محاضر') : 'محاضر';
+
+                    // 5. نسبة الالتزام
+                    $approvedCount = $stats->approved ?? 0;
+                    $deliveredCount = $stats->delivered ?? 0;
+                    $complianceRate = ($approvedCount > 0) ? ($deliveredCount / $approvedCount) * 100 : 0;
+
+                    // تجاهل المحاضرين الذين ليس لديهم أي نشاط في الفترة المحددة (اختياري لتنظيف التقرير)
+                    // if ($approvedCount == 0) return null; 
+
+                    return [
+                        'id' => $lecturer->lecturer_id,
+                        'name' => $lecturer->user->full_name ?? 'غير معروف',
+                        'academic_rank' => $rankName,
+                        'department' => $lecturer->department->department_name ?? '-',
+                        
+                        'approved' => $approvedCount,
+                        'delivered' => $deliveredCount,
+                        'absences' => $stats->absences ?? 0,
+                        'makeups' => 0, // يمكن ربطه بجدول التعويضات لاحقاً
+                        
+                        'total_hours' => $totalHours,
+                        'compliance_rate' => round($complianceRate, 1),
+                        
+                        'hourly_price' => $hourlyPrice,
+                        'total_amount' => $totalAmount,
+                        'employment_status' => 'متفرغ' // أو $lecturer->employment_type
+                    ];
+                })
+                ->filter() // إزالة القيم الفارغة (nulls) إذا فعلنا شرط الإخفاء
+                ->values(); // إعادة فهرسة المصفوفة
+
+
+            // ----------------------------------------------------------------
+            // القسم (ج): تقرير المقررات الدراسية (Courses)
+            // ----------------------------------------------------------------
+            
+            $coursesQuery = \App\Models\Course::query()->where('college_id', $collegeId);
+
+            // تطبيق الفلاتر الهرمية
+            if ($departmentId) $coursesQuery->where('department_id', $departmentId);
+            if ($programId) $coursesQuery->where('program_id', $programId);
+            if ($levelId) $coursesQuery->where('level_id', $levelId);
+            if ($semesterId) $coursesQuery->where('semester_id', $semesterId);
+
+            $courses = $coursesQuery
+                ->with(['department', 'program', 'level', 'semester'])
+                ->withCount(['timetable as total_sessions_count' => function($q) use ($year) {
+                     if ($year && $year !== 'all') $q->where('academic_year', $year);
+                }])
+                ->take(50) // تحديد العدد للأداء
+                ->get()
+                ->map(function ($course) use ($year) {
+                    
+                    // لحساب نسبة الحضور التقريبية للمقرر
+                    // (ملاحظة: الحساب الدقيق يتم عند النقر على المقرر في التقرير التفصيلي)
+                    $attendanceRate = 0;
+                    
+                    return [
+                        'course_id' => $course->course_id,
+                        'course_name' => $course->course_name,
+                        'course_code' => $course->course_code,
+                        'notes' => $course->notes,
+                        
+                        'department_name' => optional($course->department)->department_name ?? 'عام',
+                        'program_name' => optional($course->program)->program_name ?? '-',
+                        'level_name' => optional($course->level)->level_name ?? (optional($course->level)->level_number ?? '-'),
+                        'semester_name' => optional($course->semester)->semester_name ?? ('الترم ' . optional($course->semester)->term_number ?? '-'),
+                        
+                        'total_lectures' => $course->total_sessions_count ?? 0,
+                        'attendance_rate' => $attendanceRate,
+                        'students_count' => 0 // يتطلب استعلاماً ثقيلاً، يفضل جلبه عند الطلب
+                    ];
+                });
+
+            // ----------------------------------------------------------------
+            // النهاية: إرجاع البيانات
+            // ----------------------------------------------------------------
+            
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'financial' => [
+                        'approved' => $approvedSessions,
+                        'executed' => $executedSessions,
+                        'compensation' => $compensation,
+                        'missed' => $missedSessions
+                    ],
+                    'instructors' => $instructors,
+                    'courses' => $courses
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false, 
+                'message' => 'Server Error: ' . $e->getMessage(),
+                'file' => basename($e->getFile()),
+                'line' => $e->getLine()
+            ], 500);
+        }
     }
 
     /**
@@ -400,5 +511,316 @@ class ReportsController extends Controller
                 'history' => $history
             ]
         ]);
+    }
+
+    // إضافة دالة جديدة لجلب مجموعات مقرر معين مع الإحصائيات
+    public function getCourseGroups(Request $request, $collegeId)
+    {
+        try {
+            $courseId = $request->course_id;
+            if (!$courseId) return response()->json(['status' => true, 'data' => []]);
+
+            $year = $request->academic_year;
+
+            // 1. الحصول على IDs المجموعات الفريدة المرتبطة بهذا المقرر (لمنع التكرار)
+            $groupIds = DB::table('timetable')
+                ->where('college_id', $collegeId)
+                ->where('course_id', $courseId)
+                ->when($year, function ($q) use ($year) {
+                    $q->where('academic_year', $year);
+                })
+                ->distinct()
+                ->pluck('group_id');
+
+            // 2. جلب بيانات المجموعات وحساب الإحصائيات المجمعة
+            $groupsData = [];
+
+            foreach ($groupIds as $groupId) {
+                // أ) اسم المجموعة
+                $groupName = DB::table('student_groups')
+                    ->where('group_id', $groupId)
+                    ->value('group_name');
+
+                if (!$groupName) continue;
+
+                // ب) عدد الطلاب في المجموعة
+                $studentsCount = DB::table('student_group_members')
+                    ->where('group_id', $groupId)
+                    ->count();
+
+                // ج) العثور على كل IDs الجدول (timetable_ids) لهذه المجموعة والمقرر
+                // لأن المجموعة قد يكون لها أكثر من موعد (أحد، ثلاثاء) أو سجلات متعددة
+                $timetableIds = DB::table('timetable')
+                    ->where('college_id', $collegeId)
+                    ->where('course_id', $courseId)
+                    ->where('group_id', $groupId)
+                    ->when($year, function ($q) use ($year) {
+                        $q->where('academic_year', $year);
+                    })
+                    ->pluck('timetable_id');
+
+                // د) حساب الجلسات المنفذة (status = 1)
+                // نبحث في جدول الجلسات عن أي جلسة تابعة لأي من timetable_ids هذه
+                $executedSessionsCount = DB::table('lecture_sessions')
+                    ->whereIn('timetable_id', $timetableIds)
+                    ->where('status', 1) // منفذة
+                    ->count();
+
+                // هـ) حساب حضور الطلاب الفعلي
+                // نبحث في جدول حضور الطلاب عن أي سجل تابع لأي من timetable_ids هذه
+                $totalStudentAttendance = DB::table('student_attendance')
+                    ->whereIn('timetable_id', $timetableIds)
+                    ->where('status', 1) // حاضر
+                    ->count();
+
+                // و) حساب النسبة
+                $percentage = 0;
+                $totalPossibleAttendance = $executedSessionsCount * $studentsCount;
+                
+                if ($totalPossibleAttendance > 0) {
+                    $percentage = ($totalStudentAttendance / $totalPossibleAttendance) * 100;
+                }
+
+                $groupsData[] = [
+                    'group_id' => $groupId,
+                    'group_name' => $groupName,
+                    'students_count' => $studentsCount,
+                    'attendance_percentage' => round($percentage, 1),
+                    'sessions_count' => $executedSessionsCount
+                ];
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $groupsData
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false, 
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // دالة لجلب تفاصيل حضور الطلاب في مجموعة ومقرر معين
+    public function getGroupStudentsAttendance(Request $request, $collegeId)
+    {
+        try {
+            $courseId = $request->course_id;
+            $groupId = $request->group_id;
+            $year = $request->academic_year;
+
+            if (!$courseId || !$groupId) {
+                return response()->json(['status' => false, 'message' => 'Missing parameters'], 400);
+            }
+
+            // 1. تحديد معرفات الجدول (Timetable IDs) ذات الصلة
+            // هذا هو الرابط الأساسي بين الطالب والمقرر في هذه السنة
+            $timetableIds = DB::table('timetable')
+                ->where('college_id', $collegeId)
+                ->where('course_id', $courseId)
+                ->where('group_id', $groupId)
+                ->when($year, function ($q) use ($year) {
+                    $q->where('academic_year', $year);
+                })
+                ->pluck('timetable_id');
+
+            if ($timetableIds->isEmpty()) {
+                return response()->json(['status' => true, 'data' => []]);
+            }
+
+            // 2. إحصائيات الجلسات العامة لهذه المجموعة
+            // المعتمدة: كل الجلسات الموجودة في الجدول (سواء نفذت أو لا)
+            $approvedSessionsCount = DB::table('lecture_sessions')
+                ->whereIn('timetable_id', $timetableIds)
+                ->count();
+
+            // المنفذة: الجلسات التي تمت بالفعل (status = 1)
+            $executedSessionsCount = DB::table('lecture_sessions')
+                ->whereIn('timetable_id', $timetableIds)
+                ->where('status', 1)
+                ->count();
+
+            // 3. جلب الطلاب وإحصائياتهم
+            $students = DB::table('student_group_members')
+                ->join('students', 'student_group_members.student_id', '=', 'students.student_id')
+                ->join('users', 'students.user_id', '=', 'users.user_id')
+                ->where('student_group_members.group_id', $groupId)
+                ->select(
+                    'students.student_id',
+                    'users.full_name as student_name',
+                    'users.academic_number'
+                )
+                ->orderBy('users.full_name')
+                ->get()
+                ->map(function ($student) use ($timetableIds, $executedSessionsCount, $approvedSessionsCount) {
+                    
+                    // جلب سجلات الحضور لهذا الطالب في هذه الجلسات
+                    $attendanceStats = DB::table('student_attendance')
+                        ->whereIn('timetable_id', $timetableIds)
+                        ->where('student_id', $student->student_id)
+                        ->selectRaw('count(*) as total, sum(case when status = 1 then 1 else 0 end) as present')
+                        ->first();
+
+                    $presentCount = $attendanceStats->present ?? 0;
+                    
+                    // الغياب = (عدد الجلسات المنفذة - عدد مرات الحضور)
+                    // ملاحظة: نعتمد على الجلسات المنفذة لحساب الغياب بدقة
+                    $absentCount = max(0, $executedSessionsCount - $presentCount);
+
+                    // حساب النسبة
+                    $percentage = 0;
+                    if ($executedSessionsCount > 0) {
+                        $percentage = ($presentCount / $executedSessionsCount) * 100;
+                    }
+
+                    return [
+                        'student_id' => $student->student_id,
+                        'name' => $student->student_name,
+                        'academic_number' => $student->academic_number,
+                        'total_sessions_approved' => $approvedSessionsCount, // المجدولة
+                        'total_sessions_executed' => $executedSessionsCount, // المنفذة فعلياً
+                        'present_count' => $presentCount,
+                        'absent_count' => $absentCount,
+                        'attendance_percentage' => round($percentage, 1)
+                    ];
+                });
+
+            return response()->json([
+                'status' => true,
+                'data' => $students
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+        /**
+     * بيانات لوحة التحكم الرئيسية (Dashboard)
+     */
+        public function dashboard($collegeId)
+    {
+        try {
+            $today = Carbon::today()->toDateString();
+            $now = Carbon::now()->format('H:i:s');
+            $currentMonth = Carbon::now()->month;
+            $currentYear = Carbon::now()->year;
+
+            // 1. Counts
+            $counts = [
+                'departments' => DB::table('departments')->where('college_id', $collegeId)->count(),
+                'classrooms'  => DB::table('classrooms')
+                                    ->join('buildings', 'classrooms.building_id', '=', 'buildings.building_id')
+                                    ->where('buildings.college_id', $collegeId)
+                                    ->count(),
+                'programs'    => DB::table('programs')
+                                    ->join('departments', 'programs.department_id', '=', 'departments.department_id')
+                                    ->where('departments.college_id', $collegeId)
+                                    ->count(),
+                'staff'       => DB::table('lecturers')->where('college_id', $collegeId)->count(),
+            ];
+
+            // 2. Financials
+            // أ) مصروفات الشهر الحالي
+            $monthKey = sprintf("%02d-%s", $currentMonth, $currentYear);
+            
+            // استخدام DB::raw للتعامل مع net_amount بأمان
+            $currentMonthExpense = DB::table('lecturer_payouts')
+                ->join('financial_cycles', 'lecturer_payouts.cycle_id', '=', 'financial_cycles.cycle_id')
+                ->where('financial_cycles.college_id', $collegeId)
+                ->where('financial_cycles.month_year', $monthKey)
+                ->sum('lecturer_payouts.net_amount'); // تأكد أن العمود موجود
+
+            // ب) آخر 6 أشهر
+            $lastSixMonths = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $date = Carbon::now()->subMonths($i);
+                $m = $date->month;
+                $y = $date->year;
+                $key = sprintf("%04d-%02d", $y, $m);
+                $dbKey = sprintf("%02d-%s", $m, $y);
+
+                $amount = DB::table('financial_cycles')
+                    ->where('college_id', $collegeId)
+                    ->where('month_year', $dbKey)
+                    ->value('total_payout') ?? 0;
+
+                $lastSixMonths[] = [
+                    'month_key' => $key,
+                    'total_amount' => $amount
+                ];
+            }
+
+            // ج) أعلى المنفقين
+            $topSpenders = DB::table('lecturer_payouts')
+                ->join('lecturers', 'lecturer_payouts.lecturer_id', '=', 'lecturers.lecturer_id')
+                ->join('users', 'lecturers.user_id', '=', 'users.user_id')
+                ->join('departments', 'lecturers.department_id', '=', 'departments.department_id')
+                ->join('financial_cycles', 'lecturer_payouts.cycle_id', '=', 'financial_cycles.cycle_id')
+                ->where('financial_cycles.college_id', $collegeId)
+                ->select(
+                    'users.full_name as name',
+                    'departments.department_name as department',
+                    DB::raw('SUM(lecturer_payouts.total_hours) as hours'),
+                    DB::raw('SUM(lecturer_payouts.net_amount) as amount')
+                )
+                ->groupBy('users.full_name', 'departments.department_name')
+                ->orderByDesc('amount')
+                ->limit(5)
+                ->get();
+
+            // 3. Quick Stats
+            
+            // استعلام أساسي للجلسات
+            $baseSessionQuery = DB::table('lecture_sessions')
+                ->join('timetable', 'lecture_sessions.timetable_id', '=', 'timetable.timetable_id')
+                ->where('timetable.college_id', $collegeId)
+                ->where('lecture_sessions.session_date', $today);
+
+            $todaySessions = (clone $baseSessionQuery)->count();
+            
+            $todayAttendance = (clone $baseSessionQuery)
+                ->where('lecture_sessions.status', 1)
+                ->count();
+
+            $todayAbsence = (clone $baseSessionQuery)
+                ->where('lecture_sessions.status', 0)
+                ->where('lecture_sessions.end_time', '<', $now)
+                ->count();
+
+            $busyRooms = (clone $baseSessionQuery)
+                ->where('lecture_sessions.start_time', '<=', $now)
+                ->where('lecture_sessions.end_time', '>=', $now)
+                ->distinct('lecture_sessions.actual_classroom_id')
+                ->count('lecture_sessions.actual_classroom_id');
+
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'counts' => $counts,
+                    'financials' => [
+                        'current_month' => $currentMonthExpense,
+                        'last_six_months' => $lastSixMonths,
+                        'top_spenders' => $topSpenders
+                    ],
+                    'quick_stats' => [
+                        'today_sessions' => $todaySessions,
+                        'today_attendance' => $todayAttendance,
+                        'today_absence' => $todayAbsence,
+                        'busy_rooms' => $busyRooms
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Server Error: ' . $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => basename($e->getFile())
+            ], 500);
+        }
     }
 }

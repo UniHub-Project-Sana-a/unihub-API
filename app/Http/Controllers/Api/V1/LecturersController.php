@@ -117,12 +117,18 @@ class LecturersController extends Controller
         if (($handle = fopen($path, 'r')) === false) {
             return response()->json(['message' => 'تعذر قراءة الملف'], 422);
         }
+
+        $firstLine = fgets($handle);
+        rewind($handle); // إعادة المؤشر للبداية
+        $delimiter = (str_contains($firstLine, ';')) ? ';' : ',';
     
-        $header = fgetcsv($handle, 0, ',');
+        $header = fgetcsv($handle, 0,  $delimiter);
         if (!$header) {
             fclose($handle);
             return response()->json(['message' => 'ملف CSV بدون رؤوس أعمدة'], 422);
         }
+
+        $header[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $header[0]);
     
         // تنظيف أسماء الأعمدة وفهرستها
         $headerMap = array_flip(array_map(fn($h) => trim(mb_strtolower($h)), $header));
@@ -131,7 +137,7 @@ class LecturersController extends Controller
     
         DB::beginTransaction();
         try {
-            while (($row = fgetcsv($handle, 0, ',')) !== false) {
+            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
                 $rowNum++;
     
                 // دالة مساعدة لجلب القيمة من الصف بناءً على اسم العمود

@@ -18,43 +18,59 @@ class StudentAttendanceController extends Controller
      * يعرض قائمة الحضور لجلسة محاضرة معينة بناءً على timetable_id.
      * هذا هو الـ endpoint الرئيسي الذي تستدعيه الواجهة بعد انتهاء الجلسة.
      */
-    public function index(Request $request)
+        public function index(Request $request)
     {
-        $request->validate([
-            'timetable_id' => 'required|integer|exists:timetable,timetable_id',
-        ]);
+        // 1. تحديد كود الجلسة (session_code)
+        // نسمح بالبحث إما عن طريق كود الجلسة مباشرة (الأدق) أو عن طريق المحاضرة (الأحدث)
+        $sessionCode = null;
 
-        $timetableId = $request->timetable_id;
-        $latestSession = LectureSession::where('timetable_id', $timetableId)->latest()->first();
+        if ($request->filled('session_code')) {
+            // ✅ الحالة 1 (الجديدة): البحث المباشر بكود الجلسة
+            $sessionCode = $request->session_code;
+        } 
+        elseif ($request->filled('timetable_id')) {
+            // الحالة 2 (القديمة): البحث عن آخر جلسة للمحاضرة
+            $latestSession = LectureSession::where('timetable_id', $request->timetable_id)
+                                           ->latest()
+                                           ->first();
+            if ($latestSession) {
+                $sessionCode = $latestSession->session_code;
+            }
+        }
 
-        if (!$latestSession) {
+        // إذا لم نجد كود جلسة، نرجع مصفوفة فارغة
+        if (!$sessionCode) {
             return response()->json(['data' => []]);
         }
-        
-        $sessionCode = $latestSession->session_code;
+
+        // 2. جلب سجلات الحضور
         $attendanceRecords = StudentAttendance::where('session_code', $sessionCode)
-                                              ->with('student.user')
+                                              ->with('student.user') // Eager Loading للبيانات
                                               ->get();
 
-        if ($latestSession->system_attendance_count !== $attendanceRecords->count()) {
-            $latestSession->system_attendance_count = $attendanceRecords->count();
-            $latestSession->save();
-        }
+        // (اختياري) تحديث عداد النظام في جدول الجلسات ليكون متزامن دائماً
+        LectureSession::where('session_code', $sessionCode)
+                      ->update(['system_attendance_count' => $attendanceRecords->count()]);
 
+        // 3. تنسيق البيانات (Mapping) لتناسب واجهة React
         $formattedRecords = $attendanceRecords->map(function ($record) {
+            // حماية ضد البيانات المحذوفة أو الناقصة
             if (!$record->student || !$record->student->user) {
                 return null;
             }
 
-            // ✅ --- التعديل هنا: إضافة التحقق من وجود created_at --- ✅
             return [
-                'studentName' => $record->student->user->full_name,
-                'studentId' => $record->student->user->academic_number,
-                // إذا كان created_at موجودًا، قم بتنسيقه. وإلا، أرجع نصًا بديلاً.
-                'scanTime' => $record->created_at ? $record->created_at->format('H:i:s') : 'N/A',
-                'method' => 'QR',
+                'attendance_id' => $record->attendance_id, 
+                'student_id'    => $record->student_id, // مهم للمقارنة في الفرونت إند
+                'studentName'   => $record->student->user->full_name,
+                'studentId'     => $record->student->user->academic_number, // الرقم الجامعي
+                'status'        => $record->status, // 1 حاضر
+                
+                // تنسيق الوقت كما طلبت
+                'scanTime'      => $record->created_at ? $record->created_at->format('H:i:s') : 'N/A',
+                'method'        => 'QR', // أو يمكنك جلبه من العمود إذا أضفته لاحقاً
             ];
-        })->filter();
+        })->filter()->values(); // filter لإزالة الـ null، values لإعادة ترتيب المصفوفة
 
         return response()->json(['data' => $formattedRecords]);
     }

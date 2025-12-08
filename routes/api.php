@@ -42,6 +42,8 @@ use App\Http\Controllers\Api\V1\TimetableSetController;
 use App\Http\Controllers\Api\V1\TimetableEntryController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\ReportsController;
+use App\Http\Controllers\Api\V1\FinancialController;
+use App\Http\Controllers\Api\V1\DashboardController;
 
 // --- Debug Route (Optional) ---
 Route::get('/debug/password-algo', function () {
@@ -79,12 +81,14 @@ Route::prefix('v1')->group(function () {
         // === Authentication & User ===
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::post('auth/change-password', [AuthController::class, 'changePassword']);
 
         // === Lookups & Static Data ===
         Route::controller(LookupsController::class)->prefix('lookups')->group(function () {
             Route::get('user-types', 'userTypes');
             Route::get('permissions', 'permissions');
             Route::get('colleges', 'colleges');
+            Route::get('academic-years', 'academicYears'); 
         });
 
         // === Core Resources (CRUD) ===
@@ -103,7 +107,11 @@ Route::prefix('v1')->group(function () {
         Route::get('colleges/{college}/dashboard', [CollegesController::class, 'dashboard']);
         
         // التقرير الرئيسي (Dashboard)
+        Route::get('dashboard/university-overview', [DashboardController::class, 'index']);
         Route::get('colleges/{college}/reports', [ReportsController::class, 'index']);
+        Route::get('colleges/{college}/reports/course-groups', [ReportsController::class, 'getCourseGroups']);
+        Route::get('colleges/{college}/reports/group-students-attendance', [ReportsController::class, 'getGroupStudentsAttendance']);
+        Route::get('colleges/{college}/dashboard', [ReportsController::class, 'dashboard']);
         
         // التقارير التفصيلية (الوصول السريع)
         Route::get('colleges/{college}/reports/detailed', [ReportsController::class, 'detailedReport']);
@@ -223,5 +231,20 @@ Route::prefix('v1')->group(function () {
             Route::get('audit-logs', [SystemController::class, 'auditLogs']);
             Route::put('security/policy', [SettingsController::class, 'updatePolicy']);
         });
+    });
+
+    Route::prefix('colleges/{college}/financial')->group(function () {
+    
+        // 1. الحصول على الكشف الحالي (أو إنشاؤه إذا لم يوجد)
+        Route::get('cycle', [FinancialController::class, 'getCycleByMonth']);
+        
+        // 2. توليد/تحديث كشف جديد (Generate)
+        Route::post('generate', [FinancialController::class, 'generateCycle']);
+        
+        // 3. إضافة تسوية (خصم/مكافأة)
+        Route::post('payouts/{payout}/adjustments', [FinancialController::class, 'addAdjustment']);
+        
+        // 4. تغيير حالة الكشف (اعتماد/إغلاق)
+        Route::put('cycles/{cycle}/status', [FinancialController::class, 'updateStatus']);
     });
 });

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\UserType;
 use App\Models\Permission;
 use App\Models\College;
+use Illuminate\Support\Facades\DB;
 
 class LookupsController extends Controller
 {
@@ -34,5 +35,22 @@ class LookupsController extends Controller
                 ->orderBy('college_name')
                 ->get()
         );
+    }
+
+    public function academicYears()
+    {
+        // نجلب السنوات الفريدة من جدول timetable
+        $years = DB::table('timetable')
+                    ->select('academic_year')
+                    ->whereNotNull('academic_year') // نتجاهل القيم الفارغة
+                    ->where('academic_year', '!=', '')
+                    ->distinct()
+                    ->orderBy('academic_year', 'desc') // الأحدث أولاً
+                    ->pluck('academic_year');
+
+        return response()->json([
+            'status' => true,
+            'data' => $years
+        ]);
     }
 }

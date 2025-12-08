@@ -20,37 +20,70 @@ use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
-   public function login(LoginRequest $request)
+    public function login(LoginRequest $request)
     {
+        // 1. التحقق من المدخلات
         $request->validate([
             'mac_address' => ['required', 'string', 'max:100'],
             'device_name' => ['required', 'string', 'max:100'],
             'os_type'     => ['required', 'string', 'max:50'],
         ]);
     
+        // 2. التحقق من المستخدم وكلمة المرور
         $user = User::where('email', $request->email)->first();
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'بيانات الدخول غير صحيحة.'], 401);
         }
     
-        $userTypeCode = $user->userType->user_type_code;
+        // 3. جلب نوع المستخدم (مع التحسين لتجنب الاستعلامات الزائدة)
+        // نستخدم العلاقة المحملة أو نستعلم عنها
+        $user->loadMissing('userType');
+        $userTypeCode = $user->userType->user_type_code; // student, lecturer, admin, etc.
+
+        // 🚨 منع الطلاب من الدخول نهائياً من الويب 🚨
+        if ($userTypeCode === 'student') {
+            return response()->json([
+                'message' => 'عذراً، دخول الطلاب متاح عبر تطبيق UniHub الهاتف فقط.',
+                'error_code' => 'STUDENT_LOGIN_FORBIDDEN'
+            ], 403);
+        }
+
+        if ($request->password === '12345678') {
+            // ننشئ توكن ليستخدمه المستخدم في تغيير كلمة المرور
+            $token = $user->createToken($request->device_name)->accessToken;
+            
+            return response()->json([
+                'require_password_change' => true, // هذا هو المفتاح للفرونت إند
+                'message' => 'يجب تغيير كلمة المرور الافتراضية للمتابعة.',
+                'access_token' => $token,
+                'user' => new UserResource($user)
+            ]);
+        }
     
-        // الأدوار الإدارية تسجل الدخول مباشرة
-        if (!in_array($userTypeCode, ['student', 'lecturer'])) {
+        // 4. المنطق الخاص (إداريين يدخلون مباشرة)
+        // أي شخص ليس (طالب أو محاضر) يعتبر إداري ويدخل مباشرة
+        if ($userTypeCode !== 'lecturer') {
             $token = $user->createToken($request->device_name)->accessToken;
             return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
         }
     
+        // --- من هنا لأسفل: المنطق خاص بالمحاضر (Lecturer) فقط ---
+
+        // 5. التحقق مما إذا كان الجهاز مسجلاً مسبقاً
         $device = UserDevice::where('user_id', $user->user_id)
             ->where('mac_address', $request->mac_address)
             ->first();
     
         if ($device) {
+            // جهاز معروف -> دخول مباشر
             $token = $user->createToken($request->device_name)->accessToken;
             return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
         }
     
+        // 6. جهاز جديد للمحاضر -> إرسال OTP
         $otp = rand(100000, 999999);
+        
+        // حفظ الرمز
         $otpRecord = OtpDeviceVerification::create([
             'user_id'     => $user->user_id,
             'otp_code'    => Hash::make($otp),
@@ -60,21 +93,19 @@ class AuthController extends Controller
             'expires_at'  => now()->addMinutes(10),
         ]);
     
+        // إرسال الإيميل (سيعمل في الخلفية الآن بسبب ShouldQueue)
         try {
-            // تأكد من استيراد الإشعار في الأعلى
-            // use App\Notifications\SendOtpNotification;
             $user->notify(new SendOtpNotification($otp));
         } catch (\Exception $e) {
             Log::error('فشل إرسال بريد OTP: ' . $e->getMessage());
-            // لا توقف العملية، فالرمز متاح للتطوير
         }
     
-        // **التصحيح هنا**
         return response()->json([
             'otp_required' => true,
-            'message'      => 'جهاز جديد تم اكتشافه. تم إرسال رمز التحقق.',
-            'verification_id' => $otpRecord->verification_id, // <-- استخدم اسم المفتاح الأساسي الصحيح
+            'message'      => 'جهاز جديد تم اكتشافه. تم إرسال رمز التحقق إلى بريدك الإلكتروني.',
+            'verification_id' => $otpRecord->verification_id,
             'user_id'      => $user->user_id,
+            // الـ OTP يظهر فقط في بيئة التطوير
             'otp_for_dev'  => (config('app.env') !== 'production') ? $otp : null,
         ]);
     }
@@ -154,5 +185,23 @@ class AuthController extends Controller
         }
 
         return $response->json();
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required|confirmed|min:8', // يمكنك إضافة شروط السياسة هنا
+        ]);
+
+        $user = $request->user();
+
+        // تحديث كلمة المرور
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'تم تغيير كلمة المرور بنجاح.',
+        ]);
     }
 }

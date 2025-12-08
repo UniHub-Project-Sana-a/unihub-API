@@ -216,21 +216,34 @@ return new class extends Migration
             $table->softDeletes();
         });
 
+        // ✅ --- جدول المواد المعدل --- ✅
         Schema::create('courses', function (Blueprint $table) {
             $table->increments('course_id');
             $table->string('course_name', 150);
             $table->string('course_code', 50)->unique();
             $table->tinyInteger('course_type')->default(0);
             $table->boolean('is_active')->default(true);
+            
+            // الأعمدة الجديدة للربط المباشر
+            $table->unsignedInteger('college_id');
+            $table->unsignedInteger('department_id')->nullable();
+            $table->unsignedInteger('program_id')->nullable();
+            $table->unsignedInteger('level_id')->nullable();
             $table->unsignedInteger('semester_id');
+
             $table->integer('credit_hours')->default(0);
             $table->boolean('is_elective')->default(false);
-            $table->unsignedInteger('department_id')->nullable();
             $table->string('notes', 500)->nullable();
-            $table->foreign('semester_id')->references('semester_id')->on('semesters')->onDelete('cascade');
-            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('set null');
+            
             $table->timestamps();
             $table->softDeletes();
+
+            // القيود
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('set null');
+            $table->foreign('program_id')->references('program_id')->on('programs')->onDelete('set null');
+            $table->foreign('level_id')->references('level_id')->on('levels')->onDelete('set null');
+            $table->foreign('semester_id')->references('semester_id')->on('semesters')->onDelete('cascade');
         });
 
         Schema::create('students', function (Blueprint $table) {
@@ -330,12 +343,8 @@ return new class extends Migration
             $table->tinyInteger('notification_status')->default(0);
             $table->unsignedInteger('college_id');
             $table->decimal('lecture_hours', 4, 2);
-
-            // ✅ --- تمت إضافة الأعمدة الجديدة هنا --- ✅
             $table->decimal('hourly_rate_at_attendance', 10, 2)->nullable()->default(0.00);
             $table->decimal('lecture_rate_at_attendance', 10, 2)->nullable()->default(0.00);
-            // ✅ --- نهاية الإضافة --- ✅
-
             $table->string('session_code', 50);
             $table->timestamps();
 
@@ -343,8 +352,6 @@ return new class extends Migration
             $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
             $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
-
-            // Unique Constraints
             $table->unique(['lecturer_id', 'session_code'], 'unique_lecturer_session');
         });
 
@@ -387,7 +394,7 @@ return new class extends Migration
             $table->dateTime('generated_at')->useCurrent();
             $table->dateTime('expires_at');
             $table->boolean('is_active')->default(true);
-            $table->unsignedInteger('created_by'); // lecturer_id
+            $table->unsignedInteger('created_by'); 
             $table->decimal('latitude', 10, 7);
             $table->decimal('longitude', 10, 7);
             $table->decimal('allowed_distance', 5, 2);
@@ -484,42 +491,91 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Schema::create('timetable_import_logs', function (Blueprint $table) {
-        //     $table->increments('id');
-        //     $table->string('source', 50);
-        //     $table->integer('items')->default(0);
-        //     $table->string('status', 20);
-        //     $table->string('notes', 255)->nullable();
-        //     $table->unsignedInteger('user_id')->nullable();
+        // Schema::create('college_payments', function (Blueprint $table) {
+        //     $table->increments('payment_id');
+        //     $table->unsignedInteger('college_id');
+        //     $table->unsignedInteger('lecturer_id');
+        //     $table->string('month_year', 10); 
+        //     $table->decimal('total_hours', 5, 2);
+        //     $table->decimal('hourly_rate', 10, 2);
+        //     $table->decimal('total_amount', 10, 2)->storedAs('total_hours * hourly_rate');
+        //     $table->unsignedInteger('approved_by')->nullable();
+        //     $table->enum('payment_status', ['Pending', 'Approved', 'Paid'])->default('Pending');
         //     $table->timestamps();
-        //     $table->foreign('user_id')->references('user_id')->on('users')->onDelete('set null');
-        //     $table->index('source');
-        //     $table->index('created_at');
+        //     $table->softDeletes(); 
+
+        //     $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+        //     $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
+        //     $table->foreign('approved_by')->references('user_id')->on('users')->onDelete('set null');
+            
+        //     $table->unique(['lecturer_id', 'month_year'], 'unique_lecturer_payment_month');
         // });
 
-        // 9) جداول الرواتب والمدفوعات (جديد)
-        Schema::create('college_payments', function (Blueprint $table) {
-            $table->increments('payment_id');
+        Schema::create('financial_cycles', function (Blueprint $table) {
+            $table->increments('cycle_id');
             $table->unsignedInteger('college_id');
-            $table->unsignedInteger('lecturer_id');
-            $table->string('month_year', 10)->comment('YYYY-MM format'); // مثال: 2024-03
-            $table->decimal('total_hours', 5, 2);
-            $table->decimal('hourly_rate', 10, 2);
-            // عمود مُحتسب (Generated Column): إجمالي المبلغ = إجمالي الساعات * سعر الساعة
-            $table->decimal('total_amount', 10, 2)->storedAs('total_hours * hourly_rate');
-            $table->unsignedInteger('approved_by')->nullable()->comment('معرف المستخدم الذي وافق على الدفعة');
-            $table->enum('payment_status', ['Pending', 'Approved', 'Paid'])->default('Pending');
-            $table->timestamps();
-            $table->softDeletes(); 
-
-            // قيود المفاتيح الأجنبية
-            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
-            $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
-            // نفترض أن الموافق هو مستخدم في جدول users
-            $table->foreign('approved_by')->references('user_id')->on('users')->onDelete('set null');
+            $table->string('month_year', 7)->comment('Format: MM-YYYY'); // 10-2024
+            $table->date('start_date');
+            $table->date('end_date');
+            $table->string('status', 20)->default('draft'); // draft, review, approved, locked
+            $table->unsignedInteger('created_by')->nullable();
             
-            // قيد فريد لضمان عدم وجود دفعتين لنفس المحاضر في نفس الشهر والسنة
-            $table->unique(['lecturer_id', 'month_year'], 'unique_lecturer_payment_month');
+            // إحصائيات سريعة للكشف
+            $table->decimal('total_payout', 15, 2)->default(0);
+            $table->integer('lecturers_count')->default(0);
+            
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
+            $table->foreign('created_by')->references('user_id')->on('users')->onDelete('set null');
+            
+            // لا يمكن إنشاء كشفين لنفس الشهر لنفس الكلية
+            $table->unique(['college_id', 'month_year']);
+        });
+
+        // ب) استحقاق المحاضر (Lecturer Payout) - سطر الراتب لكل محاضر
+        Schema::create('lecturer_payouts', function (Blueprint $table) {
+            $table->increments('payout_id');
+            $table->unsignedInteger('cycle_id');
+            $table->unsignedInteger('lecturer_id');
+            
+            // البيانات الأساسية المحسوبة من النظام
+            $table->decimal('total_hours', 8, 2)->default(0);
+            $table->decimal('hourly_rate', 10, 2)->default(0);
+            $table->decimal('base_amount', 12, 2)->default(0); // Hours * Rate
+            
+            // الإضافات والخصومات (Aggregated)
+            $table->decimal('total_bonuses', 12, 2)->default(0);
+            $table->decimal('total_deductions', 12, 2)->default(0);
+            $table->decimal('tax_amount', 12, 2)->default(0);
+            
+            // الصافي النهائي
+            $table->decimal('net_amount', 12, 2)->storedAs('base_amount + total_bonuses - total_deductions - tax_amount');
+            
+            $table->string('status', 20)->default('pending'); // pending, approved, paid
+            $table->string('notes', 255)->nullable();
+            
+            $table->timestamps();
+
+            $table->foreign('cycle_id')->references('cycle_id')->on('financial_cycles')->onDelete('cascade');
+            $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
+            
+            $table->unique(['cycle_id', 'lecturer_id']);
+        });
+
+        // ج) تفاصيل التسويات (Adjustments) - لتسجيل الخصومات والمكافآت والضرائب بالتفصيل
+        Schema::create('payout_adjustments', function (Blueprint $table) {
+            $table->increments('adjustment_id');
+            $table->unsignedInteger('payout_id');
+            $table->string('type', 20); // bonus, deduction, tax
+            $table->decimal('amount', 10, 2);
+            $table->string('reason', 255)->nullable(); // "مكافأة إشراف", "غياب يومين", "ضريبة دخل 5%"
+            $table->boolean('is_automatic')->default(false); // هل تم إنشاؤه آلياً أم يدوياً
+            
+            $table->timestamps();
+
+            $table->foreign('payout_id')->references('payout_id')->on('lecturer_payouts')->onDelete('cascade');
         });
     }
 
@@ -528,24 +584,27 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // حذف بترتيب عكسي لاحترام قيود FK
+        // ✅ تعطيل الفحص لحل مشكلة الحذف
+        Schema::disableForeignKeyConstraints();
 
-        Schema::dropIfExists('college_payments');
+        Schema::dropIfExists('payout_adjustments');
+        Schema::dropIfExists('lecturer_payouts');
+        Schema::dropIfExists('financial_cycles');
         Schema::dropIfExists('user_activities');
         Schema::dropIfExists('otp_device_verifications');
         Schema::dropIfExists('user_devices');
         Schema::dropIfExists('student_excuse_submissions');
         Schema::dropIfExists('makeup_lectures_requests');
+        Schema::dropIfExists('lecturer_group_notifications'); // ✅ تم إضافته
         Schema::dropIfExists('qr_codes');
         Schema::dropIfExists('student_group_members');
         Schema::dropIfExists('student_attendance');
         Schema::dropIfExists('lecturer_attendance');
         Schema::dropIfExists('lecture_sessions');
-
-        // الجداول الجديدة للجدول الدراسي
         Schema::dropIfExists('timetable');
-
+        Schema::dropIfExists('student_groups');
         Schema::dropIfExists('students');
+        Schema::dropIfExists('courses');
         Schema::dropIfExists('semesters');
         Schema::dropIfExists('lecturers');
         Schema::dropIfExists('levels');
@@ -556,16 +615,15 @@ return new class extends Migration
         Schema::dropIfExists('user_type_permissions');
         Schema::dropIfExists('department_programs');
         Schema::dropIfExists('departments');
-        Schema::dropIfExists('timetable_import_logs');
         Schema::dropIfExists('users');
         Schema::dropIfExists('app_versions');
         Schema::dropIfExists('qr_refresh_options');
         Schema::dropIfExists('days');
-        Schema::dropIfExists('courses');
         Schema::dropIfExists('programs');
         Schema::dropIfExists('permissions');
         Schema::dropIfExists('user_types');
         Schema::dropIfExists('colleges');
-        Schema::dropIfExists('student_groups');
+
+        Schema::enableForeignKeyConstraints();
     }
 };

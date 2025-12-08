@@ -20,7 +20,13 @@ class UpdateCourseRequest extends FormRequest {
             'course_name'  => ['sometimes','string','max:150'],
             'credit_hours' => ['sometimes','integer','min:0'],
             'is_elective'  => ['sometimes','boolean'],
+            
+            // ✅ التعديلات هنا
             'department_id'=> ['nullable','integer','exists:departments,department_id'],
+            'college_id'   => ['sometimes','integer','exists:colleges,college_id'],
+            'program_id'   => ['nullable','integer','exists:programs,program_id'],
+            'level_id'     => ['nullable','integer','exists:levels,level_id'],
+            
             'notes'        => ['nullable','string','max:500'],
             'course_type'  => ['sometimes','integer'],
             'is_active'    => ['sometimes','boolean'],

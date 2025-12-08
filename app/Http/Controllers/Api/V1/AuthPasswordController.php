@@ -23,20 +23,18 @@ class AuthPasswordController extends Controller
         // إنشاء التوكن وتخزينه
         $token = Password::createToken($user);
 
-        // حاول إرسال البريد، وإن فشل نرجّع التوكن في بيئة التطوير
-        $sent = true;
-        // ✅ 2. إرسال الإشعار المخصص بدلاً من النظام الافتراضي
+        // محاولة إرسال الإشعار (اختياري، لن يوقف العملية إذا فشل)
         try {
             $user->notify(new ResetPasswordNotification($token));
         } catch (\Exception $e) {
             Log::error('فشل إرسال بريد إعادة التعيين: ' . $e->getMessage());
-            // يمكنك إرجاع استجابة خطأ للـ API هنا إذا أردت
-            return response()->json(['message' => 'فشل إرسال البريد الإلكتروني، يرجى المحاولة مرة أخرى.'], 500);
         }
 
+        // ✅ التعديل هنا: نرجع التوكن دائماً ليقوم الفرونت إند بالتوجيه المباشر
         return response()->json([
-            'message' => 'تم إرسال رابط/رمز إعادة التعيين إلى بريدك إن وجد.',
-            'token'   => app()->environment('local') && !$sent ? $token : null, // لسهولة الاختبار محلياً
+            'message' => 'تم إنشاء رمز إعادة تعيين كلمة المرور.',
+            'token'   => $token, // تم إزالة الشروط المعقدة لضمان عمل التوجيه
+            'email'   => $user->email // مفيد للفرونت إند للتأكيد
         ]);
     }
 
