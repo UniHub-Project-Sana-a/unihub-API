@@ -69,45 +69,61 @@ class AuthController extends Controller
     
         // --- من هنا لأسفل: المنطق خاص بالمحاضر (Lecturer) فقط ---
 
+        \App\Models\UserDevice::firstOrCreate(
+            [
+                'user_id' => $user->user_id,
+                'mac_address' => $request->mac_address
+            ],
+            [
+                'device_name' => $request->device_name,
+                'os_type' => $request->os_type,
+                'is_auto_attendance_enabled' => false 
+            ]
+        );
+
+        // 2. إصدار التوكن مباشرة
+        $token = $user->createToken($request->device_name)->accessToken;
+        return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
+
         // 5. التحقق مما إذا كان الجهاز مسجلاً مسبقاً
-        $device = UserDevice::where('user_id', $user->user_id)
-            ->where('mac_address', $request->mac_address)
-            ->first();
+        // $device = UserDevice::where('user_id', $user->user_id)
+        //     ->where('mac_address', $request->mac_address)
+        //     ->first();
     
-        if ($device) {
-            // جهاز معروف -> دخول مباشر
-            $token = $user->createToken($request->device_name)->accessToken;
-            return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
-        }
+        // if ($device) {
+        //     // جهاز معروف -> دخول مباشر
+        //     $token = $user->createToken($request->device_name)->accessToken;
+        //     return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
+        // }
     
-        // 6. جهاز جديد للمحاضر -> إرسال OTP
-        $otp = rand(100000, 999999);
+        // // 6. جهاز جديد للمحاضر -> إرسال OTP
+        // $otp = rand(100000, 999999);
         
-        // حفظ الرمز
-        $otpRecord = OtpDeviceVerification::create([
-            'user_id'     => $user->user_id,
-            'otp_code'    => Hash::make($otp),
-            'device_name' => $request->device_name,
-            'mac_address' => $request->mac_address,
-            'os_type'     => $request->os_type,
-            'expires_at'  => now()->addMinutes(10),
-        ]);
+        // // حفظ الرمز
+        // $otpRecord = OtpDeviceVerification::create([
+        //     'user_id'     => $user->user_id,
+        //     'otp_code'    => Hash::make($otp),
+        //     'device_name' => $request->device_name,
+        //     'mac_address' => $request->mac_address,
+        //     'os_type'     => $request->os_type,
+        //     'expires_at'  => now()->addMinutes(10),
+        // ]);
     
-        // إرسال الإيميل (سيعمل في الخلفية الآن بسبب ShouldQueue)
-        try {
-            $user->notify(new SendOtpNotification($otp));
-        } catch (\Exception $e) {
-            Log::error('فشل إرسال بريد OTP: ' . $e->getMessage());
-        }
+        // // إرسال الإيميل (سيعمل في الخلفية الآن بسبب ShouldQueue)
+        // try {
+        //     $user->notify(new SendOtpNotification($otp));
+        // } catch (\Exception $e) {
+        //     Log::error('فشل إرسال بريد OTP: ' . $e->getMessage());
+        // }
     
-        return response()->json([
-            'otp_required' => true,
-            'message'      => 'جهاز جديد تم اكتشافه. تم إرسال رمز التحقق إلى بريدك الإلكتروني.',
-            'verification_id' => $otpRecord->verification_id,
-            'user_id'      => $user->user_id,
-            // الـ OTP يظهر فقط في بيئة التطوير
-            'otp_for_dev'  => (config('app.env') !== 'production') ? $otp : null,
-        ]);
+        // return response()->json([
+        //     'otp_required' => true,
+        //     'message'      => 'جهاز جديد تم اكتشافه. تم إرسال رمز التحقق إلى بريدك الإلكتروني.',
+        //     'verification_id' => $otpRecord->verification_id,
+        //     'user_id'      => $user->user_id,
+        //     // الـ OTP يظهر فقط في بيئة التطوير
+        //     'otp_for_dev'  => (config('app.env') !== 'production') ? $otp : null,
+        // ]);
     }
     
     
