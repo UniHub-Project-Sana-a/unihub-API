@@ -65,7 +65,7 @@ class LecturersController extends Controller
         ]);
 
         $lec = Lecturer::create($data);
-        return response()->json($lec->fresh(), 201);
+        return response()->json($lec->load(['user', 'department', 'academicTitle']), 201);
     }
 
     // PUT /api/v1/lecturers/{lecturer}
@@ -82,7 +82,7 @@ class LecturersController extends Controller
         ]);
 
         $lecturer->update($data);
-        return response()->json($lecturer->fresh());
+        return response()->json($lecturer->load(['user', 'department', 'academicTitle']));
     }
 
     // DELETE /api/v1/lecturers/{lecturer}

@@ -269,4 +269,57 @@ class LectureSessionController extends Controller
             'skipped_count' => count($availableDates) - $createdCount,
         ], 201);
     }
+
+     /**
+     * عرض تفاصيل جلسة محددة
+     */
+    public function show($id)
+    {
+        // جلب الجلسة مع بيانات الجدول المرتبطة (المادة، المحاضر، القاعة، المجموعة)
+        $session = \App\Models\LectureSession::with([
+            'timetable.course',
+            'timetable.lecturer.user',
+            'timetable.group',
+            'timetable.classroom'
+        ])->findOrFail($id);
+
+        return response()->json($session);
+    }
+
+    /**
+     * تعديل بيانات الجلسة
+     */
+    public function update(\Illuminate\Http\Request $request, $id)
+    {
+        $session = \App\Models\LectureSession::findOrFail($id);
+
+        $validated = $request->validate([
+            'session_date' => 'sometimes|date',
+            'status' => 'sometimes|integer',
+            'actual_classroom_id' => 'nullable|exists:classrooms,classroom_id',
+            // 'actual_lecturer_id'  => 'nullable|exists:lecturers,lecturer_id', // ✅ الحقل الجديد
+            'start_time' => 'nullable', // يقبل H:i
+            'end_time'   => 'nullable',
+        ]);
+
+        $session->update($validated);
+
+        return response()->json([
+            'message' => 'Lecture session updated successfully',
+            'data' => $session
+        ]);
+    }
+
+    /**
+     * حذف الجلسة
+     */
+    public function destroy($id)
+    {
+        $session = \App\Models\LectureSession::findOrFail($id);
+        $session->delete();
+
+        return response()->json([
+            'message' => 'Lecture session deleted successfully'
+        ]);
+    }
 } 

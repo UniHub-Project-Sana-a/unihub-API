@@ -25,18 +25,28 @@ class UsersController extends Controller
     public function index(Request $request)
     {
         $q = $request->query('q');
+        // ✅ استقبال الرقم الجامعي
+        $academicNumber = $request->query('academic_number'); 
+        
         $perPage = (int)($request->query('per_page', 15));
         $collegeId = $request->query('college_id');
         $userTypeCode = $request->query('user_type_code');
     
         $usersQuery = \App\Models\User::query()
-            ->with('userType:user_type_id,user_type_name,user_type_code') // اختياري
+            ->with('userType:user_type_id,user_type_name,user_type_code')
+            
+            // ✅ إضافة شرط البحث الدقيق بالرقم الجامعي
+            ->when($academicNumber, function ($query) use ($academicNumber) {
+                $query->where('academic_number', $academicNumber);
+            })
+
             ->when($q, function ($query_search) use ($q) {
                 $query_search->where(function ($sub_query) use ($q) {
                     $sub_query->where('full_name', 'like', "%$q%")
                         ->orWhere('email', 'like', "%$q%")
                         ->orWhere('phone', 'like', "%$q%")
-                        ->orWhere('academic_number', 'like', "%$q%");
+                        // أبقينا البحث العام هنا أيضاً للحالات الأخرى
+                        ->orWhere('academic_number', 'like', "%$q%"); 
                 });
             })
             ->when($collegeId, function ($query_college) use ($collegeId) {
@@ -49,12 +59,11 @@ class UsersController extends Controller
             })
             ->orderBy('user_id', 'desc');
     
-        // إذا لم يكن هناك pagination مطلوب، أرجع الكل
-        if ($perPage === 0 || $request->query('all') === 'true') {
+        // إذا تم إرسال رقم جامعي، غالباً نريد نتيجة واحدة، لذا نلغي الـ pagination مؤقتاً أو نعتمد all=true
+        if ($perPage === 0 || $request->query('all') === 'true' || $academicNumber) {
             return \App\Http\Resources\V1\UserResource::collection($usersQuery->get());
         }
         
-        // إذا تطلب pagination
         $users = $usersQuery->paginate($perPage);
     
         return \App\Http\Resources\V1\UserResource::collection($users);
