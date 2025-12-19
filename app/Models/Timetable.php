@@ -66,4 +66,9 @@ class Timetable extends Model
         // هذا يعرف علاقة "ينتمي إلى" مع موديل Department
         return $this->belongsTo(Department::class, 'department_id');
     }
+
+    public function studentGroup()
+    {
+        return $this->belongsTo(StudentGroup::class, 'group_id', 'group_id');
+    }
 }

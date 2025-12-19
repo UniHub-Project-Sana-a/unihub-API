@@ -69,7 +69,8 @@ class TimetableController extends Controller
      */
     public function store(Request $request)
     {
-        // 1. التحقق الأساسي من صحة البيانات (لا تغيير هنا)
+        // 1. التحقق الأساسي (Validation)
+        // هذا الجزء ضروري جداً لأن دالة التعارض تعتمد على وجود start_date و end_date
         $validator = Validator::make($request->all(), [
             'course_id'     => 'required|integer|exists:courses,course_id',
             'lecturer_id'   => 'required|integer|exists:lecturers,lecturer_id',
@@ -79,72 +80,63 @@ class TimetableController extends Controller
             'day_id'        => 'required|integer|exists:days,day_id',
             'period_id'     => 'required|integer|exists:periods,period_id',
             'lecture_type'  => 'required|integer|in:0,1,2',
-            'status'        => 'sometimes|integer|in:0,1',
             'start_date'    => 'required|date',
             'end_date'      => 'required|date|after_or_equal:start_date',
             'academic_year' => 'required|string|max:20',
             'college_id'    => 'required|integer|exists:colleges,college_id',
             'department_id' => 'required|integer|exists:departments,department_id',
-            'gender_type'   => 'sometimes|integer|in:0,1,2',
             'lecture_hours' => 'required|numeric|min:0',
         ]);
-
+    
         if ($validator->fails()) {
             return response()->json(['status' => false, 'message' => 'خطأ في التحقق', 'errors' => $validator->errors()], 422);
         }
         
-        // 2. التحقق من التعارضات (لا تغيير هنا)
+        // 2. التحقق من التعارضات (باستخدام الدالة الجديدة الشاملة)
+        // نمرر البيانات كاملة لأن الدالة الجديدة تحتاج التواريخ والقاعة والمحاضر
         $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $request->all());
+        
         if (!empty($conflicts)) {
             return response()->json([
                 'status' => false,
-                'message' => 'تم اكتشاف تعارض.',
-                'conflicts' => $conflicts
-            ], 409); // 409 Conflict
+                'message' => 'يوجد تعارض في الجدول.',
+                'conflicts' => $conflicts // سيرسل التفاصيل الكاملة التي برمجناها
+            ], 409);
         }
         
-        // 3. إنشاء السجل
+        // 3. إنشاء السجل وإنشاء الجلسة التلقائية (كما عدلناها سابقاً)
         try {
             $validatedData = $validator->validated();
             $timetableEntry = Timetable::create($validatedData);
-
-            // --- ✅ --- التعديل الرئيسي يبدأ هنا --- ✅ ---
-            
-            // 4. التحقق من شرط إنشاء جلسة تلقائية
+    
+            // إنشاء جلسة تلقائية إذا كان تاريخ البدء هو نفسه تاريخ الانتهاء
             if ($validatedData['start_date'] === $validatedData['end_date']) {
-                
-                // جلب البيانات اللازمة لإنشاء الجلسة
                 $period = Period::find($timetableEntry->period_id);
                 $studentGroup = StudentGroup::withCount('students')->find($timetableEntry->group_id);
-
-                // إنشاء الجلسة
+    
                 LectureSession::create([
                     'timetable_id' => $timetableEntry->timetable_id,
-                    'session_date' => $timetableEntry->start_date, // هو نفس end_date
+                    'session_date' => $timetableEntry->start_date,
                     'start_time' => $period->start_time,
                     'end_time' => $period->end_time,
                     'actual_classroom_id' => $timetableEntry->classroom_id,
-                    'session_code' => 'SESS-' . Str::random(10) . '-' . time(), // كود فريد
-                    'status' => 0, // 0: لم تبدأ بعد
-                    'attendance_overage_alert' => false,
-                    // عدد الطلاب في المجموعة + المحاضر (1)
+                    'session_code' => 'SESS-' . Str::random(10) . '-' . time(),
+                    'status' => 0,
                     'system_attendance_count' => 0, 
-                    'actual_attendance_count' => $studentGroup ? ($studentGroup->students_count) : 0, // عدد الحضور الفعلي يبدأ بصفر
+                    'actual_attendance_count' => $studentGroup ? ($studentGroup->students_count) : 0,
                 ]);
             }
-
-            // --- ✅ --- نهاية التعديل --- ✅ ---
-
+    
             return response()->json([
                 'status' => true,
-                'message' => 'تم إنشاء بند الجدول بنجاح.' . ($validatedData['start_date'] === $validatedData['end_date'] ? ' وتم إنشاء جلسة تلقائية له.' : ''),
+                'message' => 'تم إنشاء الجدول بنجاح.',
                 'data' => $timetableEntry
-            ], 201); // 201 Created
-
+            ], 201);
+    
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'حدث خطأ غير متوقع أثناء الحفظ في قاعدة البيانات.',
+                'message' => 'حدث خطأ غير متوقع.',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -246,46 +238,98 @@ class TimetableController extends Controller
     private function checkForConflicts(int $day_id, int $period_id, array $data, int $ignoreId = null): array
     {
         $conflicts = [];
-
-        // التحقق من تعارض القاعة
+    
+        // 1. التأكد من وجود التواريخ لأنها جوهر الفحص
+        if (!isset($data['start_date']) || !isset($data['end_date'])) {
+            return [];
+        }
+    
+        $newStart = $data['start_date'];
+        $newEnd   = $data['end_date'];
+    
+        // دالة مساعدة (Closure) لتطبيق شرط تداخل التواريخ
+        // المنطق: (بداية الجديد <= نهاية القديم) AND (نهاية الجديد >= بداية القديم)
+        $dateScope = function ($query) use ($newStart, $newEnd) {
+            $query->where(function ($q) use ($newStart, $newEnd) {
+                $q->where('start_date', '<=', $newEnd)
+                  ->where('end_date', '>=', $newStart);
+            });
+        };
+    
+        // 2. تجهيز العلاقات لجلب أسماء المواد والمحاضرين لعرض تفاصيل الخطأ
+        $relations = ['course', 'lecturer', 'studentGroup', 'classroom'];
+    
+        // --- أ) التحقق من تعارض القاعة (Classroom Conflict) ---
         if (isset($data['classroom_id'])) {
-            $query = Timetable::where('day_id', $day_id)
-                              ->where('period_id', $period_id)
-                              ->where('classroom_id', $data['classroom_id']);
-            if ($ignoreId) {
-                $query->where('timetable_id', '!=', $ignoreId);
-            }
-            if ($query->exists()) {
-                $conflicts[] = ['type' => 'classroom', 'message' => 'القاعة الدراسية محجوزة بالفعل في هذا الوقت.'];
+            $clashes = Timetable::with($relations)
+                ->where('day_id', $day_id)
+                ->where('period_id', $period_id)
+                ->where('classroom_id', $data['classroom_id'])
+                ->where($dateScope)
+                ->when($ignoreId, function ($q) use ($ignoreId) {
+                    $q->where('timetable_id', '!=', $ignoreId);
+                })
+                ->get();
+    
+            foreach ($clashes as $clash) {
+                $conflicts[] = [
+                    'type' => 'classroom',
+                    'entity' => $clash->classroom->classroom_name ?? 'غير معروف',
+                    'message' => "القاعة محجوزة لمادة ({$clash->course->course_name}) من تاريخ {$clash->start_date} إلى {$clash->end_date}",
+                    'conflict_with_id' => $clash->timetable_id,
+                    'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                ];
             }
         }
-
-        // التحقق من تعارض المحاضر
+    
+        // --- ب) التحقق من تعارض المحاضر (Lecturer Conflict) ---
         if (isset($data['lecturer_id'])) {
-            $query = Timetable::where('day_id', $day_id)
-                              ->where('period_id', $period_id)
-                              ->where('lecturer_id', $data['lecturer_id']);
-            if ($ignoreId) {
-                $query->where('timetable_id', '!=', $ignoreId);
-            }
-            if ($query->exists()) {
-                $conflicts[] = ['type' => 'lecturer', 'message' => 'المحاضر لديه محاضرة أخرى في نفس الوقت.'];
+            $clashes = Timetable::with($relations)
+                ->where('day_id', $day_id)
+                ->where('period_id', $period_id)
+                ->where('lecturer_id', $data['lecturer_id'])
+                ->where($dateScope)
+                ->when($ignoreId, function ($q) use ($ignoreId) {
+                    $q->where('timetable_id', '!=', $ignoreId);
+                })
+                ->get();
+    
+            foreach ($clashes as $clash) {
+                $lecturerName = $clash->lecturer->user->full_name ?? 'المحاضر';
+                $conflicts[] = [
+                    'type' => 'lecturer',
+                    'entity' => $lecturerName,
+                    'message' => "المحاضر ({$lecturerName}) لديه محاضرة أخرى ({$clash->course->course_name}) في القاعة ({$clash->classroom->classroom_name})",
+                    'conflict_with_id' => $clash->timetable_id,
+                    'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                ];
             }
         }
-
-        // التحقق من تعارض المجموعة الطلابية
+    
+        // --- ج) التحقق من تعارض المجموعة الطلابية (Student Group Conflict) ---
         if (isset($data['group_id'])) {
-            $query = Timetable::where('day_id', $day_id)
-                              ->where('period_id', $period_id)
-                              ->where('group_id', $data['group_id']);
-            if ($ignoreId) {
-                $query->where('timetable_id', '!=', $ignoreId);
-            }
-            if ($query->exists()) {
-                $conflicts[] = ['type' => 'group', 'message' => 'المجموعة الطلابية لديها محاضرة أخرى في نفس الوقت.'];
+            $clashes = Timetable::with($relations)
+                ->where('day_id', $day_id)
+                ->where('period_id', $period_id)
+                ->where('group_id', $data['group_id'])
+                ->where($dateScope)
+                ->when($ignoreId, function ($q) use ($ignoreId) {
+                    $q->where('timetable_id', '!=', $ignoreId);
+                })
+                ->get();
+    
+            foreach ($clashes as $clash) {
+                $groupName = $clash->studentGroup->group_name ?? 'المجموعة';
+                $conflicts[] = [
+                    'type' => 'group',
+                    'entity' => $groupName,
+                    'message' => "المجموعة ({$groupName}) لديها محاضرة أخرى ({$clash->course->course_name}) في نفس الوقت.",
+                    'conflict_with_id' => $clash->timetable_id,
+                    'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                ];
             }
         }
-
+    
         return $conflicts;
     }
 }
