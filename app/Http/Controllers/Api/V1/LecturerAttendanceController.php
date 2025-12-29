@@ -104,60 +104,69 @@ class LecturerAttendanceController extends Controller
      * ✅ الدالة التي تم نقلها إلى هنا
      * المصادقة على جلسة حضور كاملة وتسجيل الحاضرين والغياب.
      */
-    public function finalizeSession(Request $request)
+        public function finalizeSession(Request $request)
     {
         // 1. التحقق من صحة البيانات القادمة
         $request->validate([
-            'timetable_id'        => 'required|integer|exists:timetable,timetable_id',
-            'session_id'          => 'required|integer|exists:lecture_sessions,session_id',
-            'group_id'            => 'required|integer|exists:student_groups,group_id',
-            'present_student_ids' => 'present|array', // present تعني يجب إرسال المصفوفة حتى لو فارغة
-            'present_student_ids.*' => 'integer|exists:students,student_id', // تأكد أن IDs هي student_id وليس academic_number
+            'timetable_id'  => 'required|integer|exists:timetable,timetable_id',
+            'session_id'    => 'required|integer|exists:lecture_sessions,session_id',
+            'group_id'      => 'required|integer|exists:student_groups,group_id',
+            
+            // ✅ التعديل: استقبال مصفوفة كائنات (student_id + attendance_method)
+            'students_data' => 'present|array', 
+            'students_data.*.student_id' => 'required|integer|exists:students,student_id',
+            'students_data.*.attendance_method' => 'required|integer|in:0,1', // 0: QR, 1: Manual
         ]);
 
         return DB::transaction(function () use ($request) {
-            // 2. جلب بيانات الجدول الدراسي مع المحاضر ورتبته الأكاديمية (للسعر)
+            // 2. جلب البيانات الأساسية (الجدول، المحاضر، الجلسة)
             $timetable = Timetable::with(['lecturer.academicTitle', 'course'])
                                   ->findOrFail($request->timetable_id);
 
-            // 3. جلب بيانات الجلسة الحالية (للحصول على session_code والتاريخ)
             $session = LectureSession::findOrFail($request->session_id);
             
             $sessionCode = $session->session_code;
             $attendanceDate = $session->session_date;
 
             // ---------------------------------------------------------
-            // أولاً: معالجة حضور الطلاب (حاضر وغائب)
+            // أولاً: معالجة حضور الطلاب (مع حفظ طريقة الحضور)
             // ---------------------------------------------------------
             
-            // أ) جلب جميع معرفات الطلاب في هذه المجموعة
+            // أ) جلب جميع معرفات الطلاب في هذه المجموعة (لنعرف الغائبين أيضاً)
             $allGroupMembers = DB::table('student_group_members')
                                  ->where('group_id', $request->group_id)
-                                 ->pluck('student_id'); // مصفوفة بكل الطلاب
+                                 ->pluck('student_id');
 
-            // ب) تحويل قائمة الحضور القادمة من الفرونت إلى Collection لسهولة البحث
-            $presentIdsCollection = collect($request->present_student_ids);
+            // ب) تحويل البيانات القادمة إلى Collection ليسهل البحث فيها عن طريق student_id
+            // المفتاح هو student_id والقيمة هي كامل الأوبجكت (بما فيه attendance_method)
+            $presentStudentsMap = collect($request->students_data)->keyBy('student_id');
 
             foreach ($allGroupMembers as $studentId) {
-                // جلب بيانات الطالب (للكلية والقسم)
-                // ملاحظة: لتحسين الأداء، يمكن جلب الطلاب دفعة واحدة خارج الـ loop باستخدام whereIn
+                // جلب بيانات الطالب (للكلية والقسم) - يمكن تحسين الأداء بجلبهم دفعة واحدة لكن هذا آمن
                 $student = Student::find($studentId);
                 
                 if (!$student) continue;
 
-                // تحديد الحالة: إذا كان الـ ID موجود في مصفوفة الحاضرين = 1، غير ذلك = 0
-                $status = $presentIdsCollection->contains($studentId) ? 1 : 0;
+                // هل الطالب موجود في قائمة الحاضرين؟
+                $attendanceData = $presentStudentsMap->get($studentId);
+                $isPresent = $attendanceData ? true : false;
+
+                // تحديد القيم
+                $status = $isPresent ? 1 : 0;
+                // إذا كان حاضر نأخذ طريقته، إذا غائب نضع 0 افتراضياً
+                $method = $isPresent ? $attendanceData['attendance_method'] : 0; 
 
                 StudentAttendance::updateOrCreate(
                     [
                         'student_id'   => $studentId,
-                        'session_code' => $sessionCode, // المفتاح لعدم تكرار التسجيل لنفس الجلسة
+                        'session_code' => $sessionCode, // المفتاح الفريد للجلسة
                     ],
                     [
                         'timetable_id'        => $timetable->timetable_id,
                         'level_id'            => $timetable->level_id,
                         'attendance_date'     => $attendanceDate,
                         'status'              => $status,
+                        'attendance_method'   => $method, // ✅ تم حفظ الطريقة هنا
                         'notification_status' => 0,
                         'college_id'          => $student->college_id,
                         'department_id'       => $student->department_id,
@@ -166,22 +175,17 @@ class LecturerAttendanceController extends Controller
             }
 
             // ---------------------------------------------------------
-            // ثانياً: معالجة حضور المحاضر والحسابات المالية
+            // ثانياً: معالجة حضور المحاضر والحسابات المالية (كما هي في كودك)
             // ---------------------------------------------------------
             
             $lecturer = $timetable->lecturer;
             
-            // جلب سعر الساعة من الرتبة الأكاديمية
-            // ملاحظة: تأكد أن العلاقة academicTitle موجودة في موديل Lecturer
             $hourlyRate = 0;
             if ($lecturer->academicTitle) {
                 $hourlyRate = $lecturer->academicTitle->hourly_price;
             }
 
-            // جلب عدد ساعات المحاضرة من الجدول الدراسي
             $lectureHours = $timetable->lecture_hours ?? 0;
-
-            // حساب إجمالي المبلغ لهذه الجلسة
             $totalSessionRate = $lectureHours * $hourlyRate;
 
             LecturerAttendance::updateOrCreate(
@@ -192,7 +196,7 @@ class LecturerAttendanceController extends Controller
                 [
                     'timetable_id'        => $timetable->timetable_id,
                     'attendance_date'     => $attendanceDate,
-                    'status'              => 1, // المحاضر حاضر لأنه هو من صادق
+                    'status'              => 1,
                     'notification_status' => 0,
                     'college_id'          => $timetable->college_id,
                     
@@ -204,20 +208,21 @@ class LecturerAttendanceController extends Controller
             );
 
             // ---------------------------------------------------------
-            // ثالثاً: تحديث حالة الجلسة في جدول lecture_sessions
+            // ثالثاً: تحديث حالة الجلسة
             // ---------------------------------------------------------
             
             $session->update([
-                'status' => 1, // 1: مكتملة
-                'system_attendance_count' => $presentIdsCollection->count(), // عدد الحاضرين الفعلي
+                'status' => 1, // مكتملة
+                'system_attendance_count' => $presentStudentsMap->count(),
+                'actual_attendance_count' => $presentStudentsMap->count()
             ]);
 
             return response()->json([
                 'status' => true, 
-                'message' => 'تمت مصادقة الجلسة وتسجيل الحضور والبيانات المالية بنجاح.',
+                'message' => 'تمت مصادقة الجلسة وحفظ طريقة الحضور بنجاح.',
                 'data' => [
-                    'present_count' => $presentIdsCollection->count(),
-                    'absent_count'  => $allGroupMembers->count() - $presentIdsCollection->count(),
+                    'present_count' => $presentStudentsMap->count(),
+                    'absent_count'  => $allGroupMembers->count() - $presentStudentsMap->count(),
                     'lecturer_earnings' => $totalSessionRate
                 ]
             ]);

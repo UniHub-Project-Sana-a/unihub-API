@@ -23,6 +23,7 @@ class StudentAttendance extends Model
         'college_id',
         'department_id',
         'session_code',
+        'attendance_method',
     ];
 
     protected $casts = [
@@ -39,4 +40,9 @@ class StudentAttendance extends Model
     public function timetable()  { return $this->belongsTo(Timetable::class, 'timetable_id', 'timetable_id'); }
     public function college()    { return $this->belongsTo(College::class, 'college_id', 'college_id'); }
     public function department() { return $this->belongsTo(Department::class, 'department_id', 'department_id'); }
+    public function user() 
+    {
+        // علاقة للوصول السريع لبيانات المستخدم عبر الطالب
+        return $this->hasOneThrough(User::class, Student::class, 'student_id', 'user_id', 'student_id', 'user_id');
+    }
 }

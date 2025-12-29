@@ -20,21 +20,34 @@ class StudentAttendanceController extends Controller
      */
         public function index(Request $request)
     {
-        // 1. تحديد كود الجلسة (session_code)
-        // نسمح بالبحث إما عن طريق كود الجلسة مباشرة (الأدق) أو عن طريق المحاضرة (الأحدث)
         $sessionCode = null;
 
+        // 1. محاولة العثور على كود الجلسة
         if ($request->filled('session_code')) {
-            // ✅ الحالة 1 (الجديدة): البحث المباشر بكود الجلسة
+            // أ) إذا تم إرسال كود الجلسة مباشرة
             $sessionCode = $request->session_code;
         } 
         elseif ($request->filled('timetable_id')) {
-            // الحالة 2 (القديمة): البحث عن آخر جلسة للمحاضرة
-            $latestSession = LectureSession::where('timetable_id', $request->timetable_id)
-                                           ->latest()
-                                           ->first();
-            if ($latestSession) {
-                $sessionCode = $latestSession->session_code;
+            
+            $query = LectureSession::where('timetable_id', $request->timetable_id);
+
+            // ب) ✅ التحسين: البحث باستخدام التاريخ إذا توفر (وهو ما يرسله الفرونت الآن)
+            if ($request->filled('attendance_date')) {
+                $query->whereDate('session_date', $request->attendance_date);
+            } else {
+                // ج) إذا لم يتوفر التاريخ، نأخذ آخر جلسة كخيار احتياطي
+                $query->latest();
+            }
+
+            $session = $query->first();
+
+            if ($session) {
+                $sessionCode = $session->session_code;
+                
+                // (اختياري) تحديث عداد النظام في جدول الجلسات ليكون متزامن دائماً
+                // نضعه هنا لنضمن أننا نحدث الجلسة الصحيحة
+                $count = StudentAttendance::where('session_code', $sessionCode)->count();
+                $session->update(['system_attendance_count' => $count]);
             }
         }
 
@@ -45,32 +58,31 @@ class StudentAttendanceController extends Controller
 
         // 2. جلب سجلات الحضور
         $attendanceRecords = StudentAttendance::where('session_code', $sessionCode)
-                                              ->with('student.user') // Eager Loading للبيانات
+                                              ->with('student.user') // Eager Loading
                                               ->get();
 
-        // (اختياري) تحديث عداد النظام في جدول الجلسات ليكون متزامن دائماً
-        LectureSession::where('session_code', $sessionCode)
-                      ->update(['system_attendance_count' => $attendanceRecords->count()]);
-
-        // 3. تنسيق البيانات (Mapping) لتناسب واجهة React
+        // 3. تنسيق البيانات (Mapping)
         $formattedRecords = $attendanceRecords->map(function ($record) {
-            // حماية ضد البيانات المحذوفة أو الناقصة
+            // حماية ضد البيانات المحذوفة
             if (!$record->student || !$record->student->user) {
                 return null;
             }
 
             return [
                 'attendance_id' => $record->attendance_id, 
-                'student_id'    => $record->student_id, // مهم للمقارنة في الفرونت إند
+                'student_id'    => $record->student_id,
                 'studentName'   => $record->student->user->full_name,
-                'studentId'     => $record->student->user->academic_number, // الرقم الجامعي
-                'status'        => $record->status, // 1 حاضر
-                
-                // تنسيق الوقت كما طلبت
+                'studentId'     => $record->student->user->academic_number,
+                'status'        => $record->status,
                 'scanTime'      => $record->created_at ? $record->created_at->format('H:i:s') : 'N/A',
-                'method'        => 'QR', // أو يمكنك جلبه من العمود إذا أضفته لاحقاً
+                
+                // ✅✅✅ التصحيح هنا: إرجاع القيمة الحقيقية من قاعدة البيانات
+                'attendance_method' => $record->attendance_method, 
+                
+                // قيمة احتياطية للواجهات القديمة
+                'method' => $record->attendance_method == 1 ? 'يدوي' : 'QR',
             ];
-        })->filter()->values(); // filter لإزالة الـ null، values لإعادة ترتيب المصفوفة
+        })->filter()->values(); 
 
         return response()->json(['data' => $formattedRecords]);
     }

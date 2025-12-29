@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\FinancialController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\QualityAssuranceController;
 
 // --- Debug Route (Optional) ---
 Route::get('/debug/password-algo', function () {
@@ -177,8 +178,10 @@ Route::prefix('v1')->group(function () {
             Route::post('start-session', 'startSession'); // ✅ Main Start Route
             Route::patch('{qrCode}/refresh', 'refresh');  // ✅ Main Refresh Route
             Route::patch('{qrCode}/end', 'endSession');   // ✅ Main End Route
+            // Route::patch('qr-codes/{qrCode}/extend', 'extendDuration'); // ✅ Main Extend Route
             // Route::post('refresh', 'refreshQrCode'); // Removed duplicate/conflicting route
         });
+        Route::patch('qr-codes/{qrCode}/extend', [QrCodesController::class, 'extendDuration']);
 
         // === Attendance Logic ===
         
@@ -247,4 +250,29 @@ Route::prefix('v1')->group(function () {
         // 4. تغيير حالة الكشف (اعتماد/إغلاق)
         Route::put('cycles/{cycle}/status', [FinancialController::class, 'updateStatus']);
     });
+
+    // ... داخل Route::prefix('v1')->group(function () { ...
+
+    // --- Quality Assurance Routes ---
+    
+    // 1. Dashboard Data
+    Route::get('courses/{course}/qa-data', [QualityAssuranceController::class, 'getCourseQaData']);
+    Route::get('timetable/{timetable}/topics-status', [TimetableController::class, 'getTopicsStatus']);
+
+    // 2. Learning Outcomes
+    Route::post('qa/outcomes', [QualityAssuranceController::class, 'storeOutcome']);
+    Route::put('qa/outcomes/{id}', [QualityAssuranceController::class, 'updateOutcome']);
+    Route::delete('qa/outcomes/{id}', [QualityAssuranceController::class, 'destroyOutcome']);
+
+    // 3. Topics
+    Route::post('qa/topics', [QualityAssuranceController::class, 'storeTopic']);
+    Route::put('qa/topics/{id}', [QualityAssuranceController::class, 'updateTopic']);
+    Route::delete('qa/topics/{id}', [QualityAssuranceController::class, 'destroyTopic']);
+
+    // 4. Questions
+    Route::post('qa/questions', [QualityAssuranceController::class, 'storeQuestion']);
+    Route::put('qa/questions/{id}', [QualityAssuranceController::class, 'updateQuestion']);
+    Route::delete('qa/questions/{id}', [QualityAssuranceController::class, 'destroyQuestion']);
+
+// ...
 });

@@ -40,6 +40,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+
         // في حالة التراجع، نعيد الوضع كما كان (وهذا قد يفشل إذا كانت البيانات مكررة)
         Schema::table('timetable', function (Blueprint $table) {
             $table->dropForeign(['classroom_id']);

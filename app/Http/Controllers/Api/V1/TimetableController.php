@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Timetable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 // --- ⬇️ أضف هذه الأسطر ⬇️ ---
 use App\Models\LectureSession;
 use App\Models\Period;
 use App\Models\StudentGroup;
 use Illuminate\Support\Str;
+use App\Models\CourseTopic;
 // --- ⬆️ نهاية الإضافة ⬆️ ---
 
 class TimetableController extends Controller
@@ -331,5 +333,36 @@ class TimetableController extends Controller
         }
     
         return $conflicts;
+    }
+
+    public function getTopicsStatus($timetableId)
+    {
+        // 1. جلب بيانات الجدول لمعرفة المادة
+        $timetable = Timetable::with('course')->findOrFail($timetableId);
+        $courseId = $timetable->course_id;
+    
+        // 2. جلب جميع مواضيع المادة
+        $allTopics = CourseTopic::where('course_id', $courseId)
+            ->orderBy('order_index')
+            ->get(['topic_id', 'title']);
+    
+        // 3. جلب المواضيع التي تم تغطيتها في جلسات تابعة لهذا الجدول تحديداً
+        // (هنا يكمن حل مشكلة التمييز بين الفصول الدراسية)
+        $coveredTopicIds = DB::table('session_topics_covered')
+            ->join('lecture_sessions', 'session_topics_covered.session_id', '=', 'lecture_sessions.session_id')
+            ->where('lecture_sessions.timetable_id', $timetableId) // 🔥 الفلترة حسب الجدول الحالي فقط
+            ->pluck('session_topics_covered.topic_id')
+            ->toArray();
+    
+        // 4. دمج البيانات
+        $result = $allTopics->map(function ($topic) use ($coveredTopicIds) {
+            return [
+                'topic_id' => $topic->topic_id,
+                'title' => $topic->title,
+                'is_covered' => in_array($topic->topic_id, $coveredTopicIds),
+            ];
+        });
+    
+        return response()->json(['data' => $result]);
     }
 }
