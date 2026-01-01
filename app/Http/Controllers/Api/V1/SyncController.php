@@ -11,40 +11,40 @@ use App\Models\Classroom;
 
 class SyncController extends Controller
 {
+    /**
+     * تنفيذ مزامنة مجمّعة (إنشاء أو تحديث) للكيانات.
+     * يستخدم updateOrCreate لتجنب تكرار السجلات والتعامل مع التحديثات.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function bulkSync(Request $request)
     {
-        // التحقق من صحة البيانات القادمة
+        // ... (الجزء الخاص بالـ validation يبقى كما هو) ...
         $request->validate([
             'colleges' => 'array',
             'buildings' => 'array',
             'classrooms' => 'array',
         ]);
 
-        // مصفوفات لتخزين الاستجابة (الربط بين الـ ID المحلي والجديد)
         $responseMap = [
             'colleges' => [],
             'buildings' => [],
             'classrooms' => []
         ];
 
-        // خرائط مؤقتة للربط الداخلي أثناء العملية
-        // local_id => server_id
         $collegeMap = [];
         $buildingMap = [];
 
         return DB::transaction(function () use ($request, &$responseMap, &$collegeMap, &$buildingMap) {
             
-            // 1. معالجة الكليات (Colleges)
+            // 1. معالجة الكليات (Colleges) - إنشاء أو تحديث
             if ($request->has('colleges')) {
                 foreach ($request->colleges as $item) {
-                    // إنشاء الكلية
-                    $college = College::create([
-                        'college_name' => $item['name_ar'], // تأكد من تطابق أسماء الأعمدة مع قاعدة بياناتك
-                        // 'college_name_en' => $item['name_en'], // إذا كان لديك عمود للاسم الإنجليزي
-                        // أضف باقي الحقول الضرورية هنا
-                    ]);
+                    $attributes = ['college_name' => $item['name_ar']];
+                    $values = []; // أضف حقول التحديث الأخرى هنا إن وجدت
+                    $college = College::updateOrCreate($attributes, $values);
 
-                    // تخزين الربط
                     $collegeMap[$item['local_id']] = $college->college_id;
                     $responseMap['colleges'][] = [
                         'local_id' => $item['local_id'],
@@ -53,11 +53,9 @@ class SyncController extends Controller
                 }
             }
 
-            // 2. معالجة المباني (Buildings)
+            // 2. معالجة المباني (Buildings) - إنشاء أو تحديث
             if ($request->has('buildings')) {
                 foreach ($request->buildings as $item) {
-                    // محاولة العثور على معرف الكلية الحقيقي
-                    // إما من الخريطة (إذا تم إنشاؤها للتو) أو استخدام القيمة المرسلة مباشرة
                     $collegeId = null;
                     if (isset($item['college_ref']) && isset($collegeMap[$item['college_ref']])) {
                         $collegeId = $collegeMap[$item['college_ref']];
@@ -65,14 +63,20 @@ class SyncController extends Controller
                         $collegeId = $item['college_id'];
                     }
 
-                    if (!$collegeId) continue; // تخطي إذا لم نجد أب للمبنى
+                    if (!$collegeId) continue; 
 
-                    $building = Building::create([
-                        'building_name' => $item['name_ar'],
+                    // ملاحظة: يُفترض أن 'code' موجود في جدول المباني Building
+                    $attributes = [
+                        'code' => $item['code'], 
                         'college_id' => $collegeId,
-                        'code' => $item['code'] ?? null,
-                        // 'floors_count' => ... قد تحتاج لتحديد قيمة افتراضية أو إرسالها
-                    ]);
+                    ];
+                    
+                    $values = [
+                        'building_name' => $item['name_ar'],
+                        // أضف حقول التحديث الأخرى هنا إن وجدت
+                    ];
+
+                    $building = Building::updateOrCreate($attributes, $values);
 
                     $buildingMap[$item['local_id']] = $building->building_id;
                     $responseMap['buildings'][] = [
@@ -82,9 +86,10 @@ class SyncController extends Controller
                 }
             }
 
-            // 3. معالجة القاعات (Classrooms)
+            // 3. معالجة القاعات (Classrooms) - الحل النهائي للـ updateOrCreate
             if ($request->has('classrooms')) {
                 foreach ($request->classrooms as $item) {
+                    
                     $buildingId = null;
                     if (isset($item['building_ref']) && isset($buildingMap[$item['building_ref']])) {
                         $buildingId = $buildingMap[$item['building_ref']];
@@ -94,16 +99,30 @@ class SyncController extends Controller
 
                     if (!$buildingId) continue;
 
-                    $classroom = Classroom::create([
-                        'classroom_name' => $item['code'], // أو name_ar حسب المخطط
+                    // =========================================================
+                    // تم التغيير: نستخدم classroom_name للمطابقة بدلاً من 'code'
+                    // وذلك لأن عمود 'code' غير موجود في جدول classrooms حسب الصورة
+                    // =========================================================
+
+                    // المعايير للبحث (المفتاح الفريد):
+                    $attributes = [
+                        'classroom_name' => $item['code'],      // نستخدم قيمة 'code' القادمة لملء حقل 'classroom_name' للمطابقة
                         'building_id' => $buildingId,
-                        'classroom_type' => ($item['type'] === 'LAB') ? 1 : 0, // تحويل النوع إلى رقم حسب نظامك
+                    ];
+
+                    // البيانات التي سيتم تحديثها أو إضافتها:
+                    $values = [
+                        // 'classroom_name' تم إدراجه بالفعل في $attributes للمطابقة
+                        'classroom_type' => ($item['type'] === 'LAB') ? 1 : 0, 
                         'capacity' => $item['capacity'],
                         'floor' => $item['floor'],
                         'latitude' => $item['lat'],
                         'longitude' => $item['lng'],
                         'allowed_distance' => $item['range'],
-                    ]);
+                    ];
+
+                    // استخدام updateOrCreate: يبحث بـ $attributes، ويحدث/ينشئ بـ $values
+                    $classroom = Classroom::updateOrCreate($attributes, $values);
 
                     $responseMap['classrooms'][] = [
                         'local_id' => $item['local_id'],
