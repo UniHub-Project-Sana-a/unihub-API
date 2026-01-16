@@ -45,6 +45,8 @@ use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\FinancialController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\QualityAssuranceController;
+use App\Http\Controllers\Api\V1\LecturerGradebookController;
+use App\Http\Controllers\Api\V1\Admin\IpRestrictionController;
 
 // --- Debug Route (Optional) ---
 Route::get('/debug/password-algo', function () {
@@ -59,10 +61,8 @@ Route::get('/debug/password-algo', function () {
 // ========================== V1 Routes ==========================
 Route::prefix('v1')->group(function () {
 
-    // Sync Data Route
     Route::post('sync/bulk', [SyncController::class, 'bulkSync']); 
     
-    // --- 1. Public Routes (No Auth Required) ---
     Route::controller(AuthController::class)->group(function () {
         Route::post('auth/login', 'login')->middleware('throttle:login');
         Route::post('auth/verify-otp', 'verifyOtp');
@@ -76,15 +76,12 @@ Route::prefix('v1')->group(function () {
     Route::get('app-versions/latest', [AppVersionsController::class, 'latest']);
     Route::get('admin/security/policy', [SettingsController::class, 'getPolicy']);
 
-    // --- 2. Protected Routes (Auth Required) ---
     Route::middleware(['auth:api', 'activity:admin', 'throttle:60,1'])->group(function () {
 
-        // === Authentication & User ===
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::post('auth/change-password', [AuthController::class, 'changePassword']);
 
-        // === Lookups & Static Data ===
         Route::controller(LookupsController::class)->prefix('lookups')->group(function () {
             Route::get('user-types', 'userTypes');
             Route::get('permissions', 'permissions');
@@ -92,7 +89,6 @@ Route::prefix('v1')->group(function () {
             Route::get('academic-years', 'academicYears'); 
         });
 
-        // === Core Resources (CRUD) ===
         Route::apiResource('users', UsersController::class);
         Route::apiResource('colleges', CollegesController::class);
         Route::apiResource('departments', DepartmentsController::class);
@@ -107,49 +103,53 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('academic-titles', AcademicTitlesController::class);
         Route::get('colleges/{college}/dashboard', [CollegesController::class, 'dashboard']);
         
-        // التقرير الرئيسي (Dashboard)
         Route::get('dashboard/university-overview', [DashboardController::class, 'index']);
         Route::get('colleges/{college}/reports', [ReportsController::class, 'index']);
         Route::get('colleges/{college}/reports/course-groups', [ReportsController::class, 'getCourseGroups']);
         Route::get('colleges/{college}/reports/group-students-attendance', [ReportsController::class, 'getGroupStudentsAttendance']);
+        Route::get('colleges/{college}/reports/group-grades', [ReportsController::class, 'getGroupGradesReport']);
+        Route::get('colleges/{college}/reports/qa-performance', [ReportsController::class, 'getQAPerformanceReport']);
+        Route::get('colleges/{college}/reports/qa-details', [ReportsController::class, 'getQACourseDetails']);
+        Route::get('colleges/{college}/reports/qa-detailed', [ReportsController::class, 'getQADetailedReport']);
         Route::get('colleges/{college}/dashboard', [ReportsController::class, 'dashboard']);
         
-        // التقارير التفصيلية (الوصول السريع)
         Route::get('colleges/{college}/reports/detailed', [ReportsController::class, 'detailedReport']);
         
-        // منشئ التقارير المخصصة (Builder)
         Route::post('colleges/{college}/reports/builder', [ReportsController::class, 'customBuilder']);
         Route::get('colleges/{college}/reports/lecturer/{lecturer}', [ReportsController::class, 'lecturerDetails']);
         
-        // User Types & Permissions
         Route::apiResource('user-types', UserTypeController::class)->except(['index', 'show']);
         Route::get('user-types/{userTypeId}/permissions', [UserTypePermissionController::class, 'index']);
         Route::post('user-types/{userType}/permissions/bulk-assign', [UserTypePermissionController::class, 'bulkAssign']);
 
-        // === Lecturers & Students Management ===
         Route::post('lecturers/import-csv', [LecturersController::class, 'importCsv']);
         Route::apiResource('lecturers', LecturersController::class);
         Route::get('lecturer/schedule', [ScheduleController::class, 'getSchedule']);
 
+        // ✅ --- بداية الإضافة: راوتات درجات أعمال الفصل --- ✅
+        Route::controller(LecturerGradebookController::class)->prefix('lecturer')->group(function () {
+            Route::get('my-courses', 'getMyCourses');
+            Route::get('gradebook', 'getGradebookData');
+            Route::post('assessments', 'addAssessmentColumn');
+            Route::delete('assessments/{id}', 'deleteAssessmentColumn');
+            Route::post('grades/update', 'updateStudentGrade');
+        });
+        // ✅ --- نهاية الإضافة --- ✅
+
         Route::apiResource('students', StudentsController::class)->only(['index']);
         
-        // Student Groups
         Route::controller(StudentGroupsController::class)->prefix('student-groups')->group(function () {
             Route::post('upsert-and-attach', 'upsertAndAttach');
             Route::post('import-csv', 'importCsv');
             Route::post('import-external', 'importExternal');
             Route::delete('{group}/students', 'detachStudent');
-            // Aliases for frontend compatibility
             Route::get('{student_group}/students', 'students');
         });
-        // This route is used in your Frontend (AttendanceSummary):
         Route::get('groups/{studentGroup}/students', [StudentGroupsController::class, 'students']); 
         Route::apiResource('student-groups', StudentGroupsController::class);
 
-        // === Timetable (Legacy & New) ===
         Route::apiResource('timetable', TimetableController::class);
 
-        // New Timetable Structure (Admin Only)
         Route::middleware('type:admin,dean,presidency')->group(function () {
             Route::get('timetable-sets',  [TimetableSetController::class, 'index']);
             Route::post('timetable-sets', [TimetableSetController::class, 'store']);
@@ -158,12 +158,10 @@ Route::prefix('v1')->group(function () {
             Route::post('timetable-entries',       [TimetableEntryController::class, 'store']);
             Route::post('timetable-entries/bulk',  [TimetableEntryController::class, 'bulk']);
             
-            // Aliases
             Route::post('timetable-alias',      [TimetableEntryController::class, 'storeAlias']);
             Route::post('timetable/bulk', [TimetableEntryController::class, 'bulkAlias']);
         });
 
-        // === Lecture Sessions & Operations ===
         Route::controller(LectureSessionsController::class)->prefix('lecture-sessions')->group(function () {
             Route::post('bulk', 'storeBulk');
             Route::post('start', 'startSession'); // Generic start
@@ -171,40 +169,30 @@ Route::prefix('v1')->group(function () {
         Route::get('/schedulable-lectures', [LectureSessionsController::class, 'getSchedulableLectures']);
         Route::apiResource('lecture-sessions', LectureSessionsController::class);
 
-        // === QR Codes (Cleaned Up) ===
         Route::apiResource('qr-refresh-options', QRRefreshOptionsController::class);
         
         Route::controller(QrCodesController::class)->prefix('qr-codes')->group(function () {
-            Route::post('start-session', 'startSession'); // ✅ Main Start Route
-            Route::patch('{qrCode}/refresh', 'refresh');  // ✅ Main Refresh Route
-            Route::patch('{qrCode}/end', 'endSession');   // ✅ Main End Route
-            // Route::patch('qr-codes/{qrCode}/extend', 'extendDuration'); // ✅ Main Extend Route
-            // Route::post('refresh', 'refreshQrCode'); // Removed duplicate/conflicting route
+            Route::post('start-session', 'startSession');
+            Route::patch('{qrCode}/refresh', 'refresh');
+            Route::patch('{qrCode}/end', 'endSession');   
         });
         Route::patch('qr-codes/{qrCode}/extend', [QrCodesController::class, 'extendDuration']);
 
-        // === Attendance Logic ===
-        
-        // 1. Student Attendance
         Route::controller(StudentAttendanceController::class)->prefix('attendance/students')->group(function () {
             Route::post('scan', 'scan');
             Route::post('manual', 'manualEntry');
         });
-        // General alias for scan
         Route::post('attendance/scan', [StudentAttendanceController::class, 'scan']); 
         Route::apiResource('student-attendance', StudentAttendanceController::class);
 
-        // 2. Lecturer Attendance & Finalization
         Route::controller(LecturerAttendanceController::class)->group(function () {
             Route::post('attendance/lecturers/check-in', 'checkIn');
             Route::post('lecturer-attendance', 'store');
             
-            // ✅✅✅ THE CRITICAL FIX: Finalize points to LecturerAttendanceController ✅✅✅
             Route::post('attendance/finalize', 'finalizeSession')->name('sessions.finalize');
         });
         Route::apiResource('lecturer-attendance', LecturerAttendanceController::class);
 
-        // === Requests & Notifications ===
         Route::controller(MakeupLecturesController::class)->prefix('makeup-lectures')->group(function () {
             Route::post('/', 'store');
             Route::put('{makeupLecture}/review', 'review');
@@ -220,59 +208,53 @@ Route::prefix('v1')->group(function () {
 
         Route::post('notifications', [NotificationsController::class, 'store']);
 
-        // === Devices & Security ===
         Route::controller(UserDevicesController::class)->prefix('devices')->group(function () {
             Route::put('{device}/enable-auto-attendance', 'enableAutoAttendance');
             Route::put('{device}/disable-auto-attendance', 'disableAutoAttendance');
             Route::delete('{device}', 'destroy');
         });
 
-        // === System Admin ===
         Route::prefix('admin')->group(function () {
+            
+            // 1. إدارة الجلسات (SystemController)
             Route::get('sessions', [SystemController::class, 'sessions']);
             Route::post('sessions/revoke', [SystemController::class, 'revokeSession']);
+            
+            // 2. سجلات النظام (SystemController)
             Route::get('audit-logs', [SystemController::class, 'auditLogs']);
+            
+            // 3. سياسات الأمان (SettingsController)
+            // لاحظ أن الرابط النهائي سيصبح: /api/v1/admin/security/policy
+            Route::get('security/policy', [SettingsController::class, 'getPolicy']);
             Route::put('security/policy', [SettingsController::class, 'updatePolicy']);
+            Route::apiResource('ip-restrictions', IpRestrictionController::class)->only(['index', 'store', 'destroy']);
         });
     });
 
     Route::prefix('colleges/{college}/financial')->group(function () {
     
-        // 1. الحصول على الكشف الحالي (أو إنشاؤه إذا لم يوجد)
         Route::get('cycle', [FinancialController::class, 'getCycleByMonth']);
         
-        // 2. توليد/تحديث كشف جديد (Generate)
         Route::post('generate', [FinancialController::class, 'generateCycle']);
         
-        // 3. إضافة تسوية (خصم/مكافأة)
         Route::post('payouts/{payout}/adjustments', [FinancialController::class, 'addAdjustment']);
         
-        // 4. تغيير حالة الكشف (اعتماد/إغلاق)
         Route::put('cycles/{cycle}/status', [FinancialController::class, 'updateStatus']);
     });
 
-    // ... داخل Route::prefix('v1')->group(function () { ...
-
-    // --- Quality Assurance Routes ---
-    
-    // 1. Dashboard Data
     Route::get('courses/{course}/qa-data', [QualityAssuranceController::class, 'getCourseQaData']);
     Route::get('timetable/{timetable}/topics-status', [TimetableController::class, 'getTopicsStatus']);
 
-    // 2. Learning Outcomes
     Route::post('qa/outcomes', [QualityAssuranceController::class, 'storeOutcome']);
     Route::put('qa/outcomes/{id}', [QualityAssuranceController::class, 'updateOutcome']);
     Route::delete('qa/outcomes/{id}', [QualityAssuranceController::class, 'destroyOutcome']);
 
-    // 3. Topics
     Route::post('qa/topics', [QualityAssuranceController::class, 'storeTopic']);
     Route::put('qa/topics/{id}', [QualityAssuranceController::class, 'updateTopic']);
     Route::delete('qa/topics/{id}', [QualityAssuranceController::class, 'destroyTopic']);
 
-    // 4. Questions
     Route::post('qa/questions', [QualityAssuranceController::class, 'storeQuestion']);
     Route::put('qa/questions/{id}', [QualityAssuranceController::class, 'updateQuestion']);
     Route::delete('qa/questions/{id}', [QualityAssuranceController::class, 'destroyQuestion']);
 
-// ...
 });

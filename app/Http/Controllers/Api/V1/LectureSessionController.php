@@ -30,7 +30,7 @@ class LectureSessionController extends Controller
             // جلب القاعة والمبنى المرتبط بها
             'timetable.classroom.building:building_id,building_name', 
     
-            // جلب القسم القاعة الفعلية (مهم جداً للتعديلات السابقة)
+            // جلب القسم القاعة الفعلية
             'timetable.department:department_id,department_name',
             
             // ✅ إضافة هامة: جلب بيانات القاعة الفعلية للجلسة (وليس فقط المجدولة)
@@ -46,12 +46,26 @@ class LectureSessionController extends Controller
             $query->whereBetween('session_date', [$request->start_date, $request->end_date]);
         }
     
-        // --- (الفلاتر الحالية لديك) ---
+        // --- (الفلاتر المعدلة) ---
+        
+        // ✅ التعديل الجوهري: منطق المحاضر الفعلي vs الأصلي
         if ($request->filled('lecturer_id')) {
-            $query->whereHas('timetable', function ($q) use ($request) {
-                $q->where('lecturer_id', (int)$request->lecturer_id);
+            $lecturerId = (int)$request->lecturer_id;
+
+            $query->where(function ($q) use ($lecturerId) {
+                // 1. المحاضر مسجل في الجلسة مباشرة (بديل أو تم تعديله)
+                $q->where('lecturer_id', $lecturerId)
+                
+                // 2. أو: المحاضر هو الأصلي في الجدول، ولم يتم تعيين بديل في الجلسة (lecturer_id IS NULL)
+                  ->orWhere(function ($subQ) use ($lecturerId) {
+                      $subQ->whereNull('lecturer_id')
+                           ->whereHas('timetable', function ($tQ) use ($lecturerId) {
+                               $tQ->where('lecturer_id', $lecturerId);
+                           });
+                  });
             });
         }
+
         if ($request->filled('session_date')) {
             $query->where('session_date', $request->session_date);
         }
@@ -74,20 +88,13 @@ class LectureSessionController extends Controller
         ]);
     }
 
-     /**
-     * جلب المحاضرات التي لم يتم إنشاء جلسة لها اليوم.
-     */
-        /**
-     * [نسخة تشخيصية] جلب المحاضرات التي لم يتم إنشاء جلسة لها اليوم.
-     */
-        /**
+    /**
      * جلب المحاضرات القابلة للجدولة مع التواريخ المتاحة لها فقط.
      */
     public function getSchedulableLectures(Request $request)
     {
         try {
             // جلب جميع المحاضرات النشطة
-            // يمكنك إضافة فلاتر هنا، مثلاً حسب الكلية
             $timetables = Timetable::where('status', 1)
                                    ->with('course', 'group', 'day')
                                    ->get();
@@ -124,7 +131,6 @@ class LectureSessionController extends Controller
                         }
                     }
                 } catch (\Exception $e) {
-                    // تجاهل المحاضرات ذات التواريخ غير الصالحة
                     continue;
                 }
 
@@ -136,8 +142,13 @@ class LectureSessionController extends Controller
 
                 // 4. أضف المحاضرة إلى القائمة فقط إذا كانت هناك تواريخ متاحة لها
                 if (!empty($availableDates)) {
-                    // أضف قائمة التواريخ المتاحة إلى كائن المحاضرة
                     $timetable->available_dates = $availableDates;
+                    $schedulableLectures[] = $timetable;
+                }
+                // ✅ تعديل هام: حتى لو كانت فارغة، نضيفها إذا أردنا دعم التعويض لمحاضرات مكتملة
+                // (حسب طلبك في الواجهة، إذا أردت إظهارها لغرض التعويض، يمكنك إزالة شرط if (!empty) وإضافتها دائماً)
+                else {
+                    $timetable->available_dates = [];
                     $schedulableLectures[] = $timetable;
                 }
             }
@@ -153,66 +164,90 @@ class LectureSessionController extends Controller
     }
 
     /**
-     * إنشاء جلسة محاضرة جديدة.
+     * إنشاء جلسة محاضرة جديدة (يدعم الجلسات العادية والتعويضية).
      */
     public function store(Request $request)
     {
-        /** @var \Illuminate\Http\Request $request */ // ⬅️ أضف هذا السطر
+        /** @var \Illuminate\Http\Request $request */
+        // 1. تحديث قواعد التحقق لتشمل بيانات التعويض
         $validated = $request->validate([
             'timetable_id' => 'required|integer|exists:timetable,timetable_id',
             'session_date' => 'required|date',
+            'is_makeup'    => 'nullable|boolean', // حقل جديد
+            // الحقول التالية مطلوبة فقط إذا كانت الجلسة تعويضية
+            'start_time'          => 'nullable|required_if:is_makeup,true', 
+            'end_time'            => 'nullable|required_if:is_makeup,true',
+            'actual_classroom_id' => 'nullable|required_if:is_makeup,true|exists:classrooms,classroom_id',
         ]);
 
-        $timetable = Timetable::with('period', 'group.members')->find($validated['timetable_id']);
+        $timetable = Timetable::with('period')->find($validated['timetable_id']);
+        
+        // تحديد ما إذا كانت الجلسة تعويضية
+        $isMakeup = $request->boolean('is_makeup');
 
-        // التحقق من أن تاريخ الجلسة يقع ضمن نطاق المحاضرة
-        if ($validated['session_date'] < $timetable->start_date || $validated['session_date'] > $timetable->end_date) {
-            return response()->json(['message' => 'تاريخ الجلسة خارج النطاق الزمني المحدد للمحاضرة.'], 422);
+        // متغيرات لتخزين القيم النهائية
+        $startTime = null;
+        $endTime = null;
+        $classroomId = null;
+
+        if ($isMakeup) {
+            // ✅ الحالة 1: جلسة تعويضية
+            // نستخدم البيانات المدخلة يدوياً من الواجهة
+            $startTime = $request->start_time;
+            $endTime = $request->end_time;
+            $classroomId = $request->actual_classroom_id;
+
+            // تجاوزنا التحقق من نطاق التاريخ للسماح بالمرونة
+        } else {
+            // ✅ الحالة 2: جلسة عادية
+            // نستخدم البيانات من الجدول الأصلي
+            $startTime = $timetable->period->start_time;
+            $endTime = $timetable->period->end_time;
+            $classroomId = $timetable->classroom_id;
+
+            // التحقق الصارم من النطاق الزمني (فقط للجلسات العادية)
+            if ($validated['session_date'] < $timetable->start_date || $validated['session_date'] > $timetable->end_date) {
+                return response()->json(['message' => 'تاريخ الجلسة خارج النطاق الزمني المحدد للمحاضرة.'], 422);
+            }
         }
 
-        // التحقق من أن يوم الجلسة يطابق يوم المحاضرة
-        $sessionDayOfWeek = date('w', strtotime($validated['session_date'])); // 0 for Sunday, 6 for Saturday
-        // نفترض أن day_id في جدول days يتبع نفس الترقيم أو يتم مطابقته
-        // $timetableDayId = $timetable->day_id;
-        // if ($sessionDayOfWeek != $timetableDayId) { ... }
-
+        // إنشاء السجل (تم حذف أعمدة الحضور المحذوفة)
         $session = LectureSession::create([
             'timetable_id' => $timetable->timetable_id,
+            'lecturer_id' => $timetable->lecturer_id,
             'session_date' => $validated['session_date'],
-            'start_time' => $timetable->period->start_time,
-            'end_time' => $timetable->period->end_time,
-            'actual_classroom_id' => $timetable->classroom_id,
-            'actual_attendance_count' => $timetable->group->members->count(), // عدد الطلاب في المجموعة
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'actual_classroom_id' => $classroomId,
             'session_code' => uniqid('SESS_'),
-            'status' => 0, // مجدولة
-            'attendance_overage_alert' => false,
-            'system_attendance_count' => 0,
+            'status' => 0,
+            'is_makeup' => $isMakeup ? 1 : 0,
         ]);
 
-        return response()->json(['data' => $session, 'message' => 'تم إنشاء الجلسة بنجاح.'], 201);
+        $message = $isMakeup ? 'تم إنشاء الجلسة التعويضية بنجاح.' : 'تم إنشاء الجلسة بنجاح.';
+
+        return response()->json(['data' => $session, 'message' => $message], 201);
     }
 
     /**
-    * إنشاء جلسات متعددة لمحاضرة واحدة.
+    * إنشاء جلسات متعددة لمحاضرة واحدة (Bulk).
     */
     public function storeBulk(Request $request)
     {
-        /** @var \Illuminate\Http\Request $request */ // ⬅️ أضف هذا السطر
+        /** @var \Illuminate\Http\Request $request */
         $validated = $request->validate([
             'timetable_id' => 'required|integer|exists:timetable,timetable_id',
         ]);
     
         $timetable = Timetable::with('period')->findOrFail($validated['timetable_id']);
         
-        // 1. توليد كل التواريخ الممكنة للمحاضرة بناءً على يوم الأسبوع
+        // 1. توليد كل التواريخ الممكنة
         $availableDates = [];
         $startDate = new \DateTime($timetable->start_date);
         $endDate = new \DateTime($timetable->end_date);
-        $interval = new \DateInterval('P1D'); // فترة يوم واحد
-        $dateRange = new \DatePeriod($startDate, $interval, $endDate->modify('+1 day')); // +1 day لتشمل يوم النهاية
+        $interval = new \DateInterval('P1D');
+        $dateRange = new \DatePeriod($startDate, $interval, $endDate->modify('+1 day'));
     
-        // تحويل day_id من قاعدة البيانات إلى رقم يوم الأسبوع في PHP (0=الأحد, 6=السبت)
-        // هذا مجرد مثال، يجب تعديله ليطابق الترقيم في جدول `days` لديك
         $dayMap = [1 => 6, 2 => 0, 3 => 1, 4 => 2, 5 => 3, 6 => 4, 7 => 5];
         $targetDayOfWeek = $dayMap[$timetable->day_id] ?? -1;
     
@@ -226,39 +261,38 @@ class LectureSessionController extends Controller
             return response()->json(['message' => 'لا توجد تواريخ متاحة للجدولة في هذا النطاق.'], 404);
         }
         
-        // 2. جلب الجلسات الموجودة بالفعل لهذه المحاضرة لتجنب التكرار
+        // 2. جلب الجلسات الموجودة
         $existingSessionDates = LectureSession::where('timetable_id', $timetable->timetable_id)
                                                 ->pluck('session_date')
                                                 ->map(fn($date) => $date instanceof \Carbon\Carbon ? $date->toDateString() : (string) $date)
                                                 ->all();
     
-        // 3. تحديد التواريخ الجديدة فقط التي سيتم إنشاؤها
+        // 3. تحديد التواريخ الجديدة
         $datesToCreate = array_diff($availableDates, $existingSessionDates);
         
         $createdCount = 0;
         $sessionsToInsert = [];
         $now = now();
     
-        // 4. إعداد البيانات للإنشاء المجمع
+        // 4. إعداد البيانات (تم حذف أعمدة الحضور المحذوفة)
         foreach ($datesToCreate as $date) {
             $sessionsToInsert[] = [
                 'timetable_id' => $timetable->timetable_id,
+                'lecturer_id' => $timetable->lecturer_id,
                 'session_date' => $date,
                 'start_time' => $timetable->period->start_time,
                 'end_time' => $timetable->period->end_time,
                 'actual_classroom_id' => $timetable->classroom_id,
                 'session_code' => uniqid('SESS_'),
                 'status' => 0,
-                'attendance_overage_alert' => false,
-                'system_attendance_count' => 0,
-                'actual_attendance_count' => 0,
+                'is_makeup' => 0, // الجلسات التلقائية ليست تعويضية
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
             $createdCount++;
         }
     
-        // 5. إدخال جميع الجلسات الجديدة في قاعدة البيانات بطلب واحد (أكثر كفاءة)
+        // 5. الإدخال المجمع
         if (!empty($sessionsToInsert)) {
             LectureSession::insert($sessionsToInsert);
         }
@@ -275,7 +309,6 @@ class LectureSessionController extends Controller
      */
     public function show($id)
     {
-        // جلب الجلسة مع بيانات الجدول المرتبطة (المادة، المحاضر، القاعة، المجموعة)
         $session = \App\Models\LectureSession::with([
             'timetable.course',
             'timetable.lecturer.user',
@@ -297,8 +330,8 @@ class LectureSessionController extends Controller
             'session_date' => 'sometimes|date',
             'status' => 'sometimes|integer',
             'actual_classroom_id' => 'nullable|exists:classrooms,classroom_id',
-            // 'actual_lecturer_id'  => 'nullable|exists:lecturers,lecturer_id', // ✅ الحقل الجديد
-            'start_time' => 'nullable', // يقبل H:i
+            'lecturer_id'  => 'nullable|exists:lecturers,lecturer_id', 
+            'start_time' => 'nullable',
             'end_time'   => 'nullable',
         ]);
 
@@ -322,4 +355,4 @@ class LectureSessionController extends Controller
             'message' => 'Lecture session deleted successfully'
         ]);
     }
-} 
+}

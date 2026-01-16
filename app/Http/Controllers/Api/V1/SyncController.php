@@ -132,6 +132,7 @@ class SyncController extends Controller
             }
 
             return response()->json($responseMap, 201);
+            
         });
     }
 }

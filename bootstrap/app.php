@@ -19,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'activity' => LogUserActivity::class,
             'type' => \App\Http\Middleware\CheckUserType::class
         ]);
+        $middleware->api(prepend: [
+            \App\Http\Middleware\CheckIpRestrictions::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

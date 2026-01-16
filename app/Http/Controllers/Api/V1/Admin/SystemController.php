@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class SystemController extends Controller
 {
-    // جلسات (توكنات Passport)
     public function sessions(Request $request)
     {
         $tokens = DB::table('oauth_access_tokens as t')
@@ -41,7 +40,6 @@ class SystemController extends Controller
         return response()->json(['message'=>'Provide token_id or user_id'], 422);
     }
 
-    // سجلات وصول
     public function auditLogs(Request $request)
     {
         $q = DB::table('user_activities as a')

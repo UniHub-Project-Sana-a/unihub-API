@@ -69,7 +69,7 @@ class TimetableController extends Controller
         /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request)  
     {
         // 1. التحقق الأساسي (Validation)
         // هذا الجزء ضروري جداً لأن دالة التعارض تعتمد على وجود start_date و end_date
@@ -88,6 +88,8 @@ class TimetableController extends Controller
             'college_id'    => 'required|integer|exists:colleges,college_id',
             'department_id' => 'required|integer|exists:departments,department_id',
             'lecture_hours' => 'required|numeric|min:0',
+            'gender_type'   => 'required|integer|in:0,1,2',
+            'status'        => 'required|integer|in:0,1',
         ]);
     
         if ($validator->fails()) {
@@ -118,14 +120,14 @@ class TimetableController extends Controller
     
                 LectureSession::create([
                     'timetable_id' => $timetableEntry->timetable_id,
+                    'lecturer_id' => $timetableEntry->lecturer_id,
                     'session_date' => $timetableEntry->start_date,
                     'start_time' => $period->start_time,
                     'end_time' => $period->end_time,
                     'actual_classroom_id' => $timetableEntry->classroom_id,
                     'session_code' => 'SESS-' . Str::random(10) . '-' . time(),
                     'status' => 0,
-                    'system_attendance_count' => 0, 
-                    'actual_attendance_count' => $studentGroup ? ($studentGroup->students_count) : 0,
+                    'is_makeup' => 0,
                 ]);
             }
     

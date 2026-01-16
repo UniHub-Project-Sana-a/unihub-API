@@ -20,15 +20,14 @@ class LectureSession extends Model
     // ✅ --- تأكد من أن هذه المصفوفة تحتوي على timetable_id --- ✅
     protected $fillable = [
         'timetable_id', // <-- هذا هو الحقل الناقص
+        'lecturer_id',
         'session_date',
         'start_time',
         'end_time',
         'actual_classroom_id',
-        'actual_attendance_count',
         'session_code',
         'status',
-        'attendance_overage_alert',
-        'system_attendance_count',
+        'is_makeup',
     ];
 
     /**

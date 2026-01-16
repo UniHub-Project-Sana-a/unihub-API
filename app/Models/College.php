@@ -1,6 +1,53 @@
 <?php
 
 namespace App\Models;
+// مهم مهم جدا نفذ امر php artisan storage:link في متصفح الجامعة
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +64,7 @@ class College extends Model
     protected $fillable = [
         'college_name',
         'college_code',
+        'college_logo',
     ];
 
     // Relations
