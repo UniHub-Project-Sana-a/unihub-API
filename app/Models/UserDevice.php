@@ -11,7 +11,10 @@ class UserDevice extends Model
 
     protected $table = 'user_devices';
     protected $primaryKey = 'device_id';
-    public $timestamps = true;
+    public $timestamps = false;
+    const CREATED_AT = 'registered_at';
+
+    const UPDATED_AT = 'last_login_at';
 
     protected $fillable = [
         'user_id',

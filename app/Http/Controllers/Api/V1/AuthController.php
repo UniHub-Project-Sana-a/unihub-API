@@ -16,6 +16,8 @@ use App\Models\OtpDeviceVerification;
 use App\Notifications\SendOtpNotification;
 use Illuminate\Support\Facades\Http;
 
+use function Symfony\Component\Translation\t;
+
  // تأكد أن هذا الإشعار موجود
 
 class AuthController extends Controller
@@ -35,12 +37,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'بيانات الدخول غير صحيحة.'], 401);
         }
     
-        // 3. جلب نوع المستخدم (مع التحسين لتجنب الاستعلامات الزائدة)
-        // نستخدم العلاقة المحملة أو نستعلم عنها
         $user->loadMissing('userType');
         $userTypeCode = $user->userType->user_type_code; // student, lecturer, admin, etc.
 
-        // 🚨 منع الطلاب من الدخول نهائياً من الويب 🚨
         if ($userTypeCode === 'student') {
             return response()->json([
                 'message' => 'عذراً، دخول الطلاب متاح عبر تطبيق UniHub الهاتف فقط.',
@@ -49,19 +48,16 @@ class AuthController extends Controller
         }
 
         if ($request->password === '12345678') {
-            // ننشئ توكن ليستخدمه المستخدم في تغيير كلمة المرور
             $token = $user->createToken($request->device_name)->accessToken;
             
             return response()->json([
-                'require_password_change' => true, // هذا هو المفتاح للفرونت إند
+                'require_password_change' => true, 
                 'message' => 'يجب تغيير كلمة المرور الافتراضية للمتابعة.',
                 'access_token' => $token,
                 'user' => new UserResource($user)
             ]);
         }
     
-        // 4. المنطق الخاص (إداريين يدخلون مباشرة)
-        // أي شخص ليس (طالب أو محاضر) يعتبر إداري ويدخل مباشرة
         if ($userTypeCode !== 'lecturer') {
             $token = $user->createToken($request->device_name)->accessToken;
             return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
@@ -69,63 +65,45 @@ class AuthController extends Controller
     
         // --- من هنا لأسفل: المنطق خاص بالمحاضر (Lecturer) فقط ---
 
-        \App\Models\UserDevice::firstOrCreate(
-            [
-                'user_id' => $user->user_id,
-                'mac_address' => $request->mac_address
-            ],
-            [
-                'device_name' => $request->device_name,
-                'os_type' => $request->os_type,
-                'is_auto_attendance_enabled' => false 
-            ]
-        );
-
-        // 2. إصدار التوكن مباشرة
-        $token = $user->createToken($request->device_name)->accessToken;
-        return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
-
         // 5. التحقق مما إذا كان الجهاز مسجلاً مسبقاً
-        // $device = UserDevice::where('user_id', $user->user_id)
-        //     ->where('mac_address', $request->mac_address)
-        //     ->first();
+        $device = UserDevice::where('user_id', $user->user_id)
+            ->where('mac_address', $request->mac_address)
+            ->first();
     
-        // if ($device) {
-        //     // جهاز معروف -> دخول مباشر
-        //     $token = $user->createToken($request->device_name)->accessToken;
-        //     return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
-        // }
+        if ($device) {
+            // جهاز معروف -> دخول مباشر
+            $token = $user->createToken($request->device_name)->accessToken;
+            return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
+        }
     
-        // // 6. جهاز جديد للمحاضر -> إرسال OTP
-        // $otp = rand(100000, 999999);
+        // 6. جهاز جديد للمحاضر -> إرسال OTP
+        $otp = rand(100000, 999999);
         
-        // // حفظ الرمز
-        // $otpRecord = OtpDeviceVerification::create([
-        //     'user_id'     => $user->user_id,
-        //     'otp_code'    => Hash::make($otp),
-        //     'device_name' => $request->device_name,
-        //     'mac_address' => $request->mac_address,
-        //     'os_type'     => $request->os_type,
-        //     'expires_at'  => now()->addMinutes(10),
-        // ]);
+        // حفظ الرمز
+        $otpRecord = OtpDeviceVerification::create([
+            'user_id'     => $user->user_id,
+            'otp_code'    => Hash::make($otp),
+            'device_name' => $request->device_name,
+            'mac_address' => $request->mac_address,
+            'os_type'     => $request->os_type,
+            'expires_at'  => now()->addMinutes(10),
+        ]);
     
-        // // إرسال الإيميل (سيعمل في الخلفية الآن بسبب ShouldQueue)
-        // try {
-        //     $user->notify(new SendOtpNotification($otp));
-        // } catch (\Exception $e) {
-        //     Log::error('فشل إرسال بريد OTP: ' . $e->getMessage());
-        // }
+        // إرسال الإيميل (سيعمل في الخلفية الآن بسبب ShouldQueue)
+        try {
+            $user->notify(new SendOtpNotification($otp));
+        } catch (\Exception $e) {
+            Log::error('فشل إرسال بريد OTP: ' . $e->getMessage());
+        }
     
-        // return response()->json([
-        //     'otp_required' => true,
-        //     'message'      => 'جهاز جديد تم اكتشافه. تم إرسال رمز التحقق إلى بريدك الإلكتروني.',
-        //     'verification_id' => $otpRecord->verification_id,
-        //     'user_id'      => $user->user_id,
-        //     // الـ OTP يظهر فقط في بيئة التطوير
-        //     'otp_for_dev'  => (config('app.env') !== 'production') ? $otp : null,
-        // ]);
+        return response()->json([
+            'otp_required' => true,
+            'message'      => 'جهاز جديد تم اكتشافه. تم إرسال رمز التحقق إلى بريدك الإلكتروني.',
+            'verification_id' => $otpRecord->verification_id,
+            'user_id'      => $user->user_id,
+            'otp_for_dev'  => (config('app.env') !== 'production') ? $otp : null,
+        ]);
     }
-    
     
     public function verifyOtp(Request $request)
     {

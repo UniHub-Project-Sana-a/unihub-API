@@ -20,7 +20,6 @@ class StoreAcademicTitleRequest extends FormRequest
                     ->where(fn($q) => $q->where('college_id', $this->college_id)->whereNull('deleted_at')),
             ],
             'hourly_price'  => ['nullable','numeric','min:0'],
-            'lecture_price' => ['nullable','numeric','min:0'],
             'college_id'    => ['required','integer','exists:colleges,college_id'],
         ];
     }

@@ -26,7 +26,6 @@ class UpdateAcademicTitleRequest extends FormRequest
                     ->where(fn($q) => $q->where('college_id', $collegeId)->whereNull('deleted_at')),
             ],
             'hourly_price'  => ['nullable','numeric','min:0'],
-            'lecture_price' => ['nullable','numeric','min:0'],
             'college_id'    => ['sometimes','integer','exists:colleges,college_id'],
         ];
     }

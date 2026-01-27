@@ -80,8 +80,53 @@ class LectureSessionController extends Controller
     
         // 4. جلب البيانات وترتيبها
         $sessions = $query->orderBy('session_date')->orderBy('start_time')->get();
+
+        // ⬇️⬇️⬇️ بداية الإضافة الجديدة (دون حذف السابق) ⬇️⬇️⬇️
+        
+        // أ) جمع التواريخ (مع تحويلها لصيغة Y-m-d لضمان التطابق)
+        $dates = $sessions->map(function($s) {
+            // نأخذ أول 10 حروف فقط (التاريخ) ونتجاهل الوقت
+            return substr($s->session_date, 0, 10);
+        })->unique()->toArray();
+
+        $lecturerIds = $sessions->map(function($s) {
+            return $s->lecturer_id ?: ($s->timetable->lecturer_id ?? null);
+        })->unique()->filter()->toArray();
+
+        // ب) جلب الطلبات
+        $makeupRequests = DB::table('makeup_lectures_requests')
+            ->whereIn('original_date', $dates)
+            ->whereIn('lecturer_id', $lecturerIds)
+            ->get()
+            ->keyBy(function($item) {
+                // المفتاح: ID_Date (Y-m-d)
+                return $item->lecturer_id . '_' . $item->original_date;
+            });
+
+        // ج) الدمج
+        $sessions->transform(function ($session) use ($makeupRequests) {
+            $lecId = $session->lecturer_id ?: ($session->timetable->lecturer_id ?? null);
+            
+            // تحويل تاريخ الجلسة لنفس الصيغة Y-m-d
+            $dateOnly = substr($session->session_date, 0, 10);
+
+            if ($lecId) {
+                $key = $lecId . '_' . $dateOnly; // ✅ استخدام التاريخ الموحد
+                $req = $makeupRequests->get($key);
+
+                if ($req) {
+                    $session->makeupRequest = [
+                        'id' => $req->request_id,
+                        'status' => $req->status,
+                        'requestedDate' => $req->requested_date
+                    ];
+                } else {
+                    $session->makeupRequest = null;
+                }
+            }
+            return $session;
+        });
     
-        // 5. إرجاع الاستجابة
         return response()->json([
             'status' => true,
             'data' => $sessions
@@ -96,7 +141,8 @@ class LectureSessionController extends Controller
         try {
             // جلب جميع المحاضرات النشطة
             $timetables = Timetable::where('status', 1)
-                                   ->with('course', 'group', 'day')
+                                   ->when($request->college_id, fn($q) => $q->where('college_id', $request->college_id))
+                                   ->with('course', 'group', 'day', 'period', 'classroom', 'lecturer.user')
                                    ->get();
 
             // جلب كل الجلسات الموجودة حالياً وتجميعها حسب timetable_id
@@ -111,6 +157,16 @@ class LectureSessionController extends Controller
                                                 });
             
             $schedulableLectures = [];
+
+                        $dayMap = [
+                1 => 6, // السبت
+                2 => 0, // الأحد
+                3 => 1, // الاثنين
+                4 => 2, // الثلاثاء
+                5 => 3, // الأربعاء
+                6 => 4, // الخميس
+                7 => 5  // الجمعة
+            ];
 
             foreach ($timetables as $timetable) {
                 // 1. توليد كل التواريخ الممكنة نظرياً للمحاضرة

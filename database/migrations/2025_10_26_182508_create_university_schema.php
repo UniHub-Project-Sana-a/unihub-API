@@ -44,25 +44,6 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        Schema::create('qr_refresh_options', function (Blueprint $table) {
-            $table->increments('option_id');
-            $table->integer('interval_seconds')->unique();
-            $table->string('description', 100)->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
-
-        Schema::create('app_versions', function (Blueprint $table) {
-            $table->increments('version_id');
-            $table->string('package_name', 50);
-            $table->string('version_number', 20);
-            $table->date('release_date');
-            $table->boolean('is_mandatory_update')->default(false);
-            $table->string('platform', 20);
-            $table->text('description')->nullable();
-            $table->timestamps();
-        });
-
         // 2) جداول تعتمد على الأساسية
         Schema::create('users', function (Blueprint $table) {
             $table->increments('user_id');
@@ -107,7 +88,6 @@ return new class extends Migration
             $table->string('title_name', 100);
             $table->string('title_code', 50);
             $table->decimal('hourly_price', 10, 2);
-            $table->decimal('lecture_price', 10, 2)->default(0.00);
             $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
             $table->unique(['college_id', 'title_code']);
             $table->unique(['college_id', 'title_name']);
@@ -180,16 +160,6 @@ return new class extends Migration
             $table->unique(['building_id', 'floor', 'classroom_name'], 'unique_room_per_floor_per_building');
             $table->timestamps();
             $table->softDeletes();
-        });
-
-        // جداول ربط
-        Schema::create('department_programs', function (Blueprint $table) {
-            $table->unsignedInteger('department_id');
-            $table->unsignedInteger('program_id');
-            $table->foreign('department_id')->references('department_id')->on('departments')->onDelete('cascade');
-            $table->foreign('program_id')->references('program_id')->on('programs')->onDelete('cascade');
-            $table->primary(['department_id', 'program_id']);
-            $table->timestamps();
         });
 
         Schema::create('user_type_permissions', function (Blueprint $table) {
@@ -389,7 +359,6 @@ return new class extends Migration
             $table->increments('qr_id');
             $table->unsignedInteger('timetable_id'); 
             $table->unsignedInteger('session_id');
-            $table->unsignedInteger('refresh_option_id')->nullable();
             $table->string('qr_code_value');
             $table->dateTime('generated_at')->useCurrent();
             $table->dateTime('expires_at');
@@ -400,7 +369,6 @@ return new class extends Migration
             $table->decimal('allowed_distance', 5, 2);
             $table->foreign('timetable_id')->references('timetable_id')->on('timetable')->onDelete('cascade');
             $table->foreign('session_id')->references('session_id')->on('lecture_sessions')->onDelete('cascade');
-            $table->foreign('refresh_option_id')->references('option_id')->on('qr_refresh_options')->onDelete('set null');
             $table->foreign('created_by')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
             $table->timestamps();
             $table->softDeletes();
@@ -464,7 +432,6 @@ return new class extends Migration
             $table->dateTime('registered_at')->useCurrent();
             $table->dateTime('last_login_at')->nullable();
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
-            $table->timestamps();
         });
 
         Schema::create('otp_device_verifications', function (Blueprint $table) {
@@ -491,26 +458,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Schema::create('college_payments', function (Blueprint $table) {
-        //     $table->increments('payment_id');
-        //     $table->unsignedInteger('college_id');
-        //     $table->unsignedInteger('lecturer_id');
-        //     $table->string('month_year', 10); 
-        //     $table->decimal('total_hours', 5, 2);
-        //     $table->decimal('hourly_rate', 10, 2);
-        //     $table->decimal('total_amount', 10, 2)->storedAs('total_hours * hourly_rate');
-        //     $table->unsignedInteger('approved_by')->nullable();
-        //     $table->enum('payment_status', ['Pending', 'Approved', 'Paid'])->default('Pending');
-        //     $table->timestamps();
-        //     $table->softDeletes(); 
-
-        //     $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('cascade');
-        //     $table->foreign('lecturer_id')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
-        //     $table->foreign('approved_by')->references('user_id')->on('users')->onDelete('set null');
-            
-        //     $table->unique(['lecturer_id', 'month_year'], 'unique_lecturer_payment_month');
-        // });
-
         Schema::create('financial_cycles', function (Blueprint $table) {
             $table->increments('cycle_id');
             $table->unsignedInteger('college_id');
@@ -534,7 +481,6 @@ return new class extends Migration
             $table->unique(['college_id', 'month_year']);
         });
 
-        // ب) استحقاق المحاضر (Lecturer Payout) - سطر الراتب لكل محاضر
         Schema::create('lecturer_payouts', function (Blueprint $table) {
             $table->increments('payout_id');
             $table->unsignedInteger('cycle_id');
@@ -564,7 +510,6 @@ return new class extends Migration
             $table->unique(['cycle_id', 'lecturer_id']);
         });
 
-        // ج) تفاصيل التسويات (Adjustments) - لتسجيل الخصومات والمكافآت والضرائب بالتفصيل
         Schema::create('payout_adjustments', function (Blueprint $table) {
             $table->increments('adjustment_id');
             $table->unsignedInteger('payout_id');
@@ -595,7 +540,7 @@ return new class extends Migration
         Schema::dropIfExists('user_devices');
         Schema::dropIfExists('student_excuse_submissions');
         Schema::dropIfExists('makeup_lectures_requests');
-        Schema::dropIfExists('lecturer_group_notifications'); // ✅ تم إضافته
+        Schema::dropIfExists('lecturer_group_notifications');
         Schema::dropIfExists('qr_codes');
         Schema::dropIfExists('student_group_members');
         Schema::dropIfExists('student_attendance');
@@ -616,8 +561,6 @@ return new class extends Migration
         Schema::dropIfExists('department_programs');
         Schema::dropIfExists('departments');
         Schema::dropIfExists('users');
-        Schema::dropIfExists('app_versions');
-        Schema::dropIfExists('qr_refresh_options');
         Schema::dropIfExists('days');
         Schema::dropIfExists('programs');
         Schema::dropIfExists('permissions');

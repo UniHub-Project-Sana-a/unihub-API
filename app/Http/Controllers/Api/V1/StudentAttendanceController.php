@@ -206,4 +206,58 @@ class StudentAttendanceController extends Controller
             return response()->json(['status' => false, 'message' => 'Failed to delete record.', 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * تسجيل حضور طالب يدوياً من قبل المحاضر
+     */
+    public function manualEntry(Request $request)
+    {
+        // 1. التحقق من البيانات
+        $validator = Validator::make($request->all(), [
+            'student_id'      => 'required|integer|exists:students,student_id',
+            'attendance_date' => 'required|date',
+            'status'          => 'required|integer',
+            'timetable_id'    => 'required|integer', // ضروري لربط الجلسة الصحيحة
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        // 2. البحث الذكي: نستخدم timetable_id والتاريخ للعثور على الجلسة الصحيحة
+        // هذا يحل مشكلة أن التطبيق يرسل كود QR متغير لا تعرفه قاعدة البيانات
+        $session = LectureSession::with('timetable')
+                    ->where('timetable_id', $request->timetable_id)
+                    ->whereDate('session_date', $request->attendance_date)
+                    ->first();
+
+        if (!$session) {
+            return response()->json(['status' => false, 'message' => 'لم يتم العثور على جلسة فعالة لهذا التاريخ'], 404);
+        }
+
+        // 3. الحفظ الفعلي في الداتابيس (الجزء الذي كان ناقصاً)
+        $attendance = StudentAttendance::updateOrCreate(
+            [
+                'student_id'   => $request->student_id,
+                'session_code' => $session->session_code, // ✅ نستخدم الكود الثابت من الجلسة
+            ],
+            [
+                'timetable_id'      => $session->timetable_id,
+                'attendance_date'   => $request->attendance_date,
+                'status'            => $request->status,
+                'attendance_method' => 1, // يدوي
+                
+                // تعبئة البيانات التلقائية
+                'college_id'        => $session->timetable->college_id ?? 1,
+                'department_id'     => $session->timetable->department_id ?? 1,
+                'level_id'          => $session->timetable->level_id ?? 1,
+            ]
+        );
+
+        return response()->json([
+            'status' => true, 
+            'message' => 'تم الحفظ بنجاح',
+            'data' => $attendance
+        ]);
+    }
 }

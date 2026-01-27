@@ -21,10 +21,9 @@ class ResetPasswordNotification extends Notification
 
     public function toMail($notifiable)
     {
-        $url = url(config('app.frontend_url', 'http://localhost:8080') . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email));
 
-        $frontendUrl = config('app.frontend_url', 'http://localhost:8080');
-
+        $frontendUrl = "http://192.168.0.124/react-app/#/reset-password";
+        $url = $frontendUrl . "?token=" . $this->token . "&email=" . urlencode($notifiable->email);
         // 2. بناء الرابط الكامل
         $resetUrl = $frontendUrl . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
 

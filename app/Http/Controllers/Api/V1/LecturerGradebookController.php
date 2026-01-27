@@ -67,7 +67,6 @@ class LecturerGradebookController extends Controller
      */
     public function getGradebookData(Request $request)
     {
-        // التحقق من المدخلات الأساسية
         $request->validate([
             'course_id' => 'required|integer',
             'group_id' => 'required|integer',
@@ -80,7 +79,7 @@ class LecturerGradebookController extends Controller
         $semesterId = $request->semester_id;
         $academicYear = $request->academic_year;
 
-        // أ) جلب أعمدة التقييم (Assessments) - هنا semester_id موجود في جدول التقييمات، فلا بأس
+        // أ) جلب أعمدة التقييم
         $assessments = CourseAssessment::where([
                 ['course_id', '=', $courseId],
                 ['group_id', '=', $groupId],
@@ -90,7 +89,7 @@ class LecturerGradebookController extends Controller
             ->select('assessment_id', 'name', 'max_score', 'weight')
             ->get();
 
-        // ب) جلب الطلاب المسجلين في هذه المجموعة
+        // ب) جلب الطلاب المسجلين
         $students = DB::table('student_group_members')
             ->join('students', 'student_group_members.student_id', '=', 'students.student_id')
             ->join('users', 'students.user_id', '=', 'users.user_id')
@@ -98,6 +97,7 @@ class LecturerGradebookController extends Controller
             ->where('students.status', 1) 
             ->select(
                 'students.student_id',
+                'users.user_id', // ✅ تمت إضافة user_id لربط العذر
                 'users.full_name',
                 'users.academic_number',
                 'students.status'
@@ -105,7 +105,7 @@ class LecturerGradebookController extends Controller
             ->orderBy('users.full_name')
             ->get();
 
-        // ج) جلب جميع الدرجات المرصودة
+        // ج) جلب الدرجات
         $assessmentIds = $assessments->pluck('assessment_id')->toArray();
         $grades = [];
         if (!empty($assessmentIds)) {
@@ -115,9 +115,7 @@ class LecturerGradebookController extends Controller
                 ->get();
         }
 
-        // د) حساب إحصائيات الحضور
-        // 1. تحديد حصص الجدول (Timetable Slots)
-        // ✅ التعديل هنا: حذفنا where('semester_id') لأن العمود غير موجود في timetable
+        // د) حساب الحضور
         $timetableIds = DB::table('timetable')
             ->where('course_id', $courseId)
             ->where('group_id', $groupId)
@@ -125,7 +123,6 @@ class LecturerGradebookController extends Controller
             ->pluck('timetable_id')
             ->toArray();
 
-        // 2. حساب إجمالي الجلسات التي تم عقدها
         $totalSessionsHeld = 0;
         $studentAttendanceCounts = [];
 
@@ -135,7 +132,6 @@ class LecturerGradebookController extends Controller
                 ->where('status', '!=', 0) 
                 ->count();
 
-            // 3. حساب عدد مرات حضور كل طالب
             $attendanceRecords = DB::table('student_attendance')
                 ->whereIn('timetable_id', $timetableIds)
                 ->where('status', 1)
@@ -143,19 +139,25 @@ class LecturerGradebookController extends Controller
                 ->groupBy('student_id')
                 ->get();
 
-            // تحويل النتائج إلى مصفوفة لسهولة الوصول إليها: [student_id => count]
             foreach ($attendanceRecords as $record) {
                 $studentAttendanceCounts[$record->student_id] = $record->attended_count;
             }
         }
 
-        // هـ) دمج البيانات لبناء الصفوف
-        // تحويل مجموعة الدرجات إلى Collection لسهولة البحث
+        // ✅ [جديد] و) جلب الأعذار المرتبطة بهذه المادة وهؤلاء الطلاب
+        // ملاحظة: نستخدم whereIn للطلاب لتسريع الاستعلام
+        $excuses = DB::table('student_excuse_submissions')
+            ->where('course_id', $courseId)
+            ->whereIn('student_user_id', $students->pluck('user_id')->toArray()) 
+            ->select('submission_id', 'student_user_id', 'reason', 'request_date', 'response_status', 'lecturer_comment')
+            ->get()
+            ->keyBy('student_user_id'); // لسهولة الوصول بالعنوان user_id
+
+        // هـ) دمج البيانات
         $gradesCollection = collect($grades);
 
-        $studentRows = $students->map(function ($student) use ($assessments, $gradesCollection, $studentAttendanceCounts, $totalSessionsHeld) {
+        $studentRows = $students->map(function ($student) use ($assessments, $gradesCollection, $studentAttendanceCounts, $totalSessionsHeld, $excuses) {
             
-            // 1. تجميع الدرجات
             $myGrades = [];
             foreach ($assessments as $col) {
                 $gradeRecord = $gradesCollection
@@ -165,11 +167,13 @@ class LecturerGradebookController extends Controller
                 $myGrades[$col->assessment_id] = $gradeRecord ? $gradeRecord->score : null;
             }
 
-            // 2. حساب الحضور
             $attended = $studentAttendanceCounts[$student->student_id] ?? 0;
             $percentage = $totalSessionsHeld > 0 
                 ? round(($attended / $totalSessionsHeld) * 100, 1) 
                 : 0;
+
+            // ✅ استخراج بيانات العذر (إن وجد)
+            $excuseRecord = $excuses->get($student->user_id);
 
             return [
                 'student_id' => $student->student_id,
@@ -181,7 +185,15 @@ class LecturerGradebookController extends Controller
                     'attended' => $attended,
                     'total_sessions' => $totalSessionsHeld,
                     'percentage' => $percentage
-                ]
+                ],
+                // ✅ إضافة كائن العذر للفرونت إند
+                'excuse' => $excuseRecord ? [
+                    'id' => $excuseRecord->submission_id,
+                    'reason' => $excuseRecord->reason,
+                    'date' => $excuseRecord->request_date,
+                    'status' => $excuseRecord->response_status,
+                    'comment' => $excuseRecord->lecturer_comment,
+                ] : null
             ];
         });
 

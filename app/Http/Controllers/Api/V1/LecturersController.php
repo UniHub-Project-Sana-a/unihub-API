@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Lecturer;
 use App\Models\User;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use App\Models\LecturerPayout;
+use App\Models\FinancialCycle;
 
 class LecturersController extends Controller
 {
@@ -283,5 +286,130 @@ class LecturersController extends Controller
     {
         $v = mb_strtolower(trim((string)$val));
         return in_array($v, ['1','true','متفرغ','fulltime','yes','y'], true);
+    }
+
+        /**
+     * عرض المستحقات المالية للمحاضر مع الفلاتر
+     */
+    public function getFinancialDues(Request $request)
+    {
+        // 1. التحقق من المدخلات
+        $request->validate([
+            'year' => 'required|numeric',
+            'month' => 'required|numeric|min:1|max:12',
+            'college_id' => 'nullable|exists:colleges,college_id',
+            'status' => 'nullable|in:paid,pending,approved', // paid = تم الصرف, pending = قيد الانتظار
+        ]);
+
+        // تحديد المحاضر الحالي (يفترض وجود Middleware للمصادقة)
+        // $lecturerId = auth()->user()->lecturer_id; 
+        // سنستخدم ID ثابت للتجربة إذا لم تكن المصادقة جاهزة، غيره لاحقاً:
+        $lecturerId = $request->user()->lecturer_id;
+
+        // تنسيق الشهر والسنة ليطابق قاعدة البيانات (MM-YYYY)
+        // مثال: شهر 1 سنة 2026 يصبح "01-2026"
+        $monthYear = sprintf('%02d-%d', $request->month, $request->year);
+
+        // 2. بناء الاستعلام الأساسي
+        $query = LecturerPayout::with(['cycle.college'])
+            ->where('lecturer_id', $lecturerId)
+            ->whereHas('cycle', function ($q) use ($monthYear) {
+                $q->where('month_year', $monthYear);
+            });
+
+        // تطبيق فلتر الكلية إذا تم اختياره
+        if ($request->filled('college_id') && $request->college_id != 'all') {
+            $query->whereHas('cycle', function ($q) use ($request) {
+                $q->where('college_id', $request->college_id);
+            });
+        }
+
+        // تطبيق فلتر الحالة (للتبديل بين شاشات "قيد الانتظار" و "تم الصرف")
+        if ($request->filled('status')) {
+            // ملاحظة: في الواجهة "قيد الانتظار" قد تشمل pending و approved ولم تدفع بعد
+            if ($request->status == 'pending') {
+                $query->whereIn('status', ['pending', 'approved']);
+            } else {
+                $query->where('status', $request->status);
+            }
+        }
+
+        // تنفيذ الاستعلام لجلب البيانات
+        $payouts = $query->get();
+
+        // 3. حساب الإجمالي (للعرض في البطاقة الكبيرة العلوية)
+        $totalAmount = $payouts->sum('net_amount');
+
+        // 4. تجهيز قائمة الكليات التي درس فيها المحاضر (من أجل الفلتر الأفقي في الواجهة)
+        // نجلب كل الكليات التي لدى المحاضر مستحقات فيها لهذا الشهر بغض النظر عن الفلتر الحالي
+        $availableColleges = LecturerPayout::where('lecturer_id', $lecturerId)
+            ->whereHas('cycle', function ($q) use ($monthYear) {
+                $q->where('month_year', $monthYear);
+            })
+            ->with('cycle.college')
+            ->get()
+            ->pluck('cycle.college')
+            ->unique('college_id')
+            ->values()
+            ->map(function ($college) {
+                return [
+                    'id' => $college->college_id,
+                    'name' => $college->name, // تأكد أن اسم العمود في جدول الكليات هو name أو name_ar
+                ];
+            });
+
+        // 5. تنسيق البيانات للواجهة (Mapping)
+        $formattedPayouts = $payouts->map(function ($payout) {
+            return [
+                'id' => $payout->payout_id,
+                'college_name' => $payout->cycle->college->name ?? 'غير محدد',
+                'amount' => number_format($payout->net_amount, 0), // تنسيق الرقم بدون كسور واضحة
+                'currency' => 'ريال',
+                // وصف العملية الحسابية كما في الصورة (عدد ساعات * سعر الساعة)
+                // ملاحظة: الجدول يخزن إجمالي الساعات، سنفترض عدد المحاضرات أو نعرض الساعات فقط
+                'details_text' => "{$payout->total_hours} ساعة × " . number_format($payout->hourly_rate, 0) . " ريال/ساعة",
+                'status_label' => self::getStatusLabel($payout->status),
+                'status_color' => self::getStatusColor($payout->status),
+                'date' => $payout->created_at->format('Y-m-d'),
+            ];
+        });
+
+        // 6. إرجاع الرد JSON
+        return response()->json([
+            'status' => true,
+            'message' => 'تم جلب البيانات بنجاح',
+            'data' => [
+                'summary' => [
+                    'total_amount' => number_format($totalAmount, 0),
+                    'currency' => 'ريال يمني',
+                    'period' => $monthYear
+                ],
+                'filters' => [
+                    'colleges' => $availableColleges
+                ],
+                'payouts' => $formattedPayouts
+            ]
+        ]);
+    }
+
+    // دوال مساعدة لتنسيق النصوص والألوان
+    private static function getStatusLabel($status)
+    {
+        return match ($status) {
+            'paid' => 'تم الصرف',
+            'approved' => 'معتمد',
+            'pending' => 'قيد المراجعة',
+            default => $status,
+        };
+    }
+
+    private static function getStatusColor($status)
+    {
+        return match ($status) {
+            'paid' => '#28a745', // أخضر
+            'approved' => '#17a2b8', // سماوي
+            'pending' => '#ffc107', // أصفر
+            default => '#6c757d',
+        };
     }
 }

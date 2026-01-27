@@ -17,13 +17,11 @@ class AcademicTitle extends Model
         'title_name',
         'title_code',
         'hourly_price',
-        'lecture_price',
         'college_id',
     ];
 
     protected $casts = [
         'hourly_price'  => 'decimal:2',
-        'lecture_price' => 'decimal:2',
     ];
 
     public function getRouteKeyName()

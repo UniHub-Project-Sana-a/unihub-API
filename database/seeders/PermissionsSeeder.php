@@ -9,58 +9,144 @@ class PermissionsSeeder extends Seeder
 {
     public function run(): void
     {
+        // تنظيف الجدول
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('permissions')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+
         $permissions = [
-            // General
-            ['permission_key' => 'dashboard.view', 'permission_name' => 'عرض لوحة التحكم', 'description' => ''],
+            // =======================================================
+            // 1. إدارة الكليات (Colleges Management)
+            // =======================================================
+            ['key' => 'colleges.view',   'name' => 'عرض الكليات',       'desc' => 'عرض قائمة الكليات وتفاصيلها'],
+            ['key' => 'colleges.create', 'name' => 'إضافة كلية',        'desc' => 'إنشاء كلية جديدة وإعداد بياناتها'],
+            ['key' => 'colleges.update', 'name' => 'تعديل بيانات كلية', 'desc' => 'تعديل الاسم، الشعار، أو الكود الأكاديمي'],
+            ['key' => 'colleges.delete', 'name' => 'حذف كلية',          'desc' => 'حذف الكلية من النظام'],
 
-            // Users
-            ['permission_key' => 'users.view', 'permission_name' => 'عرض المستخدمين', 'description' => ''],
-            ['permission_key' => 'users.create', 'permission_name' => 'إنشاء مستخدم', 'description' => ''],
-            ['permission_key' => 'users.update', 'permission_name' => 'تعديل مستخدم', 'description' => ''],
-            ['permission_key' => 'users.delete', 'permission_name' => 'حذف مستخدم', 'description' => ''],
+            // =======================================================
+            // 2. إدارة المستخدمين (Users Management)
+            // =======================================================
+            ['key' => 'users.view',   'name' => 'عرض المستخدمين',       'desc' => 'عرض قائمة كافة المستخدمين في النظام'],
+            ['key' => 'users.create', 'name' => 'إضافة مستخدم',         'desc' => 'إنشاء حساب مستخدم جديد'],
+            ['key' => 'users.update', 'name' => 'تعديل بيانات مستخدم',  'desc' => 'تعديل البريد، الاسم، أو الهاتف'],
+            ['key' => 'users.delete', 'name' => 'حذف مستخدم',           'desc' => 'حذف حساب مستخدم نهائياً أو إيقافه'],
 
-            // Roles (User Types) & Permissions
-            ['permission_key' => 'roles.view', 'permission_name' => 'عرض الأدوار', 'description' => ''],
-            ['permission_key' => 'roles.create', 'permission_name' => 'إنشاء دور', 'description' => ''],
-            ['permission_key' => 'roles.update', 'permission_name' => 'تعديل دور', 'description' => ''],
-            ['permission_key' => 'roles.delete', 'permission_name' => 'حذف دور', 'description' => ''],
-            ['permission_key' => 'roles.assign_permissions', 'permission_name' => 'تعيين صلاحيات للأدوار', 'description' => ''],
+            // =======================================================
+            // 3. إدارة الأدوار والصلاحيات (Roles & Permissions)
+            // =======================================================
+            ['key' => 'roles.view',               'name' => 'عرض الأدوار',              'desc' => 'عرض قائمة أنواع المستخدمين (الأدوار)'],
+            ['key' => 'roles.create',             'name' => 'إضافة دور جديد',           'desc' => 'إنشاء مسمى وظيفي جديد'],
+            ['key' => 'roles.update',             'name' => 'تعديل دور',                'desc' => 'تعديل اسم أو كود الدور'],
+            ['key' => 'roles.delete',             'name' => 'حذف دور',                  'desc' => 'حذف الدور من النظام'],
+            ['key' => 'roles.assign_permissions', 'name' => 'توزيع الصلاحيات (المصفوفة)','desc' => 'التحكم في مصفوفة الصلاحيات'],
+            ['key' => 'roles.assign_user',        'name' => 'تعيين دور لمستخدم',        'desc' => 'ربط الموظف بوظيفة محددة'],
 
-            // Academic Dictionaries
-            ['permission_key' => 'colleges.manage', 'permission_name' => 'إدارة الكليات', 'description' => ''],
-            ['permission_key' => 'departments.manage', 'permission_name' => 'إدارة الأقسام', 'description' => ''],
-            ['permission_key' => 'programs.manage', 'permission_name' => 'إدارة البرامج', 'description' => ''],
-            ['permission_key' => 'levels.manage', 'permission_name' => 'إدارة المستويات', 'description' => ''],
-            ['permission_key' => 'semesters.manage', 'permission_name' => 'إدارة الفصول الدراسية', 'description' => ''],
+            // =======================================================
+            // 4. التحكم في الوصول والأمان (Access Control)
+            // =======================================================
+            ['key' => 'security.view_policy',    'name' => 'عرض سياسة الأمان',      'desc' => 'الاطلاع على إعدادات الأمان'],
+            ['key' => 'security.manage_policy',  'name' => 'تعديل سياسة الأمان',    'desc' => 'تغيير إعدادات كلمات المرور والحظر'],
+            ['key' => 'security.manage_sessions','name' => 'إدارة الجلسات النشطة',  'desc' => 'إنهاء جلسات المستخدمين'],
+            ['key' => 'security.view_devices',   'name' => 'عرض أجهزة المستخدمين',  'desc' => 'مراقبة الأجهزة المتصلة'],
+            ['key' => 'security.manage_ips',     'name' => 'قيود الشبكة (IP)',      'desc' => 'إدارة القائمة البيضاء والسوداء'],
+            ['key' => 'logs.view',               'name' => 'عرض سجلات النظام',      'desc' => 'الاطلاع على الـ Audit Logs'],
 
-            // Facilities & Periods
-            ['permission_key' => 'buildings.manage', 'permission_name' => 'إدارة المباني', 'description' => ''],
-            ['permission_key' => 'classrooms.manage', 'permission_name' => 'إدارة القاعات', 'description' => ''],
-            ['permission_key' => 'periods.manage', 'permission_name' => 'إدارة الفترات', 'description' => ''],
+            // =======================================================
+            // 5. الخطة الدراسية (Study Plan)
+            // =======================================================
+            ['key' => 'study_plan.view',   'name' => 'عرض الخطة الدراسية',   'desc' => 'عرض الهيكل الأكاديمي والمقررات'],
+            ['key' => 'study_plan.create', 'name' => 'إضافة في الخطة',       'desc' => 'إضافة أقسام، برامج، أو مواد'],
+            ['key' => 'study_plan.update', 'name' => 'تعديل الخطة',          'desc' => 'تعديل بيانات البرامج والمقررات'],
+            ['key' => 'study_plan.delete', 'name' => 'حذف من الخطة',         'desc' => 'حذف عناصر من الهيكل الأكاديمي'],
 
-            // Courses & Groups
-            ['permission_key' => 'courses.manage', 'permission_name' => 'إدارة المقررات', 'description' => ''],
-            ['permission_key' => 'groups.manage', 'permission_name' => 'إدارة المجموعات الطلابية', 'description' => ''],
+            // =======================================================
+            // 6. القاعات والمباني (Locations)
+            // =======================================================
+            ['key' => 'locations.view',   'name' => 'عرض القاعات والمباني',  'desc' => 'عرض قائمة المباني والقاعات'],
+            ['key' => 'locations.create', 'name' => 'إضافة قاعة/مبنى',       'desc' => 'إضافة مبنى جديد أو قاعة'],
+            ['key' => 'locations.update', 'name' => 'تعديل قاعة/مبنى',       'desc' => 'تعديل بيانات المباني والقاعات'],
+            ['key' => 'locations.delete', 'name' => 'حذف قاعة/مبنى',         'desc' => 'حذف المباني أو القاعات'],
 
-            // Timetable & Sessions
-            ['permission_key' => 'timetable.manage', 'permission_name' => 'إدارة الجداول الدراسية', 'description' => ''],
-            ['permission_key' => 'timetable.view', 'permission_name' => 'عرض الجداول الدراسية', 'description' => ''],
+            // =======================================================
+            // 7. الرتب الأكاديمية (Academic Titles)
+            // =======================================================
+            ['key' => 'academic_titles.view',   'name' => 'عرض الرتب الأكاديمية', 'desc' => ''],
+            ['key' => 'academic_titles.create', 'name' => 'إضافة رتبة أكاديمية',  'desc' => ''],
+            ['key' => 'academic_titles.update', 'name' => 'تعديل رتبة أكاديمية',  'desc' => ''],
+            ['key' => 'academic_titles.delete', 'name' => 'حذف رتبة أكاديمية',    'desc' => ''],
 
-            // Attendance & QR
-            ['permission_key' => 'attendance.view', 'permission_name' => 'عرض سجلات الحضور', 'description' => ''],
-            ['permission_key' => 'qr.manage', 'permission_name' => 'إدارة رموز QR', 'description' => ''],
+            // =======================================================
+            // 8. هيئة التدريس (Staff)
+            // =======================================================
+            ['key' => 'staff.view',   'name' => 'عرض هيئة التدريس',    'desc' => 'عرض قائمة المحاضرين'],
+            ['key' => 'staff.create', 'name' => 'إضافة عضو هيئة تدريس', 'desc' => 'إضافة محاضر جديد'],
+            ['key' => 'staff.update', 'name' => 'تعديل بيانات عضو',     'desc' => 'تعديل الملف الشخصي للمحاضر'],
+            ['key' => 'staff.delete', 'name' => 'حذف عضو هيئة تدريس',   'desc' => ''],
 
-            // Requests & Notifications
-            ['permission_key' => 'excuses.review', 'permission_name' => 'مراجعة أعذار الطلاب', 'description' => ''],
-            ['permission_key' => 'makeup_lectures.review', 'permission_name' => 'مراجعة طلبات المحاضرات التعويضية', 'description' => ''],
-            ['permission_key' => 'notifications.send', 'permission_name' => 'إرسال إشعارات', 'description' => ''],
+            // =======================================================
+            // 9. الجدول الدراسي (Timetable)
+            // =======================================================
+            ['key' => 'timetable.create_table',   'name' => 'إنشاء جدول دراسي',    'desc' => 'تهيئة جدول جديد للفصل'],
+            ['key' => 'timetable.view_lectures',  'name' => 'عرض المحاضرات',       'desc' => 'عرض المحاضرات في الجدول'],
+            ['key' => 'timetable.create_lecture', 'name' => 'إنشاء محاضرة',        'desc' => 'إضافة محاضرة للجدول'],
+            ['key' => 'timetable.update_lecture', 'name' => 'تعديل محاضرة',        'desc' => 'تغيير وقت أو قاعة المحاضرة'],
+            ['key' => 'timetable.delete_lecture', 'name' => 'حذف محاضرة',          'desc' => 'إزالة محاضرة من الجدول'],
+            // ['key' => 'timetable.create_makeup',  'name' => 'إنشاء محاضرة تعويضية','desc' => 'جدولة محاضرة تعويضية يدوياً'],
 
-            // Admin & Settings
-            ['permission_key' => 'settings.manage', 'permission_name' => 'إدارة إعدادات النظام', 'description' => ''],
-            ['permission_key' => 'sessions.view', 'permission_name' => 'عرض الجلسات النشطة', 'description' => ''],
-            ['permission_key' => 'audit_logs.view', 'permission_name' => 'عرض سجلات التدقيق', 'description' => ''],
+            // =======================================================
+            // 10. التسجيل والطلاب (Registration)
+            // =======================================================
+            ['key' => 'groups.view',     'name' => 'عرض المجموعات',     'desc' => 'عرض المجموعات الطلابية'],
+            ['key' => 'groups.create',   'name' => 'إنشاء مجموعة',      'desc' => 'إنشاء مجموعة جديدة'],
+            ['key' => 'students.add',    'name' => 'إضافة طالب',        'desc' => 'تسجيل طالب في النظام'],
+            ['key' => 'students.update', 'name' => 'تعديل بيانات طالب', 'desc' => ''],
+            ['key' => 'students.delete', 'name' => 'حذف طالب',          'desc' => ''],
+
+            // =======================================================
+            // 11. الفترات الزمنية (Periods)
+            // =======================================================
+            ['key' => 'periods.view',   'name' => 'عرض الفترات',    'desc' => ''],
+            ['key' => 'periods.create', 'name' => 'إضافة فترة',     'desc' => ''],
+            ['key' => 'periods.update', 'name' => 'تعديل فترة',     'desc' => ''],
+            ['key' => 'periods.delete', 'name' => 'حذف فترة',       'desc' => ''],
+
+            // =======================================================
+            // 12. طلبات التعويض (Requests)
+            // =======================================================
+            ['key' => 'requests.approve_makeup', 'name' => 'الموافقة على طلبات التعويض', 'desc' => 'قبول أو رفض طلبات المحاضرين'],
+            ['key' => 'requests.rejected_makeup', 'name' => ' أعادة الطلبات المرفوضة  ', 'desc' => 'إعادة تقديم طلبات المحاضرين المرفوضة'],
+            ['key' => 'requests.view_makeup',    'name' => 'عرض طلبات التعويض',        'desc' => 'عرض كافة طلبات المحاضرين للتعويض'],
+            ['key' => 'requests.schedule_makeup', 'name' => 'جدولة المحاضرة التعويضية',   'desc' => 'تحديد الوقت والقاعة للطلب بعد الموافقة عليه'],
+
+
+            // =======================================================
+            // 13. التقارير (Reports)
+            // =======================================================
+            ['key' => 'reports.financial_manage',   'name' => 'إدارة التقارير المالية',   'desc' => 'عرض وإنشاء كشوف الاستحقاق'],
+            ['key' => 'reports.lecturer_attendance','name' => 'تقرير حضور المحاضرين',     'desc' => 'عرض سجلات حضور الدكاترة'],
+            ['key' => 'reports.student_attendance', 'name' => 'تقرير حضور الطلاب',        'desc' => 'عرض سجلات حضور وغياب الطلاب'],
+            ['key' => 'reports.semester_results',   'name' => 'نتائج أعمال الفصل',        'desc' => 'عرض درجات ونتائج الفصل'],
+            ['key' => 'reports.view_custom',          'name' => 'عرض التقارير المخصصة',     'desc' => 'إنشاء تقارير مخصصة حسب الحاجة'],
+
+            // =======================================================
+            // 14. لوحة التحكم (Dashboards) - تم التحديث
+            // =======================================================
+            ['key' => 'dashboard.view_global',  'name' => 'عرض لوحة التحكم العامة',   'desc' => 'اللوحة الرئيسية للنظام (تشمل جميع الكليات)'],
+            ['key' => 'dashboard.view_college', 'name' => 'عرض لوحة تحكم الكلية',     'desc' => 'اللوحة الخاصة بإحصائيات الكلية الواحدة'],
         ];
 
-        DB::table('permissions')->insert($permissions);
+        $this->command->info('Start Seeding Permissions...');
+
+        foreach ($permissions as $perm) {
+            DB::table('permissions')->insert([
+                'permission_key'  => $perm['key'],
+                'permission_name' => $perm['name'],
+                'description'     => $perm['desc'],
+                'created_at'      => now(),
+                'updated_at'      => now()
+            ]);
+        }
+
+        $this->command->info('Permissions updated successfully! Total: ' . count($permissions));
     }
 }

@@ -8,7 +8,10 @@ use App\Models\LecturerPayout;
 use App\Models\Lecturer;
 use App\Models\LectureSession;
 use App\Models\College;
+use GeniusTS\HijriDate\Hijri;
+use GeniusTS\HijriDate\Date as HijriDate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,138 +20,238 @@ class FinancialController extends Controller
     // جلب الكشف لشهر معين
     public function getCycleByMonth(Request $request, $collegeId)
     {
-        $month = $request->month; // 10
-        $year = $request->year;   // 2024 (Academic or Calendar year?) سنفترض Calendar للرواتب
-        
-        $monthYear = sprintf("%02d-%s", $month, $year); // 10-2024
+        $month = $request->month; // مثال: 1
+        $startYear = $request->year;   // مثال: 2025 (بداية العام الدراسي)
+        $calendarType = $request->input('calendar_type', 'gregorian');
 
+        $monthYearKey = "";
+
+        // 1. حساب المفتاح الصحيح بنفس منطق دالة التوليد (generateCycle)
+        if ($calendarType === 'hijri') {
+            // للهجري: نستخدم آخر رقمين من السنة + حرف H
+            $shortYear = $startYear % 100;
+            $monthYearKey = sprintf("%02d-%02dH", $month, $shortYear);
+        } else {
+            // للميلادي: نحسب السنة التقويمية الفعلية
+            // إذا الشهر < 9 (يناير - أغسطس) فهو في السنة التالية (2026)
+            // إذا الشهر >= 9 (سبتمبر - ديسمبر) فهو في نفس سنة البداية (2025)
+            $realCalendarYear = ($month < 9) ? ($startYear + 1) : $startYear;
+            
+            // المفتاح الذي تم تخزينه عند الإنشاء
+            $monthYearKey = sprintf("%02d-%d", $month, $realCalendarYear);
+        }
+
+        // 2. البحث عن الكشف
         $cycle = FinancialCycle::where('college_id', $collegeId)
-            ->where('month_year', $monthYear)
+            ->where('month_year', $monthYearKey)
             ->with(['payouts.lecturer.user', 'payouts.lecturer.department', 'payouts.adjustments'])
             ->first();
 
         if (!$cycle) {
-            return response()->json(['status' => false, 'message' => 'No cycle found', 'code' => 'NOT_FOUND']);
+            return response()->json([
+                'status' => false, 
+                'message' => 'No cycle found', 
+                'code' => 'NOT_FOUND',
+                // (اختياري) لمعرفة ماذا كان يبحث النظام
+                // 'debug_searched_key' => $monthYearKey 
+            ], 404);
         }
 
         return response()->json(['status' => true, 'data' => $cycle]);
     }
 
-        /**
+    /**
      * توليد أو تحديث كشف الرواتب لشهر معين
      */
     public function generateCycle(Request $request, $collegeId)
     {
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year'  => 'required|integer|min:2020',
+            'year'  => 'required|integer', // مثلاً 2025 (بداية السنة الدراسية)
+            'calendar_type' => 'nullable|in:gregorian,hijri',
         ]);
 
         $month = $request->month;
-        $year = $request->year;
-        $monthYear = sprintf("%02d-%s", $month, $year);
+        $startYear = $request->year; // 2025
+        $calendarType = $request->input('calendar_type', 'gregorian');
 
-        // 1. التحقق من وجود كشف سابق
+        // 1. بناء نص العام الدراسي (للمطابقة مع timetable.academic_year)
+        // إذا كان النظام هجرياً، تكون الصيغة 1446-1447، وإذا ميلادي 2025-2026
+        $academicYearString = sprintf("%d-%d", $startYear, $startYear + 1);
+
+        // 2. تحديد "السنة التقويمية الفعلية" (لأجل تواريخ الكشف start_date و end_date)
+        // القاعدة: إذا كان الشهر أقل من 9 (يناير - أغسطس)، فهو في السنة التالية (2026)
+        // إذا كان الشهر 9 أو أكثر (سبتمبر - ديسمبر)، فهو في نفس سنة البداية (2025)
+        $realCalendarYear = ($month < 9) ? ($startYear + 1) : $startYear;
+
+        // تحديد التواريخ الدقيقة للكشف (للتخزين في financial_cycles)
+        if ($calendarType === 'hijri') {
+            $dates = $this->getGregorianDatesFromHijri($realCalendarYear, $month);
+            $startDate = $dates['start'];
+            $endDate = $dates['end'];
+            $monthYearKey = sprintf("%02d-%s-H", $month, $academicYearString); 
+        } else {
+            $startDate = \Carbon\Carbon::create($realCalendarYear, $month, 1)->startOfMonth();
+            $endDate = \Carbon\Carbon::create($realCalendarYear, $month, 1)->endOfMonth();
+            if ($calendarType === 'hijri') {
+                $shortYear = $startYear % 100;
+                $monthYearKey = sprintf("%02d-%02dH", $month, $shortYear); 
+            } else {
+                $monthYearKey = sprintf("%02d-%d", $month, $realCalendarYear);
+            }
+        }
+
+        // 3. إدارة سجل الدورة المالية
         $cycle = FinancialCycle::firstOrCreate(
-            ['college_id' => $collegeId, 'month_year' => $monthYear],
+            ['college_id' => $collegeId, 'month_year' => $monthYearKey],
             [
-                'start_date' => Carbon::create($year, $month, 1)->startOfMonth(),
-                'end_date'   => Carbon::create($year, $month, 1)->endOfMonth(),
+                'start_date' => $startDate,
+                'end_date'   => $endDate,
                 'status'     => 'draft',
-                'created_by' => Auth::id() ?? 1, // المستخدم الحالي
+                'created_by' => \Illuminate\Support\Facades\Auth::id() ?? 1,
             ]
         );
 
-        // حماية: لا يمكن إعادة الحساب إذا كان الكشف معتمداً أو مدفوعاً
         if (in_array($cycle->status, ['approved', 'paid', 'locked'])) {
-            return response()->json([
-                'status' => false, 
-                'message' => 'لا يمكن إعادة توليد الكشف لأنه معتمد أو مدفوع.'
-            ], 403);
+            return response()->json(['status' => false, 'message' => 'الكشف معتمد ولا يمكن تعديله.'], 403);
         }
 
         DB::beginTransaction();
         try {
-            // 2. جلب جميع المحاضرين في الكلية
-            $lecturers = Lecturer::where('college_id', $collegeId)
-                ->with('academicTitle') // لجلب السعر
+            // 4. الاستعلام: نعتمد على academic_year في timetable وعلى الشهر في lecture_sessions
+            $lecturerStats = DB::table('lecture_sessions')
+                ->join('timetable', 'lecture_sessions.timetable_id', '=', 'timetable.timetable_id')
+                ->where('timetable.college_id', $collegeId)
+                // ✅ الشرط الأول: السنة الدراسية في الجدول
+                ->where('timetable.academic_year', $academicYearString)
+                // ✅ الشرط الثاني: الجلسات المنفذة فقط
+                ->where('lecture_sessions.status', 1) 
+                // ✅ الشرط الثالث: الشهر المحدد (بغض النظر عن السنة، لأن academic_year ضبطها)
+                // نستخدم whereBetween للتأكد من الدقة في حال الهجري، أو whereMonth للميلادي
+                ->where(function($q) use ($calendarType, $month, $startDate, $endDate) {
+                    if ($calendarType === 'hijri') {
+                        // للهجري نلتزم بالنطاق الزمني المحول
+                        $q->whereBetween('lecture_sessions.session_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+                    } else {
+                        // للميلادي: نستخدم الشهر والسنة الفعلية التي حسبناها
+                        // (ضروري تحديد السنة الفعلية 2026 لكي لا يجلب بيانات من 2025 بالخطأ)
+                        $q->whereMonth('lecture_sessions.session_date', $startDate->month)
+                          ->whereYear('lecture_sessions.session_date', $startDate->year);
+                    }
+                })
+                ->select(
+                    DB::raw('COALESCE(lecture_sessions.lecturer_id, timetable.lecturer_id) as actual_lecturer_id'),
+                    DB::raw('SUM(timetable.lecture_hours) as total_hours')
+                )
+                ->groupBy('actual_lecturer_id')
                 ->get();
 
+            $activeLecturerIds = [];
             $totalCyclePayout = 0;
             $lecturersCount = 0;
 
-            foreach ($lecturers as $lecturer) {
-                // 3. حساب الساعات المنفذة في هذا الشهر
-                // نجمع ساعات كل الجلسات المنفذة (status=1) في هذا الشهر
-                $executedHours = DB::table('lecture_sessions')
-                    ->join('timetable', 'lecture_sessions.timetable_id', '=', 'timetable.timetable_id')
-                    ->where('timetable.lecturer_id', $lecturer->lecturer_id)
-                    ->where('lecture_sessions.status', 1) // منفذة
-                    ->whereMonth('lecture_sessions.session_date', $month) // في هذا الشهر
-                    ->whereYear('lecture_sessions.session_date', $year)   // في هذه السنة
-                    ->sum('timetable.lecture_hours'); // نجمع ساعات المحاضرة
+            foreach ($lecturerStats as $stat) {
+                if (!$stat->actual_lecturer_id || $stat->total_hours <= 0) continue;
 
-                // إذا لم يكن لديه ساعات، نتجاوزه (أو نسجله بصفر حسب السياسة)
-                if ($executedHours <= 0) {
-                    // خيار: حذف السجل إذا كان موجوداً سابقاً وأصبح صفراً
-                    LecturerPayout::where('cycle_id', $cycle->cycle_id)
-                        ->where('lecturer_id', $lecturer->lecturer_id)
-                        ->delete();
-                    continue;
-                }
+                $activeLecturerIds[] = $stat->actual_lecturer_id;
 
-                // 4. تحديد السعر
+                $lecturer = Lecturer::with('academicTitle')->find($stat->actual_lecturer_id);
+                if (!$lecturer) continue;
+
                 $hourlyRate = $lecturer->academicTitle->hourly_price ?? 0;
-                $baseAmount = $executedHours * $hourlyRate;
+                $baseAmount = $stat->total_hours * $hourlyRate;
 
-                // 5. إنشاء أو تحديث سجل الاستحقاق
+                // إنشاء أو تحديث
                 $payout = LecturerPayout::updateOrCreate(
                     [
                         'cycle_id'    => $cycle->cycle_id,
-                        'lecturer_id' => $lecturer->lecturer_id
+                        'lecturer_id' => $stat->actual_lecturer_id
                     ],
                     [
-                        'total_hours' => $executedHours,
+                        'total_hours' => $stat->total_hours,
                         'hourly_rate' => $hourlyRate,
                         'base_amount' => $baseAmount,
-                        // لا نعيد تعيين الخصومات/الإضافات يدوياً هنا لكي لا نفقدها عند التحديث
-                        // لكن يجب تحديث الصافي
                     ]
                 );
                 
-                // تحديث الصافي (لأن الساعات قد تكون تغيرت)
-                // هذا يتطلب أن تكون الخصومات مسجلة في جدول adjustments
-                // دالة recalculateTotals في الموديل ستقوم باللازم
-                $payout->recalculateTotals();
+                // حساب الصافي
+                if (method_exists($payout, 'recalculateTotals')) {
+                    $payout->recalculateTotals();
+                    $net = $payout->net_amount;
+                } else {
+                    $net = $baseAmount + ($payout->total_bonuses ?? 0) - ($payout->total_deductions ?? 0) - ($payout->tax_amount ?? 0);
+                    $payout->update(['net_amount' => $net]);
+                }
 
-                $totalCyclePayout += $payout->net_amount; // أو base_amount حسب المنطق
+                $totalCyclePayout += $net;
                 $lecturersCount++;
             }
 
-            // 6. تحديث إجماليات الكشف
+            // تنظيف
+            LecturerPayout::where('cycle_id', $cycle->cycle_id)
+                ->whereNotIn('lecturer_id', $activeLecturerIds)
+                ->delete();
+
+            // تحديث الكشف
             $cycle->update([
-                'total_payout' => $totalCyclePayout, // هذا تقريبي، الأدق جمعه من الجدول
+                'total_payout' => $totalCyclePayout,
                 'lecturers_count' => $lecturersCount,
                 'updated_at' => now()
             ]);
-            
-            // إعادة حساب دقيق للإجمالي من القاعدة
-            $realTotal = LecturerPayout::where('cycle_id', $cycle->cycle_id)->sum(DB::raw('base_amount + total_bonuses - total_deductions - tax_amount'));
-            $cycle->update(['total_payout' => $realTotal]);
 
             DB::commit();
 
-            // إرجاع الكشف محدثاً
-            return $this->getCycleByMonth($request, $collegeId);
+            return response()->json([
+                'status' => true,
+                'data' => $cycle->load(['payouts.lecturer.user', 'payouts.lecturer.department'])
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'status' => false,
-                'message' => 'فشل توليد الكشف: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * تحويل الشهر الهجري إلى نطاق ميلادي (بداية ونهاية الشهر)
+     */
+    private function getGregorianDatesFromHijri($year, $month)
+    {
+        try {
+            // 1. تحديد عدد أيام الشهر الهجري لهذه السنة (للحصول على تاريخ النهاية بدقة 29 أو 30)
+            // ملاحظة: المكتبة قد لا تحتوي على دالة مباشرة لعدد الأيام، لذا سنفترض 30 يوماً
+            // وإذا كان التاريخ غير صالح (مثلاً 30 فبراير)، ستقوم بالتصحيح أو نستخدم try-catch
+            
+            // تاريخ بداية الشهر الهجري (1 / شهر / سنة)
+            $hijriStart = Hijri::convertToGregorian(1, $month, $year);
+            $startDate = Carbon::createFromDate($hijriStart);
+
+            // تاريخ نهاية الشهر الهجري
+            // نحاول تحويل يوم 30، إذا فشل نجرب 29
+            try {
+                $hijriEnd = Hijri::convertToGregorian(30, $month, $year);
+            } catch (\Exception $e) {
+                $hijriEnd = Hijri::convertToGregorian(29, $month, $year);
+            }
+            
+            $endDate = Carbon::createFromDate($hijriEnd)->endOfDay();
+
+            return [
+                'start' => $startDate,
+                'end'   => $endDate
+            ];
+
+        } catch (\Exception $e) {
+            // في حال حدوث خطأ في التحويل، نعود للميلادي كاحتياط لتجنب توقف النظام
+            Log::warning("Hijri conversion failed for $month-$year: " . $e->getMessage());
+            $start = Carbon::create($year, $month, 1);
+            return [
+                'start' => $start, 
+                'end' => $start->copy()->endOfMonth()
+            ];
+        }
+    }
+
     /**
      * إضافة تسوية (خصم/مكافأة) لسجل استحقاق معين
     */

@@ -9,7 +9,11 @@ use Illuminate\Http\Request;
 class BuildingsController extends Controller {
     public function index(Request $request) {
         $q = $request->query('q');
-        $query = Building::query()->with('college')->when($q, fn($qq) => $qq->where('building_name', 'like', "%{$q}%"));
+        $collegeId = $request->query('college_id');
+        $query = Building::query()
+        ->with('college')
+        ->when($q, fn($qq) => $qq->where('building_name', 'like', "%{$q}%"))
+        ->when($collegeId, fn($qq) => $qq->where('college_id', $collegeId));
         return response()->json($query->get());
     }
     public function store(StoreBuildingRequest $request) {

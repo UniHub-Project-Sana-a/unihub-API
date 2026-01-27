@@ -6,35 +6,50 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Models\User;
+
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class AuthPasswordController extends Controller
 {
     public function forgot(ForgotPasswordRequest $request)
     {
-        $user = User::where('email', $request->email)->firstOrFail();
+        // بما أن الريكويست تحقق من الوجود، يمكننا جلبه مباشرة
+        $user = User::where('email', $request->email)->first();
 
-        // إنشاء التوكن وتخزينه
-        $token = Password::createToken($user);
+        // 1. توليد التوكن (نص عشوائي)
+        $token = Str::random(60);
 
-        // محاولة إرسال الإشعار (اختياري، لن يوقف العملية إذا فشل)
+        // 2. التخزين في جدول password_reset_tokens
+        // نحذف القديم أولاً لتجنب التكرار
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+        
+        DB::table('password_reset_tokens')->insert([
+            'email' => $request->email,
+            'token' => Hash::make($token), // نشفره في القاعدة
+            'created_at' => now()
+        ]);
+
+        // 3. محاولة الإرسال
         try {
+            // نرسل التوكن الأصلي (غير المشفر)
             $user->notify(new ResetPasswordNotification($token));
         } catch (\Exception $e) {
-            Log::error('فشل إرسال بريد إعادة التعيين: ' . $e->getMessage());
+            Log::error("Failed to send reset email to {$user->email}: " . $e->getMessage());
+            // لن نوقف العملية، سنعيد التوكن للواجهة في كل الأحوال
         }
 
-        // ✅ التعديل هنا: نرجع التوكن دائماً ليقوم الفرونت إند بالتوجيه المباشر
+        // 4. الرد للواجهة (React)
         return response()->json([
-            'message' => 'تم إنشاء رمز إعادة تعيين كلمة المرور.',
-            'token'   => $token, // تم إزالة الشروط المعقدة لضمان عمل التوجيه
-            'email'   => $user->email // مفيد للفرونت إند للتأكيد
+            'message' => 'تم إرسال رمز التحقق (أو تم إنشاؤه للتطوير).',
+            'token'   => $token, // ✅ ضروري للتوجيه المباشر في React
+            'email'   => $user->email
         ]);
     }
 

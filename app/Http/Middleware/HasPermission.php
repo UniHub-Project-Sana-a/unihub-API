@@ -4,36 +4,47 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class HasPermission
 {
-    public function handle(Request $request, Closure $next, string $permissionKey, string $requireCollege = 'false')
+    /**
+     * التحقق من الصلاحية (Permission Middleware)
+     */
+    public function handle(Request $request, Closure $next, string $permissionKey): Response
     {
-        $user = $request->user();
+        $user = Auth::user();
+
         if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // college_id من الهيدر أو الكويري
-        $collegeId = $request->header('X-College-Id') ?? $request->query('college_id');
-
-        // لو الصلاحية مطلوبة على مستوى كلية وتغيب college_id => خطأ 400
-        if ($requireCollege === 'true' && empty($collegeId)) {
-            return response()->json(['message' => 'college_id is required for this permission'], 400);
+        // 1. تجاوز للمشرفين (Super Admin Bypass)
+        // إذا كان المستخدم مشرفاً أو رئاسة جامعة، يمر فوراً
+        $user->loadMissing('userType'); // تأكد من تحميل العلاقة
+        if (in_array($user->userType->user_type_code, ['admin', 'presidency'])) {
+            return $next($request);
         }
 
-        $has = DB::table('user_type_permissions as utp')
-            ->join('permissions as p', 'p.permission_id', '=', 'utp.permission_id')
-            ->where('utp.user_type_id', $user->user_type_id)
-            ->where('p.permission_key', $permissionKey)
-            ->when($requireCollege === 'true', function ($q) use ($collegeId) {
-                $q->where('utp.college_id', $collegeId);
-            })
-            ->exists();
+        // 2. التحقق من الصلاحية في قاعدة البيانات
+        $query = DB::table('user_type_permissions')
+            ->join('permissions', 'user_type_permissions.permission_id', '=', 'permissions.permission_id')
+            ->where('user_type_permissions.user_type_id', $user->user_type_id)
+            ->where('permissions.permission_key', $permissionKey);
 
-        if (!$has) {
-            return response()->json(['message' => 'Forbidden: missing required permission'], 403);
+        // 3. التحقق من سياق الكلية (Context Check)
+        // إذا كان المستخدم مرتبطاً بكلية (مثل العميد)، يجب أن تكون الصلاحية ممنوحة له في هذه الكلية
+        if ($user->college_id) {
+            $query->where('user_type_permissions.college_id', $user->college_id);
+        }
+
+        if (!$query->exists()) {
+            return response()->json([
+                'message' => 'عذراً، ليس لديك الصلاحية للقيام بهذا الإجراء.',
+                'required_permission' => $permissionKey
+            ], 403);
         }
 
         return $next($request);

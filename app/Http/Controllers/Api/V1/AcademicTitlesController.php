@@ -14,7 +14,7 @@ class AcademicTitlesController extends Controller
     public function index(Request $request)
     {
         $q = AcademicTitle::query()
-            ->select(['title_id','title_name','title_code','hourly_price','lecture_price','college_id']);
+            ->select(['title_id','title_name','title_code','hourly_price','college_id']);
 
         if ($request->filled('college_id')) {
             $q->where('college_id', (int)$request->college_id);

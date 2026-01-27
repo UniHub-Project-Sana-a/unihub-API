@@ -22,7 +22,6 @@ class QrCode extends Model
      protected $fillable = [
         'timetable_id',
         'session_id',
-        'refresh_option_id',
         'qr_code_value',
         'expires_at',
         'is_active',
@@ -57,11 +56,6 @@ class QrCode extends Model
     {
         // 'created_by' يشير إلى 'lecturer_id'
         return $this->belongsTo(Lecturer::class, 'created_by', 'lecturer_id');
-    }
-
-    public function refreshOption()
-    {
-        return $this->belongsTo(QrRefreshOption::class, 'refresh_option_id', 'option_id');
     }
 
     public function session()

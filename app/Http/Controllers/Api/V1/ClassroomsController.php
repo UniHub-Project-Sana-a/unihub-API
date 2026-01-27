@@ -5,6 +5,7 @@ use App\Http\Requests\V1\Classroom\StoreClassroomRequest;
 use App\Http\Requests\V1\Classroom\UpdateClassroomRequest;
 use App\Models\Classroom;
 use Illuminate\Http\Request;
+use App\Models\LectureSession;
 
 class ClassroomsController extends Controller {
 // App\Http\Controllers\Api\V1\ClassroomsController.php
@@ -46,5 +47,60 @@ class ClassroomsController extends Controller {
     public function destroy(Classroom $classroom) {
         $classroom->delete();
         return response()->json(['message' => 'Classroom deleted']);
+    }
+
+    public function checkAvailability(Request $request)
+    {
+        try {
+            $collegeId = $request->query('college_id');
+            $date = $request->query('date');
+            $startTime = $request->query('start_time');
+            $endTime = $request->query('end_time');
+    
+            // 1. جلب القاعات (التصحيح هنا: البحث عبر علاقة المبنى)
+            $classrooms = Classroom::query()
+                // ندخل إلى جدول buildings المرتبط
+                ->whereHas('building', function ($q) use ($collegeId) {
+                    // ونبحث هناك عن college_id
+                    $q->where('college_id', $collegeId);
+                })
+                ->select('classroom_id', 'classroom_name as name', 'capacity')
+                ->get();
+    
+            // 2. إذا لم يتم تحديد وقت، نرجع الكل متاح
+            if (!$date || !$startTime || !$endTime) {
+                $data = $classrooms->map(function($c) {
+                    $c->setAttribute('is_busy', false);
+                    return $c;
+                });
+                return response()->json(['data' => $data]);
+            }
+    
+            // 3. البحث عن القاعات المشغولة
+            $busyClassroomIds = LectureSession::where('session_date', $date)
+                ->where('status', '!=', 2)
+                ->where(function ($q) use ($startTime, $endTime) {
+                    $q->where('start_time', '<', $endTime)
+                      ->where('end_time', '>', $startTime);
+                })
+                ->pluck('actual_classroom_id')
+                ->toArray();
+    
+            // 4. دمج المعلومة
+            $results = $classrooms->map(function ($room) use ($busyClassroomIds) {
+                $isBusy = in_array($room->classroom_id, $busyClassroomIds);
+                $room->setAttribute('is_busy', $isBusy);
+                return $room;
+            });
+    
+            return response()->json(['data' => $results]);
+    
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'حدث خطأ في السيرفر',
+                'error' => $e->getMessage(),
+                'line' => $e->getLine()
+            ], 500);
+        }
     }
 }
