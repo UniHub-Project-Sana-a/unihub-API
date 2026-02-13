@@ -4,7 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
+use App\Models\Course;
+use App\Models\Lecturer;
+use App\Models\StudentGroup;
+use App\Models\Classroom;
+use App\Models\Day;
+use App\Models\Period;
+use App\Models\LectureSession;
+use App\Models\Department;
+use \App\Models\QA\QaCampaign;
 class Timetable extends Model
 {
     use HasFactory;
@@ -70,5 +78,15 @@ class Timetable extends Model
     public function studentGroup()
     {
         return $this->belongsTo(StudentGroup::class, 'group_id', 'group_id');
+    }
+
+        public function qaCampaigns()
+    {
+        return $this->belongsToMany(
+            QaCampaign::class, 
+            'qa_campaign_assignments', // اسم الجدول الوسيط
+            'timetable_id',            // المفتاح في الوسيط الخاص بهذا الموديل
+            'campaign_id'              // المفتاح في الوسيط الخاص بالموديل الآخر
+        );
     }
 }

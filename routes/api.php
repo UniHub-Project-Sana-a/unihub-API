@@ -24,50 +24,34 @@ use App\Http\Controllers\Api\V1\SemestersController;
 use App\Http\Controllers\Api\V1\CoursesController;
 use App\Http\Controllers\Api\V1\BuildingsController;
 use App\Http\Controllers\Api\V1\ClassroomsController;
-
 use App\Http\Controllers\Api\V1\AcademicTitlesController;
-
 use App\Http\Controllers\Api\V1\LecturersController;
-
 use App\Http\Controllers\Api\V1\StudentsController;
-
 use App\Http\Controllers\Api\V1\StudentGroupsController;
-
 use App\Http\Controllers\Api\V1\TimetableController;
-
 use App\Http\Controllers\Api\V1\LectureSessionController as LectureSessionsController;
-
 use App\Http\Controllers\Api\V1\QrCodesController;
-
 use App\Http\Controllers\Api\V1\StudentAttendanceController;
-
 use App\Http\Controllers\Api\V1\LecturerAttendanceController;
-
 use App\Http\Controllers\Api\V1\MakeupLecturesController;
-
 use App\Http\Controllers\Api\V1\StudentExcusesController;
-
 use App\Http\Controllers\Api\V1\NotificationsController;
-
 use App\Http\Controllers\Api\V1\UserDevicesController;
-
 use App\Http\Controllers\Api\V1\Admin\SystemController;
-
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
-
 use App\Http\Controllers\Api\V1\SyncController;
-
 use App\Http\Controllers\Api\V1\ReportsController;
-
 use App\Http\Controllers\Api\V1\FinancialController;
-
 use App\Http\Controllers\Api\V1\DashboardController;
-
 use App\Http\Controllers\Api\V1\LecturerGradebookController;
-
 use App\Http\Controllers\Api\V1\Admin\IpRestrictionController;
 
-
+use App\Http\Controllers\Api\V1\QA\Admin\QaManagerController;
+use App\Http\Controllers\Api\V1\QA\Admin\QaCampaignsController;
+use App\Http\Controllers\Api\V1\QA\Student\QaEvaluationController;
+use App\Http\Controllers\Api\V1\QA\Reports\QaAnalysisController;
+use App\Http\Controllers\Api\V1\QualityAssuranceController;
+use App\Http\Controllers\Api\V1\QA\Reports\CourseExecutionReportController;
 
 Route::get('/debug/password-algo', function () {
 
@@ -88,7 +72,6 @@ Route::get('/debug/password-algo', function () {
 
 
 Route::prefix('v1')->group(function ()
-
 {
 
     Route::get('admin/security/policy', [SettingsController::class, 'getPolicy']);
@@ -435,6 +418,20 @@ Route::prefix('v1')->group(function ()
 
         });
 
+        Route::prefix('qa/student')->group(function () {
+            Route::controller(QaEvaluationController::class)->group(function () {
+                // 1. جلب قائمة التقييمات المعلقة (المواد التي لم تُقيم)
+                Route::get('pending', 'getPendingEvaluations');
+                
+                // 2. إرسال الإجابات
+                Route::post('submit', 'submitEvaluation');
+
+                
+                // 3. جلب أسئلة نموذج معين للبدء في التقييم
+                Route::get('form/{campaign}', 'getEvaluationForm');
+            });
+        });
+
     });
 
 
@@ -459,4 +456,58 @@ Route::prefix('v1')->group(function ()
 
     });
 
+    // داخل Route::prefix('v1')->middleware(...)->group(function () { ...
+
+    Route::prefix('qa')->group(function () {
+        Route::controller(QaManagerController::class)->group(function () {
+            Route::get('forms', 'index');
+            Route::post('forms', 'store');
+            Route::get('forms/{form}', 'show');
+            Route::put('forms/{form}', 'update'); // هذا الرابط سيحفظ الهيكل كاملاً
+            Route::delete('forms/{form}', 'destroy');
+        });
+
+            // ✅ روابط إدارة الحملات (جديد)
+        Route::controller(QaCampaignsController::class)->group(function () {
+            // ✅ 1. الراوتات المحددة (الثابتة) توضع في البداية
+            Route::get('campaigns/create-meta', 'getCreationMeta');
+            Route::get('campaigns/year-details', 'getYearDetails'); // تأكد أن هذا السطر قبل {campaign}
+        
+            // 2. الراوتات العامة
+            Route::get('campaigns', 'index');
+            Route::post('campaigns', 'store');
+        
+            // ⚠️ 3. الراوتات التي تحتوي على متغيرات {campaign} توضع في النهاية
+            Route::put('campaigns/{campaign}', 'update');
+            Route::delete('campaigns/{campaign}', 'destroy');
+        });
+
+            // ✅ روابط التقارير والتحليل
+        Route::controller(QaAnalysisController::class)->group(function () {
+            // جلب إحصائيات حملة معينة (ملخص + قائمة المحاضرين)
+            Route::get('reports/campaign-summary', 'getCampaignSummary');
+            Route::get('reports/campaign-timetables', 'getCampaignTimetables'); 
+        });
+
+        Route::controller(CourseExecutionReportController::class)->prefix('reports')->group(function () {
+            Route::get('execution/list', 'index'); 
+            Route::get('execution/details/{timetable}', 'show');
+            Route::get('execution/filters-meta', 'getFiltersMeta');
+        });
+    });
+
+    Route::get('courses/{course}/qa-data', [QualityAssuranceController::class, 'getCourseQaData']);
+    Route::get('timetable/{timetable}/topics-status', [TimetableController::class, 'getTopicsStatus']);
+
+    Route::post('qa/outcomes', [QualityAssuranceController::class, 'storeOutcome']);
+    Route::put('qa/outcomes/{id}', [QualityAssuranceController::class, 'updateOutcome']);
+    Route::delete('qa/outcomes/{id}', [QualityAssuranceController::class, 'destroyOutcome']);
+
+    Route::post('qa/topics', [QualityAssuranceController::class, 'storeTopic']);
+    Route::put('qa/topics/{id}', [QualityAssuranceController::class, 'updateTopic']);
+    Route::delete('qa/topics/{id}', [QualityAssuranceController::class, 'destroyTopic']);
+
+    Route::post('qa/questions', [QualityAssuranceController::class, 'storeQuestion']);
+    Route::put('qa/questions/{id}', [QualityAssuranceController::class, 'updateQuestion']);
+    Route::delete('qa/questions/{id}', [QualityAssuranceController::class, 'destroyQuestion']);
 });

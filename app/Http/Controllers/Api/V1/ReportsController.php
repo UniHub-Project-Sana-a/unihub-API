@@ -937,4 +937,298 @@ class ReportsController extends Controller
             ]
         ]);
     }
+
+            // 1. تقرير الملخص (للجدول في الصفحة الرئيسية)
+    public function getQAPerformanceReport(Request $request, $collegeId)
+    {
+        try {
+            $year = $request->academic_year;
+            $deptId = $request->department_id;
+
+            $query = DB::table('timetable')
+                ->join('courses', 'timetable.course_id', '=', 'courses.course_id')
+                ->join('student_groups', 'timetable.group_id', '=', 'student_groups.group_id')
+                ->join('lecturers', 'timetable.lecturer_id', '=', 'lecturers.lecturer_id')
+                ->join('users', 'lecturers.user_id', '=', 'users.user_id')
+                ->join('departments', 'timetable.department_id', '=', 'departments.department_id')
+                ->where('timetable.college_id', $collegeId)
+                ->select(
+                    'timetable.timetable_id', 
+                    'timetable.course_id',
+                    'courses.course_name',
+                    'courses.course_code',
+                    'timetable.group_id',
+                    'student_groups.group_name',
+                    'timetable.lecturer_id',
+                    'users.full_name as lecturer_name',
+                    'departments.department_name'
+                );
+
+            if ($year && $year !== 'all') {
+                $query->where('timetable.academic_year', $year);
+            }
+            if ($deptId && $deptId !== 'all') {
+                $query->where('timetable.department_id', $deptId);
+            }
+
+            $records = $query->get();
+
+            $report = $records->map(function ($record) {
+                // 1. إحصائيات الجلسات
+                $sessionsStats = DB::table('lecture_sessions')
+                    ->where('timetable_id', $record->timetable_id)
+                    ->select(
+                        DB::raw('COUNT(*) as total_created'),
+                        DB::raw('SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as executed')
+                    )
+                    ->first();
+
+                // 2. إحصائيات المواضيع
+                $totalTopics = DB::table('course_topics')->where('course_id', $record->course_id)->count();
+                
+                $coveredTopics = DB::table('session_topics_covered')
+                    ->join('lecture_sessions', 'session_topics_covered.session_id', '=', 'lecture_sessions.session_id')
+                    ->where('lecture_sessions.timetable_id', $record->timetable_id)
+                    ->count();
+
+                // 3. ✅ حساب الفهم (المنطق الجديد)
+                // أ) نحصل على معرفات الجلسات التي تم فيها طرح أسئلة (أي يوجد لها إجابات)
+                $sessionsWithQA = DB::table('student_lecture_answers')
+                    ->join('lecture_sessions', 'student_lecture_answers.session_id', '=', 'lecture_sessions.session_id')
+                    ->where('lecture_sessions.timetable_id', $record->timetable_id)
+                    ->pluck('lecture_sessions.session_id')
+                    ->unique()
+                    ->toArray();
+
+                $totalAttendeesExposed = 0;
+                $totalCorrectAnswers = 0;
+
+                if (!empty($sessionsWithQA)) {
+                    // ب) نحسب إجمالي الطلاب الحاضرين في هذه الجلسات فقط (المقام)
+                    $totalAttendeesExposed = DB::table('student_attendance')
+                        // نفترض الربط عبر الجلسة إذا كان متاحاً، أو عبر التاريخ والجدول (وهو الأدق حالياً حسب بنيتك)
+                        // للتبسيط والدقة، سنعتمد على أن الحضور مسجل في student_attendance للجلسات المنفذة
+                        // سنستخدم طريقة تقريبية: لكل جلسة فيها أسئلة، نحسب عدد الحضور
+                        ->join('lecture_sessions', function($join) use ($sessionsWithQA) {
+                            $join->on('student_attendance.timetable_id', '=', 'lecture_sessions.timetable_id')
+                                 ->on('student_attendance.attendance_date', '=', 'lecture_sessions.session_date');
+                        })
+                        ->whereIn('lecture_sessions.session_id', $sessionsWithQA)
+                        ->where('student_attendance.status', 1) // حاضر
+                        ->count();
+
+                    // ج) نحسب إجمالي الإجابات الصحيحة في هذه الجلسات (البسط)
+                    $totalCorrectAnswers = DB::table('student_lecture_answers')
+                        ->whereIn('session_id', $sessionsWithQA)
+                        ->where('is_correct', 1)
+                        ->count();
+                }
+
+                $understandingPercent = ($totalAttendeesExposed > 0) 
+                    ? round(($totalCorrectAnswers / $totalAttendeesExposed) * 100) 
+                    : 0;
+
+                return [
+                    'timetable_id' => $record->timetable_id,
+                    'lecturer_name' => $record->lecturer_name,
+                    'course_name' => $record->course_name,
+                    'course_code' => $record->course_code, // نحتاجه للعرض
+                    'group_name' => $record->group_name,
+                    'department_name' => $record->department_name,
+                    
+                    'sessions_executed' => $sessionsStats->executed,
+                    'sessions_total' => $sessionsStats->total_created,
+                    
+                    'topics_total' => $totalTopics,
+                    'topics_covered' => $coveredTopics,
+                    'coverage_percent' => $totalTopics > 0 ? round(($coveredTopics / $totalTopics) * 100) : 0,
+                    
+                    // بيانات الفهم الجديدة
+                    'understanding_percent' => $understandingPercent,
+                    'qa_sessions_count' => count($sessionsWithQA), // عدد الجلسات التي قيمناها
+                    'total_attendees_exposed' => $totalAttendeesExposed, // لغرض التوضيح (Tooltip مثلاً)
+                ];
+            });
+
+            return response()->json(['data' => $report]);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // 2. التقرير التفصيلي (للمودال)
+    public function getQADetailedReport(Request $request, $collegeId)
+    {
+        $timetableId = $request->timetable_id;
+
+        // 1. البيانات الوصفية (Meta Data)
+        $meta = DB::table('timetable')
+            ->join('courses', 'timetable.course_id', '=', 'courses.course_id')
+            ->join('lecturers', 'timetable.lecturer_id', '=', 'lecturers.lecturer_id')
+            ->join('users', 'lecturers.user_id', '=', 'users.user_id')
+            ->join('student_groups', 'timetable.group_id', '=', 'student_groups.group_id')
+            ->join('departments', 'timetable.department_id', '=', 'departments.department_id')
+            ->where('timetable.timetable_id', $timetableId)
+            ->select(
+                'courses.course_name', 
+                'courses.course_code',
+                'users.full_name as lecturer_name', 
+                'student_groups.group_name',
+                'departments.department_name',
+                'timetable.academic_year'
+            )
+            ->first();
+
+        if (!$meta) return response()->json(['message' => 'Not found'], 404);
+
+        // 2. جلب الجلسات المنفذة لهذا الجدول
+        $sessions = DB::table('lecture_sessions')
+            ->where('timetable_id', $timetableId)
+            ->where('status', 1) // 1: منتهية/منفذة
+            ->orderBy('session_date', 'asc')
+            ->get();
+
+        // 3. تحليل بيانات كل جلسة
+        $sessionsData = $sessions->map(function ($session) {
+            
+            // أ) الموضوع المشروح
+            $topics = DB::table('session_topics_covered')
+                ->join('course_topics', 'session_topics_covered.topic_id', '=', 'course_topics.topic_id')
+                ->where('session_topics_covered.session_id', $session->session_id)
+                ->pluck('course_topics.title')
+                ->toArray();
+
+            // ب) الحضور
+            // نعتمد على الجدول المباشر إذا كان مسجلاً فيه، أو نحسبه من student_attendance
+            $attendanceCount = DB::table('student_attendance')
+                ->join('lecture_sessions', function($join) use ($session) {
+                     // ربط تقريبي لضمان الدقة بناء على التاريخ والجدول
+                     $join->on('student_attendance.timetable_id', '=', 'lecture_sessions.timetable_id')
+                          ->on('student_attendance.attendance_date', '=', 'lecture_sessions.session_date');
+                })
+                ->where('lecture_sessions.session_id', $session->session_id)
+                ->where('student_attendance.status', 1)
+                ->count();
+
+            // ج) تحليل الأسئلة التفاعلية (QA Analysis)
+            $questions = DB::table('student_lecture_answers')
+                ->join('qa_questions', 'student_lecture_answers.question_id', '=', 'qa_questions.question_id')
+                ->where('student_lecture_answers.session_id', $session->session_id)
+                ->select('qa_questions.question_id', 'qa_questions.question_text')
+                ->distinct()
+                ->get();
+
+            $questionsData = $questions->map(function($q) use ($session) {
+                // إجمالي الإجابات على هذا السؤال
+                $totalResponses = DB::table('student_lecture_answers')
+                    ->where('session_id', $session->session_id)
+                    ->where('question_id', $q->question_id)
+                    ->count();
+
+                // تفصيل الخيارات
+                $optionsStats = DB::table('qa_question_options')
+                    ->where('question_id', $q->question_id)
+                    ->get()
+                    ->map(function($opt) use ($session, $totalResponses) {
+                        $count = DB::table('student_lecture_answers')
+                            ->where('session_id', $session->session_id)
+                            ->where('selected_option_id', $opt->option_id)
+                            ->count();
+                        
+                        return [
+                            'text' => $opt->option_text,
+                            'is_correct' => $opt->is_correct,
+                            'count' => $count,
+                            'percentage' => $totalResponses > 0 ? round(($count / $totalResponses) * 100) : 0
+                        ];
+                    });
+
+                // نسبة الإجابة الصحيحة العامة للسؤال
+                $correctCount = $optionsStats->where('is_correct', 1)->sum('count');
+                $generalAccuracy = $totalResponses > 0 ? round(($correctCount / $totalResponses) * 100) : 0;
+
+                return [
+                    'question_text' => $q->question_text,
+                    'total_responses' => $totalResponses,
+                    'accuracy' => $generalAccuracy,
+                    'options' => $optionsStats
+                ];
+            });
+
+            return [
+                'session_id' => $session->session_id,
+                'date' => $session->session_date,
+                'attendance_count' => $attendanceCount,
+                'topics' => !empty($topics) ? implode('، ', $topics) : 'لا يوجد موضوع مسجل',
+                'qa_data' => $questionsData,
+                'has_qa' => $questionsData->isNotEmpty()
+            ];
+        });
+
+        return response()->json([
+            'meta' => $meta,
+            'sessions' => $sessionsData
+        ]);
+    }
+
+    // دالة إضافية لجلب التفاصيل الدقيقة (Topics Breakdown) للمودال
+    public function getQACourseDetails(Request $request, $collegeId)
+    {
+        $courseId = $request->course_id;
+        $lecturerId = $request->lecturer_id;
+    
+        // جلب كل مواضيع المادة
+        $topics = DB::table('course_topics')
+            ->where('course_id', $courseId)
+            ->orderBy('order_index')
+            ->get();
+    
+        // جلب أي المواضيع تم تغطيتها ومتى
+        $covered = DB::table('session_topics_covered')
+            ->join('lecture_sessions', 'session_topics_covered.session_id', '=', 'lecture_sessions.session_id')
+            ->join('timetable', 'lecture_sessions.timetable_id', '=', 'timetable.timetable_id')
+            ->where('timetable.course_id', $courseId)
+            ->where('timetable.lecturer_id', $lecturerId)
+            ->select('session_topics_covered.topic_id', 'lecture_sessions.session_date', 'lecture_sessions.session_code')
+            ->get()
+            ->keyBy('topic_id');
+    
+        // جلب أداء الطلاب لكل موضوع (متقدم)
+        // يتطلب ربط السؤال بالموضوع
+        $performance = DB::table('student_lecture_answers')
+            ->join('qa_questions', 'student_lecture_answers.question_id', '=', 'qa_questions.question_id')
+            ->join('lecture_sessions', 'student_lecture_answers.session_id', '=', 'lecture_sessions.session_id')
+            ->join('timetable', 'lecture_sessions.timetable_id', '=', 'timetable.timetable_id')
+            ->where('timetable.course_id', $courseId)
+            ->where('timetable.lecturer_id', $lecturerId)
+            ->select(
+                'qa_questions.topic_id',
+                DB::raw('count(*) as total'),
+                DB::raw('sum(case when student_lecture_answers.is_correct = 1 then 1 else 0 end) as correct')
+            )
+            ->groupBy('qa_questions.topic_id')
+            ->get()
+            ->keyBy('topic_id');
+    
+        $result = $topics->map(function($topic) use ($covered, $performance) {
+            $isCovered = isset($covered[$topic->topic_id]);
+            $stats = isset($performance[$topic->topic_id]) ? $performance[$topic->topic_id] : null;
+            
+            $score = 0;
+            if ($stats && $stats->total > 0) {
+                $score = round(($stats->correct / $stats->total) * 100);
+            }
+    
+            return [
+                'topic_id' => $topic->topic_id,
+                'title' => $topic->title,
+                'status' => $isCovered ? 'covered' : 'pending',
+                'session_date' => $isCovered ? $covered[$topic->topic_id]->session_date : null,
+                'student_understanding' => $stats ? $score : null // null means no questions asked
+            ];
+        });
+    
+        return response()->json(['data' => $result]);
+    }
 }

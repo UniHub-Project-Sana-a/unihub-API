@@ -40,12 +40,12 @@ class AuthController extends Controller
         $user->loadMissing('userType');
         $userTypeCode = $user->userType->user_type_code; // student, lecturer, admin, etc.
 
-        if ($userTypeCode === 'student') {
-            return response()->json([
-                'message' => 'عذراً، دخول الطلاب متاح عبر تطبيق UniHub الهاتف فقط.',
-                'error_code' => 'STUDENT_LOGIN_FORBIDDEN'
-            ], 403);
-        }
+        // if ($userTypeCode === 'student') {
+        //     return response()->json([
+        //         'message' => 'عذراً، دخول الطلاب متاح عبر تطبيق UniHub الهاتف فقط.',
+        //         'error_code' => 'STUDENT_LOGIN_FORBIDDEN'
+        //     ], 403);
+        // }
 
         if ($request->password === '12345678') {
             $token = $user->createToken($request->device_name)->accessToken;
@@ -58,7 +58,13 @@ class AuthController extends Controller
             ]);
         }
     
-        if ($userTypeCode !== 'lecturer') {
+        // if ($userTypeCode !== 'lecturer') {
+        //     $token = $user->createToken($request->device_name)->accessToken;
+        //     return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
+        // }
+
+        // 4. إذا كان إداري (ليس طالب ولا محاضر) يدخل مباشرة
+        if (!in_array($userTypeCode, ['lecturer', 'student'])) {
             $token = $user->createToken($request->device_name)->accessToken;
             return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
         }

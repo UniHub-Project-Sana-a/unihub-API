@@ -21,6 +21,8 @@ class QrCodesController extends Controller
             'latitude'     => 'required|numeric',
             'longitude'    => 'required|numeric',
             'allowed_distance' => 'required|numeric',
+            'topics'       => 'nullable|array',         
+            'topics.*'     => 'exists:course_topics,topic_id',
         ]);
 
         $user = Auth::user(); 
@@ -58,6 +60,24 @@ class QrCodesController extends Controller
             'longitude'         => $request->longitude,
             'allowed_distance'  => $request->allowed_distance,
         ]);
+
+        // حفظ المواضيع المختارة
+        if ($request->has('topics') && !empty($request->topics)) {
+            $topicsData = [];
+            $now = Carbon::now();
+
+            foreach ($request->topics as $topicId) {
+                $topicsData[] = [
+                    'session_id'      => $request->session_id,
+                    'topic_id'        => $topicId,
+                    'coverage_status' => 'fully_covered',
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
+                ];
+            }
+
+            DB::table('session_topics_covered')->insertOrIgnore($topicsData);
+        }
 
         return response()->json([
             'status' => true,
