@@ -60,6 +60,7 @@ class College extends Model
     protected $table = 'colleges';
     protected $primaryKey = 'college_id';
     public $timestamps = true;
+    protected $appends = ['logoUrl'];
 
     protected $fillable = [
         'college_name',
@@ -106,5 +107,14 @@ class College extends Model
     public function userTypePermissions()
     {
         return $this->hasMany(UserTypePermission::class, 'college_id', 'college_id');
+    }
+
+    public function getLogoUrlAttribute()
+    {
+        if ($this->college_logo) {
+            // سيقوم بتحويل colleges/15.png إلى http://domain.com/storage/colleges/15.png
+            return asset('storage/' . $this->college_logo);
+        }
+        return null;
     }
 }
