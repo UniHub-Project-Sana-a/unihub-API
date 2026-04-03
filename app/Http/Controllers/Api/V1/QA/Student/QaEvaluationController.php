@@ -17,30 +17,27 @@ class QaEvaluationController extends Controller
     /**
      * جلب المواد التي يجب على الطالب تقييمها الآن
      */
+    // App/Http/Controllers/Api/V1/QA/Student/QaEvaluationController.php
+
     public function getPendingEvaluations(Request $request)
     {
         $user = Auth::user();
         $student = Student::where('user_id', $user->user_id)->firstOrFail();
     
-        // 1. جلب مجموعات الطالب
         $groupIds = DB::table('student_group_members')
             ->where('student_id', $student->student_id)
             ->pluck('group_id');
     
-        // 2. جلب الجداول الدراسية المرتبطة بحملات نشطة
+        // 1. جلب الجداول الدراسية المرتبطة بحملات نشطة
         $timetables = Timetable::query()
             ->whereIn('group_id', $groupIds)
-            ->where('status', 1) // الجدول فعال
+            ->where('status', 1) 
             ->whereHas('qaCampaigns', function($q) {
-                 // الشرط: الحملة منشورة + تاريخ اليوم يقع ضمن فترتها
                  $q->where('is_published', true)
-                   ->where('start_date', '<=', now()->format('Y-m-d'))
                    ->where('end_date', '>=', now()->format('Y-m-d'));
             })
             ->with(['course', 'lecturer.user', 'qaCampaigns' => function($q) {
-                 // نجلب بيانات الحملة والنموذج
                  $q->where('is_published', true)
-                   ->where('start_date', '<=', now()->format('Y-m-d'))
                    ->where('end_date', '>=', now()->format('Y-m-d'))
                    ->with('form');
             }])
@@ -49,59 +46,98 @@ class QaEvaluationController extends Controller
         $evaluationsList = [];
     
         foreach ($timetables as $timetable) {
-            // بما أن العلاقة أصبحت Many-to-Many، قد يكون هناك أكثر من حملة
-            // سنقوم بالدوران عليهم جميعاً (في الغالب ستكون واحدة)
             foreach ($timetable->qaCampaigns as $campaign) {
                 
-                // التحقق من التقييم السابق
-                $isSubmitted = QaSubmission::where('campaign_id', $campaign->campaign_id)
-                    ->where('student_id', $student->student_id)
-                    ->where('course_id', $timetable->course_id) // تأكدنا من المادة
-                    ->where('lecturer_id', $timetable->lecturer_id) // تأكدنا من المحاضر
-                    ->exists();
-    
-                if ($isSubmitted) continue;
-    
-                // --- حساب نسبة الحضور ---
-                $totalSessions = DB::table('lecture_sessions')
-                    ->where('timetable_id', $timetable->timetable_id)
-                    ->where('status', 1)
-                    ->count();
-    
-                $studentAttendanceCount = DB::table('student_attendance')
-                    ->where('timetable_id', $timetable->timetable_id)
-                    ->where('student_id', $student->student_id)
-                    ->where('status', 1)
-                    ->count();
-    
-                $attendancePercentage = ($totalSessions > 0) ? ($studentAttendanceCount / $totalSessions) * 100 : 100;
-                $attendancePercentage = round($attendancePercentage, 1);
+                // 🔥🔥 التعديل الجذري: جمع كل المحاضرين المحتملين 🔥🔥
                 
-                // --- التحقق من الأهلية ---
-                $isEligibleAttendance = $attendancePercentage >= $campaign->min_attendance_percentage;
-                
-                // إضافة البيانات للقائمة
-                $evaluationsList[] = [
-                    'timetable_id' => $timetable->timetable_id,
-                    'campaign_id' => $campaign->campaign_id,
-                    'course_id' => $timetable->course_id,
-                    'lecturer_id' => $timetable->lecturer_id,
+                // 1. المحاضر الأصلي (من الجدول مباشرة)
+                $lecturerIds = [$timetable->lecturer_id];
+    
+                // 2. المحاضرين البدلاء (من جدول الجلسات - بغض النظر عن الحالة)
+                $sessionLecturers = DB::table('lecture_sessions')
+                    ->where('timetable_id', $timetable->timetable_id)
+                    // ->where('status', 1) // ❌ حذفنا هذا الشرط لنكتشفهم حتى لو المحاضرة مجدولة
+                    ->pluck('lecturer_id')
+                    ->toArray();
+    
+                // 3. دمج المصفوفتين وإزالة التكرار
+                $allLecturers = array_unique(array_merge($lecturerIds, $sessionLecturers));
+    
+                // الآن ننشئ بطاقة لكل محاضر وجدناه
+                foreach ($allLecturers as $lecturerId) {
                     
-                    'campaign_name' => $campaign->campaign_name,
-                    'course_name' => $timetable->course->course_name,
-                    'course_code' => $timetable->course->course_code,
-                    'lecture_type' => $timetable->lecture_type == 1 ? 'عملي' : 'نظري',
-                    'lecturer_name' => $timetable->lecturer->user->full_name ?? 'غير محدد',
+                    // التحقق: هل قام الطالب بتقييم هذا المحاضر تحديداً؟
+                    $isSubmitted = QaSubmission::where('campaign_id', $campaign->campaign_id)
+                        ->where('student_id', $student->student_id)
+                        ->where('course_id', $timetable->course_id)
+                        ->where('lecturer_id', $lecturerId) 
+                        ->exists();
+    
+                    if ($isSubmitted) continue;
+    
+                    // جلب اسم المحاضر (سواء كان الأصلي أو البديل)
+                    $lecturerName = \App\Models\User::whereHas('lecturer', function($q) use ($lecturerId) {
+                        $q->where('lecturer_id', $lecturerId);
+                    })->value('full_name');
+    
+                    if (!$lecturerName) continue; // حماية في حال عدم وجود بيانات
+    
+                    // --- حساب نسبة الحضور (الخاصة بهذا المحاضر) ---
+                    // ملاحظة: نحسب نسبة الحضور بناءً على الجلسات التي *نفذها هذا المحاضر فعلياً* (status=1)
                     
-                    'student_attendance' => $attendancePercentage,
-                    'required_attendance' => $campaign->min_attendance_percentage,
-                    'start_date' => $campaign->start_date,
+                    $totalSessions = DB::table('lecture_sessions')
+                        ->where('timetable_id', $timetable->timetable_id)
+                        ->where('lecturer_id', $lecturerId) // ✅ نحسب جلسات هذا المحاضر فقط
+                        ->where('status', 1)
+                        ->count();
+    
+                    // إذا لم يكن للمحاضر جلسات منفذة بعد (جديد أو بديل مستقبلي)، نعتبر النسبة 100%
+                    // لكي لا يظهر "محروم" بسبب عدم وجود جلسات
+                    if ($totalSessions == 0) {
+                        $attendancePercentage = 100;
+                    } else {
+                        // نحسب كم مرة حضر الطالب في جلسات هذا المحاضر
+                        // نحتاج لربط student_attendance بـ lecture_sessions للتأكد من المحاضر
+                        $studentAttendanceCount = DB::table('student_attendance')
+                            ->join('lecture_sessions', 'student_attendance.session_code', '=', 'lecture_sessions.session_code') // الربط عبر الكود أو ID
+                            ->where('student_attendance.student_id', $student->student_id)
+                            ->where('lecture_sessions.timetable_id', $timetable->timetable_id)
+                            ->where('lecture_sessions.lecturer_id', $lecturerId) // ✅ جلسات هذا المحاضر
+                            ->where('student_attendance.status', 1)
+                            ->count();
+    
+                        $attendancePercentage = ($studentAttendanceCount / $totalSessions) * 100;
+                    }
                     
-                    'is_upcoming' => false, // بما أننا فلترنا بالتاريخ في الاستعلام، فهي جارية حكماً
-                    'is_eligible_attendance' => $isEligibleAttendance,
-                    'can_evaluate' => $isEligibleAttendance,
-                    'rejection_reason' => $isEligibleAttendance ? null : "نسبة حضورك ($attendancePercentage%) أقل من الحد المطلوب ($campaign->min_attendance_percentage%)."
-                ];
+                    $attendancePercentage = round($attendancePercentage, 1);
+                    
+                    // التحقق من الأهلية
+                    $isEligibleAttendance = $attendancePercentage >= $campaign->min_attendance_percentage;
+                    
+                    // إضافة البطاقة
+                    $evaluationsList[] = [
+                        'timetable_id' => $timetable->timetable_id,
+                        'campaign_id' => $campaign->campaign_id,
+                        'course_id' => $timetable->course_id,
+                        'lecturer_id' => $lecturerId, // ✅ ID المحاضر الحالي
+                        
+                        'campaign_name' => $campaign->campaign_name,
+                        'course_name' => $timetable->course->course_name,
+                        'course_code' => $timetable->course->course_code,
+                        'lecture_type' => $timetable->lecture_type == 1 ? 'عملي' : 'نظري',
+                        
+                        'lecturer_name' => $lecturerName, // ✅ اسم المحاضر الحالي
+                        
+                        'student_attendance' => $attendancePercentage,
+                        'required_attendance' => $campaign->min_attendance_percentage,
+                        'start_date' => $campaign->start_date,
+                        
+                        'is_upcoming' => false,
+                        'is_eligible_attendance' => $isEligibleAttendance,
+                        'can_evaluate' => $isEligibleAttendance,
+                        'rejection_reason' => $isEligibleAttendance ? null : "نسبة حضورك ($attendancePercentage%) مع هذا المحاضر أقل من الحد المطلوب."
+                    ];
+                }
             }
         }
     

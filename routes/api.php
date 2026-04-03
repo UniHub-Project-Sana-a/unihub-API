@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\V1\ReportsController;
 use App\Http\Controllers\Api\V1\FinancialController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\LecturerGradebookController;
+use App\Http\Controllers\Api\V1\LectureAttachmentsController;
 use App\Http\Controllers\Api\V1\Admin\IpRestrictionController;
 
 use App\Http\Controllers\Api\V1\QA\Admin\QaManagerController;
@@ -52,6 +53,7 @@ use App\Http\Controllers\Api\V1\QA\Student\QaEvaluationController;
 use App\Http\Controllers\Api\V1\QA\Reports\QaAnalysisController;
 use App\Http\Controllers\Api\V1\QualityAssuranceController;
 use App\Http\Controllers\Api\V1\QA\Reports\CourseExecutionReportController;
+use App\Http\Controllers\Api\V1\UniversityReportController;
 
 Route::get('/debug/password-algo', function () {
 
@@ -263,6 +265,7 @@ Route::prefix('v1')->group(function ()
         Route::get('/schedulable-lectures', [LectureSessionsController::class, 'getSchedulableLectures']);
 
         Route::apiResource('lecture-sessions', LectureSessionsController::class);
+        Route::post('sessions/{id}/finish', [LectureSessionsController::class, 'finishLecture']);
 
        
 
@@ -510,4 +513,13 @@ Route::prefix('v1')->group(function ()
     Route::post('qa/questions', [QualityAssuranceController::class, 'storeQuestion']);
     Route::put('qa/questions/{id}', [QualityAssuranceController::class, 'updateQuestion']);
     Route::delete('qa/questions/{id}', [QualityAssuranceController::class, 'destroyQuestion']);
+
+    Route::controller(LectureAttachmentsController::class)->group(function () {
+        Route::get('sessions/{sessionId}/attachments', 'index');
+        Route::post('attachments', 'store');
+        Route::put('attachments/{id}', 'update');
+        Route::delete('attachments/{id}', 'destroy');
+    });
+
+    Route::get('reports/university-comprehensive', [UniversityReportController::class, 'index']);
 });

@@ -24,7 +24,7 @@ class Timetable extends Model
     protected $fillable = [
         'course_id', 'lecturer_id', 'group_id', 'classroom_id', 'day_id', 'period_id',
         'lecture_type', 'status', 'start_date', 'end_date', 'academic_year',
-        'college_id', 'department_id', 'level_id', 'gender_type', 'lecture_hours',
+        'college_id', 'department_id', 'level_id', 'gender_type', 'lecture_hours', 'allowance_minutes',
     ];
 
     // --- ✅ العلاقات (Relationships) - تأكد من وجودها كلها ---

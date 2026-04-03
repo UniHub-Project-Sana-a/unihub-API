@@ -46,7 +46,7 @@ class Department extends Model
 
     public function programs()
     {
-        return $this->belongsToMany(Program::class, 'department_programs', 'department_id', 'program_id')->withTimestamps();
+        return $this->hasMany(Program::class, 'department_id', 'department_id');
     }
 
     public function timetables()

@@ -39,4 +39,17 @@ class StudentGroup extends Model
     {
         return $this->hasMany(LecturerGroupNotification::class, 'group_id', 'group_id');
     }
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'department_id', 'department_id');
+    }
+    public function level()
+    {
+        return $this->belongsTo(Level::class, 'level_id', 'level_id');
+    }
+
+    public function semester()
+    {
+        return $this->belongsTo(Semester::class, 'semester_id', 'semester_id');
+    }
 }

@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\QrCode;
 use App\Models\Lecturer;
+use App\Models\LectureSession;
 
 class QrCodesController extends Controller
 {
@@ -78,6 +79,10 @@ class QrCodesController extends Controller
 
             DB::table('session_topics_covered')->insertOrIgnore($topicsData);
         }
+
+        LectureSession::where('session_id', $request->session_id)->update([
+            'actual_start_time' => Carbon::now(),
+        ]);
 
         return response()->json([
             'status' => true,

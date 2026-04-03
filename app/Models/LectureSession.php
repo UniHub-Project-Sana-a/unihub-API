@@ -28,14 +28,25 @@ class LectureSession extends Model
         'session_code',
         'status',
         'is_makeup',
+        'actual_start_time',
+
+        'actual_end_time',
+        'end_latitude',
+        'end_longitude',
+        'is_ended_remotely',
+        'early_exit_reason'
     ];
 
     /**
      * The attributes that should be cast.
      */
     protected $casts = [
-        'session_date' => 'date',
+        'session_date' => 'date:Y-m-d',
         'attendance_overage_alert' => 'boolean',
+
+        'actual_start_time' => 'datetime',
+        'actual_end_time' => 'datetime',
+        'is_ended_remotely' => 'boolean',
     ];
 
     /**
@@ -50,4 +61,17 @@ class LectureSession extends Model
     {
         return $this->belongsTo(Classroom::class, 'actual_classroom_id', 'classroom_id');
     }
+
+    //     /**
+    //  * Prepare a date for array / JSON serialization.
+    //  *
+    //  * @param  \DateTimeInterface  $date
+    //  * @return string
+    //  */
+    // protected function serializeDate(\DateTimeInterface $date)
+    // {
+    //     // هذا السطر يجبر لارافيل على إرسال التاريخ بصيغة السنة-الشهر-اليوم فقط
+    //     // دون أي تلاعب بالتوقيت أو تحويل لـ UTC
+    //     return $date->format('Y-m-d');
+    // }
 }

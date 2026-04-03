@@ -7,6 +7,8 @@ use App\Models\LectureSession;
 use App\Models\Timetable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use App\Models\QrCode;
 
 class LectureSessionController extends Controller
 {
@@ -378,7 +380,7 @@ class LectureSessionController extends Controller
     /**
      * تعديل بيانات الجلسة
      */
-    public function update(\Illuminate\Http\Request $request, $id)
+    public function update(Request $request, $id)
     {
         $session = \App\Models\LectureSession::findOrFail($id);
 
@@ -410,5 +412,67 @@ class LectureSessionController extends Controller
         return response()->json([
             'message' => 'Lecture session deleted successfully'
         ]);
+    }
+
+    /**
+     * إنهاء المحاضرة كلياً (تسجيل الخروج وحساب الوقت)
+    */
+    public function finishLecture(Request $request, $id)
+    {
+        $session = LectureSession::findOrFail($id);
+
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'early_exit_reason' => 'nullable|string|max:255',
+        ]);
+
+        // 1. التحقق من الموقع (Is Remote?)
+        // نستخدم دالة مساعدة لحساب المسافة (Haversine Formula)
+        // أو نقارن ببساطة إذا لم تكن الدقة حرجة جداً، لكن الأفضل حساب المسافة
+        $isRemote = $this->calculateDistance(
+            $request->latitude, $request->longitude,
+            $session->actualClassroom->latitude, $session->actualClassroom->longitude
+        ) > $session->actualClassroom->allowed_distance;
+
+        // 2. تحديث الجلسة
+        $session->update([
+            'status' => 1, // 1 = Completed
+            'actual_end_time' => Carbon::now(),
+            'end_latitude' => $request->latitude,
+            'end_longitude' => $request->longitude,
+            'is_ended_remotely' => $isRemote,
+            'early_exit_reason' => $request->early_exit_reason
+        ]);
+
+        // 3. إغلاق أي QR مفتوح لهذه الجلسة تلقائياً (تنظيف)
+        QrCode::where('session_id', $session->session_id)
+            ->where('is_active', true)
+            ->update(['is_active' => false, 'expires_at' => Carbon::now()]);
+
+        return response()->json([
+            'message' => 'تم إنهاء المحاضرة وتوثيق الوقت والموقع بنجاح.',
+            'session' => $session
+        ]);
+    }
+
+    /**
+     * دالة مساعدة لحساب المسافة بالمتر (Haversine)
+     */
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2) {
+        $earthRadius = 6371000; // نصف قطر الأرض بالمتر
+
+        $latFrom = deg2rad($lat1);
+        $lonFrom = deg2rad($lon1);
+        $latTo = deg2rad($lat2);
+        $lonTo = deg2rad($lon2);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+            
+        return $angle * $earthRadius;
     }
 }

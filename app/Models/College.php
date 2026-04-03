@@ -117,4 +117,10 @@ class College extends Model
         }
         return null;
     }
+
+    public function studentGroups()
+    {
+        // الكلية تملك مجموعات طلابية كثيرة
+        return $this->hasMany(StudentGroup::class, 'college_id', 'college_id');
+    }
 }

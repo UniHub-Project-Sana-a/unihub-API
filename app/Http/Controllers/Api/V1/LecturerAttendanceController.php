@@ -104,7 +104,7 @@ class LecturerAttendanceController extends Controller
      * ✅ الدالة التي تم نقلها إلى هنا
      * المصادقة على جلسة حضور كاملة وتسجيل الحاضرين والغياب.
      */
-        public function finalizeSession(Request $request)
+    public function finalizeSession(Request $request)
     {
         // 1. التحقق من صحة البيانات القادمة
         $request->validate([
@@ -212,7 +212,7 @@ class LecturerAttendanceController extends Controller
             // ---------------------------------------------------------
             
             $session->update([
-                'status' => 1, // مكتملة
+                'status' => 2, // مكتملة
                 'system_attendance_count' => $presentStudentsMap->count(),
                 'actual_attendance_count' => $presentStudentsMap->count()
             ]);

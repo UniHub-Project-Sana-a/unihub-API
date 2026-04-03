@@ -61,33 +61,56 @@ class QaCampaignsController extends Controller
     }
     
     // دالة لجلب إحصائيات سريعة عند اختيار السنة (اختياري للعرض في الواجهة)
+
     public function getYearDetails(Request $request)
     {
         $year = $request->query('year');
         $collegeId = $request->query('college_id');
     
-        // جلب صفوف الجدول الدراسي مع تفاصيل المادة والمحاضر
-        $timetableRows = \App\Models\Timetable::query()
-            ->where('timetable.college_id', $collegeId)
-            ->where('timetable.academic_year', $year)
-            ->where('timetable.status', '!=', 0) // يمكنك تفعيل هذا الشرط لاحقاً
+        $rows = \App\Models\Timetable::query()
             ->join('courses', 'timetable.course_id', '=', 'courses.course_id')
             ->join('lecturers', 'timetable.lecturer_id', '=', 'lecturers.lecturer_id')
             ->join('users', 'lecturers.user_id', '=', 'users.user_id')
-            ->join('student_groups', 'timetable.group_id', '=', 'student_groups.group_id')
+            ->leftJoin('student_groups', 'timetable.group_id', '=', 'student_groups.group_id')
+            ->where('timetable.college_id', $collegeId)
+            ->where('timetable.academic_year', $year)
             ->select(
                 'timetable.timetable_id',
-                'timetable.lecture_type', // تأكد من نوع البيانات (مثلاً 0 نظري، 1 عملي)
+                'timetable.lecture_type',
                 'courses.course_name',
                 'courses.course_code',
-                'users.full_name as lecturer_name',
+                'users.full_name as lecturer_name', // المحاضر الأصلي
                 'student_groups.group_name'
             )
             ->get();
     
+        // 🔥 السحر هنا: البحث عن المحاضرين البدلاء لكل جدول
+        $rows->transform(function ($row) {
+            // نجمع أسماء المحاضرين المختلفين الذين درّسوا جلسات لهذا الجدول
+            $substituteLecturers = DB::table('lecture_sessions')
+                ->join('lecturers', 'lecture_sessions.lecturer_id', '=', 'lecturers.lecturer_id')
+                ->join('users', 'lecturers.user_id', '=', 'users.user_id')
+                ->where('lecture_sessions.timetable_id', $row->timetable_id)
+                // ->where('lecture_sessions.status', 1) 
+                ->where('users.full_name', '!=', $row->lecturer_name) // نستبعد الأصلي
+                ->distinct()
+                ->pluck('users.full_name')
+                ->toArray();
+    
+            // إذا وجد بدلاء، نضيفهم للاسم المعروض
+            if (!empty($substituteLecturers)) {
+                $row->lecturer_name .= ' و ' . implode('، ', $substituteLecturers) . ' (مشترك)';
+                $row->has_substitutes = true; // علامة للواجهة (لتلوينها مثلاً)
+            } else {
+                $row->has_substitutes = false;
+            }
+    
+            return $row;
+        });
+    
         return response()->json([
-            'rows' => $timetableRows,
-            'count' => $timetableRows->count()
+            'rows' => $rows,
+            'count' => $rows->count()
         ]);
     }
         /**

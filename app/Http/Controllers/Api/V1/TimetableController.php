@@ -90,6 +90,7 @@ class TimetableController extends Controller
             'lecture_hours' => 'required|numeric|min:0',
             'gender_type'   => 'required|integer|in:0,1,2',
             'status'        => 'required|integer|in:0,1',
+            'allowance_minutes' => 'required|integer|min:0|max:60',
         ]);
     
         if ($validator->fails()) {
