@@ -54,6 +54,7 @@ use App\Http\Controllers\Api\V1\QA\Reports\QaAnalysisController;
 use App\Http\Controllers\Api\V1\QualityAssuranceController;
 use App\Http\Controllers\Api\V1\QA\Reports\CourseExecutionReportController;
 use App\Http\Controllers\Api\V1\UniversityReportController;
+use App\Http\Controllers\Api\V1\BlockController;
 
 Route::get('/debug/password-algo', function () {
 
@@ -149,6 +150,7 @@ Route::prefix('v1')->group(function ()
         Route::apiResource('courses', CoursesController::class);
 
         Route::apiResource('buildings', BuildingsController::class);
+        Route::apiResource('blocks', BlockController::class);
 
         Route::get('/classrooms/availability', [ClassroomsController::class, 'checkAvailability']);
         Route::apiResource('classrooms', ClassroomsController::class);

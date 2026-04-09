@@ -14,10 +14,19 @@ class Program extends Model
     protected $primaryKey = 'program_id';
     public $timestamps = true;
 
-    protected $fillable = ['program_name','department_id','is_active'];
+    protected $fillable = [
+        'department_id',
+        'program_name',
+        'academic_system',
+        'block_based',
+        'is_active',
+        'total_hours'
+    ];
 
     protected $casts = [
+        'block_based' => 'boolean',
         'is_active' => 'boolean',
+        'total_hours' => 'integer'
     ];
 
     public function department()

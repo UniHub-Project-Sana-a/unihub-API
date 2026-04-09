@@ -8,7 +8,15 @@ use Illuminate\Http\Request;
 
 class ProgramsController extends Controller {
     public function index(Request $r) {
-      $q = Program::query()->select(['program_id','program_name','is_active','department_id']);
+      $q = Program::query()->select([
+        'program_id',
+        'program_name',
+        'is_active',
+        'department_id',
+        'academic_system',
+        'block_based',
+        'total_hours'
+      ]);
       if ($r->filled('department_id')) $q->where('department_id', (int)$r->department_id);
       return response()->json($q->get());
     }
@@ -18,7 +26,10 @@ class ProgramsController extends Controller {
       $program = Program::create([
         'program_name'  => $data['program_name'],
         'department_id' => $data['department_id'],
+        'academic_system' => $data['academic_system'],
+        'block_based'     => $data['block_based'],
         'is_active'     => $data['is_active'] ?? true,
+        'total_hours'   => $data['total_hours'] ?? null,
       ]);
       return response()->json($program->fresh(), 201);
     }
@@ -30,6 +41,9 @@ class ProgramsController extends Controller {
       $program->update([
         'program_name' => $data['program_name'] ?? $program->program_name,
         'is_active'    => array_key_exists('is_active',$data) ? $data['is_active'] : $program->is_active,
+        'academic_system' => $data['academic_system'] ?? $program->academic_system,
+        'block_based'     => array_key_exists('block_based',$data) ? $data['block_based'] : $program->block_based,
+        'total_hours'   => array_key_exists('total_hours',$data) ? $data['total_hours'] : $program->total_hours,
       ]);
       return response()->json($program->fresh());
     }
