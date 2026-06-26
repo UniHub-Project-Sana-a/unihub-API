@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('block_name');
             $table->integer('block_number');
             $table->decimal('weight', 5, 2)->default(0);
-            $table->decimal('credit_hours', 5, 2)->default(0);
+            $table->decimal('credit_hours', 5, 2)->default(0)->nullable();
             $table->integer('weeks')->default(1);
             $table->enum('type', ['compulsory', 'elective'])->default('compulsory');
             

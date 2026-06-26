@@ -6,33 +6,31 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class CourseTopic extends Model
+class CourseAssignment extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'course_topics';
-    protected $primaryKey = 'topic_id';
-    protected $guarded = ['topic_id'];
+    protected $table = 'course_assignments';
+    protected $primaryKey = 'assignment_id';
+    protected $guarded = ['assignment_id'];
 
     protected $fillable = [
         'course_id',
         'part',
+        'title',
+        'description',
         'week',
-        'unit_name',
-        'subtopics',
-        'is_exam',
-        'exam_type',
-        'hours',
+        'grade',
         'clo_ids',
-        'order',
+        'assignment_type',
+        'is_mandatory',
         'notes',
     ];
 
     protected $casts = [
-        'subtopics' => 'array',
+        'grade' => 'decimal:2',
         'clo_ids' => 'array',
-        'is_exam' => 'boolean',
-        'hours' => 'decimal:2',
+        'is_mandatory' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -43,25 +41,24 @@ class CourseTopic extends Model
     // ============================================================
 
     /**
-     * المقرر الذي ينتمي له الموضوع
+     * المقرر الذي ينتمي له التكليف
      */
     public function course()
     {
         return $this->belongsTo(Course::class, 'course_id', 'course_id');
     }
 
-    /**
-     * الأسئلة المرتبطة بهذا الموضوع
-     */
-    public function questions()
-    {
-        return $this->hasMany(TopicQuestion::class, 'topic_id', 'topic_id')
-            ->orderBy('order');
-    }
-
     // ============================================================
     // Scopes
     // ============================================================
+
+    /**
+     * فلترة التكاليف الإجبارية
+     */
+    public function scopeMandatory($query)
+    {
+        return $query->where('is_mandatory', true);
+    }
 
     /**
      * فلترة حسب المقرر
@@ -80,27 +77,11 @@ class CourseTopic extends Model
     }
 
     /**
-     * فلترة الامتحانات فقط
+     * فلترة حسب نوع التكليف
      */
-    public function scopeExams($query)
+    public function scopeByType($query, $type)
     {
-        return $query->where('is_exam', true);
-    }
-
-    /**
-     * فلترة المواضيع العادية (غير الامتحانات)
-     */
-    public function scopeNonExams($query)
-    {
-        return $query->where('is_exam', false);
-    }
-
-    /**
-     * فلترة حسب الأسبوع
-     */
-    public function scopeByWeek($query, $week)
-    {
-        return $query->where('week', $week);
+        return $query->where('assignment_type', $type);
     }
 
     // ============================================================
@@ -108,7 +89,7 @@ class CourseTopic extends Model
     // ============================================================
 
     /**
-     * التحقق من أن الأسبوع صحيح
+     * التحقق من صحة الأسبوع
      */
     public function isValidWeek()
     {

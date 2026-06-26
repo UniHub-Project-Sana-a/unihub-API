@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2c85df5610772a1e0642f1efabcbae29",
+    "content-hash": "68b6ebb743d3eeb1058562495c41ed70",
     "packages": [
         {
             "name": "brick/math",
@@ -8168,6 +8168,53 @@
                 }
             ],
             "time": "2025-08-08T12:00:00+00:00"
+        },
+        {
+            "name": "garygreen/pretty-routes",
+            "version": "1.0.15",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/garygreen/pretty-routes.git",
+                "reference": "f04503d875e9b0e6c2cae0f8618ea6e95bb9e310"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/garygreen/pretty-routes/zipball/f04503d875e9b0e6c2cae0f8618ea6e95bb9e310",
+                "reference": "f04503d875e9b0e6c2cae0f8618ea6e95bb9e310",
+                "shasum": ""
+            },
+            "require": {
+                "laravel/framework": "5.*|6.*|7.*|8.*|^9.0|^10.0|^11.0|^12.0|^13.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "PrettyRoutes\\ServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "PrettyRoutes\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Gary Green",
+                    "email": "holegary@gmail.com"
+                }
+            ],
+            "description": "Pretty routes for Laravel 5+",
+            "support": {
+                "issues": "https://github.com/garygreen/pretty-routes/issues",
+                "source": "https://github.com/garygreen/pretty-routes/tree/1.0.15"
+            },
+            "time": "2026-04-01T16:39:42+00:00"
         },
         {
             "name": "hamcrest/hamcrest-php",
