@@ -96,6 +96,7 @@ Route::prefix('v1')->group(function ()
 
 
     Route::post('sync/bulk', [SyncController::class, 'bulkSync']);
+    Route::post('sync', [SyncController::class, 'bulkSync']);
 
    
 

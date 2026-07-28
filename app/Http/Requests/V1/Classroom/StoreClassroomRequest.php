@@ -6,6 +6,7 @@ class StoreClassroomRequest extends FormRequest {
     public function authorize(): bool { return true; }
     public function rules(): array {
         return [
+            'college_id' => ['nullable', 'integer', 'exists:colleges,college_id'],
             'classroom_name' => ['required', 'string', 'max:100'],
             'building_id' => ['required', 'integer', 'exists:buildings,building_id'],
             'floor' => ['required', 'integer'],

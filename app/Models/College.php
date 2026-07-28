@@ -79,6 +79,11 @@ class College extends Model
         return $this->hasMany(Building::class, 'college_id', 'college_id');
     }
 
+    public function classrooms()
+    {
+        return $this->hasMany(Classroom::class, 'college_id', 'college_id');
+    }
+
     public function periods()
     {
         return $this->hasMany(Period::class, 'college_id', 'college_id');
