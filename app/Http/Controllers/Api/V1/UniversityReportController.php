@@ -15,8 +15,9 @@ class UniversityReportController extends Controller
             // 1. الخطة الدراسية (تسلسل عميق)
             'departments.programs.levels.semesters.courses',
             
-            // 2. القاعات والمباني
+            // 2. القاعات والمباني (مباشرة وتراجعياً)
             'buildings.classrooms',
+            'classrooms.building',
             
             // 3. الرتب الأكاديمية
             'academicTitles',

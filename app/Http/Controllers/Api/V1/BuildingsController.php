@@ -28,7 +28,14 @@ class BuildingsController extends Controller {
         return response()->json($building->load('college'));
     }
     public function destroy(Building $building) {
+        if ($building->classrooms()->exists()) {
+            $count = $building->classrooms()->count();
+            return response()->json([
+                'message' => "لا يمكن حذف المبنى '{$building->building_name}' لأنه يحتوي على {$count} قاعات نشطة مرتبطة به. يرجى نقل أو حذف القاعات أولاً."
+            ], 409);
+        }
+
         $building->delete();
-        return response()->json(['message' => 'Building deleted']);
+        return response()->json(['message' => 'تم حذف المبنى بنجاح']);
     }
 }

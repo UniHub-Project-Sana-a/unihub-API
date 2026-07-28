@@ -16,6 +16,7 @@ class Building extends Model
 
     protected $fillable = [
         'building_name',
+        'code',
         'floors_count',
         'college_id',
     ];
@@ -33,5 +34,17 @@ class Building extends Model
     public function classrooms()
     {
         return $this->hasMany(Classroom::class, 'building_id', 'building_id');
+    }
+
+    public function colleges()
+    {
+        return $this->hasManyThrough(
+            College::class,
+            Classroom::class,
+            'building_id', // Foreign key on classrooms table...
+            'college_id',  // Foreign key on colleges table...
+            'building_id', // Local key on buildings table...
+            'college_id'   // Local key on classrooms table...
+        )->distinct();
     }
 }

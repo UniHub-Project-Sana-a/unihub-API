@@ -714,7 +714,10 @@ class ReportsController extends Controller
                 'departments' => DB::table('departments')->where('college_id', $collegeId)->count(),
                 'classrooms'  => DB::table('classrooms')
                                     ->join('buildings', 'classrooms.building_id', '=', 'buildings.building_id')
-                                    ->where('buildings.college_id', $collegeId)
+                                    ->where(function($q) use ($collegeId) {
+                                        $q->where('classrooms.college_id', $collegeId)
+                                          ->orWhere('buildings.college_id', $collegeId);
+                                    })
                                     ->count(),
                 'programs'    => DB::table('programs')
                                     ->join('departments', 'programs.department_id', '=', 'departments.department_id')

@@ -13,10 +13,14 @@ class ClassroomsController extends Controller {
     {
         $query = Classroom::query();
     
-        // الفلترة حسب الكلية (عبر علاقة المبنى)
+        // الفلترة حسب الكلية (المباشرة للقاعة أو عبر علاقة المبنى كدعم تراجعي)
         if ($request->filled('college_id')) {
-            $query->whereHas('building', function ($q) use ($request) {
-                $q->where('college_id', (int)$request->college_id);
+            $cId = (int)$request->college_id;
+            $query->where(function ($q) use ($cId) {
+                $q->where('college_id', $cId)
+                  ->orWhereHas('building', function ($bq) use ($cId) {
+                      $bq->where('college_id', $cId);
+                  });
             });
         }
     
@@ -25,6 +29,8 @@ class ClassroomsController extends Controller {
             $query->where('building_id', (int)$request->building_id);
         }
         
+        $query->with(['college', 'building']);
+
         // إذا كان الطلب يريد كل النتائج (للقوائم المنسدلة)
         if ($request->query('all') === 'true') {
             return response()->json($query->orderBy('classroom_name')->get());
@@ -57,12 +63,13 @@ class ClassroomsController extends Controller {
             $startTime = $request->query('start_time');
             $endTime = $request->query('end_time');
     
-            // 1. جلب القاعات (التصحيح هنا: البحث عبر علاقة المبنى)
+            // 1. جلب القاعات (البحث المباشر في القاعة أو عبر علاقة المبنى كدعم تراجعي)
             $classrooms = Classroom::query()
-                // ندخل إلى جدول buildings المرتبط
-                ->whereHas('building', function ($q) use ($collegeId) {
-                    // ونبحث هناك عن college_id
-                    $q->where('college_id', $collegeId);
+                ->where(function ($q) use ($collegeId) {
+                    $q->where('college_id', $collegeId)
+                      ->orWhereHas('building', function ($bq) use ($collegeId) {
+                          $bq->where('college_id', $collegeId);
+                      });
                 })
                 ->select('classroom_id', 'classroom_name as name', 'capacity')
                 ->get();
