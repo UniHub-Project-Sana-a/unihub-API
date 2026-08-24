@@ -26,4 +26,19 @@ class Block extends Model
                     ->wherePivot('relation_type', 'concurrent')
                     ->withTimestamps();
     }
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class, 'program_id', 'program_id');
+    }
+
+    public function level()
+    {
+        return $this->belongsTo(Level::class, 'level_id', 'level_id');
+    }
+
+    public function courses()
+    {
+        return $this->hasMany(Course::class, 'block_id', 'id');
+    }
 }

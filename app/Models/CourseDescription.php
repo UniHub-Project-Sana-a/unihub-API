@@ -67,10 +67,7 @@ class CourseDescription extends Model
     public function calculateWordCount(): self
     {
         if ($this->description) {
-            $words = array_filter(
-                explode(' ', trim($this->description)),
-                fn($word) => strlen($word) > 0
-            );
+            $words = preg_split('/\s+/u', trim($this->description), -1, PREG_SPLIT_NO_EMPTY);
             $this->word_count = count($words);
         } else {
             $this->word_count = 0;
@@ -107,10 +104,7 @@ class CourseDescription extends Model
         $this->attributes['description'] = $value;
         
         if ($value) {
-            $words = array_filter(
-                explode(' ', trim($value)),
-                fn($word) => strlen($word) > 0
-            );
+            $words = preg_split('/\s+/u', trim($value), -1, PREG_SPLIT_NO_EMPTY);
             $this->attributes['word_count'] = count($words);
         } else {
             $this->attributes['word_count'] = 0;

@@ -158,6 +158,8 @@ class CourseReferenceController extends Controller
                 ->firstOrFail();
 
             $validated = $request->validate([
+                'type' => 'in:main,support,electronic',
+                'category' => 'nullable|in:website,journal,other',
                 'author' => 'nullable|string|max:300',
                 'year' => 'nullable|integer|min:1900|max:2099',
                 'title' => 'string|max:500',

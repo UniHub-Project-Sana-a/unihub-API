@@ -52,7 +52,7 @@ class CourseDescriptionController extends Controller
     {
         try {
             $validated = $request->validate([
-                'description' => 'required|string|min:80|max:500',
+                'description' => 'required|string',
             ], [
                 'description.required' => 'الوصف مطلوب',
                 'description.min' => 'الوصف يجب أن يكون 80 كلمة على الأقل',
@@ -61,8 +61,25 @@ class CourseDescriptionController extends Controller
 
             Course::findOrFail($courseId);
 
+            $description = trim($validated['description']);
+            $wordCount = count(preg_split('/\s+/u', $description, -1, PREG_SPLIT_NO_EMPTY));
+            $sentences = array_values(array_filter(preg_split('/[.!؟]+/u', $description)));
+            $prefixes = [
+                'يهدف هذا المقرر إلى',
+                'ويغطي هذا المقرر',
+                'ويركز هذا المقرر على',
+                'ويعتمد هذا المقرر',
+            ];
+
+            if ($wordCount < 80 || $wordCount > 100) {
+                return response()->json(['success' => false, 'message' => 'الوصف يجب أن يكون بين 80 و100 كلمة'], 422);
+            }
+            if (count($sentences) !== 4 || count(array_filter($prefixes, fn ($prefix, $i) => !str_starts_with(trim($sentences[$i] ?? ''), $prefix), ARRAY_FILTER_USE_BOTH)) > 0) {
+                return response()->json(['success' => false, 'message' => 'الوصف يجب أن يتكون من أربع جمل بالترتيب المحدد'], 422);
+            }
+
             $desc = CourseDescription::firstOrCreate(['course_id' => $courseId]);
-            $desc->description = $validated['description'];
+            $desc->description = $description;
             $desc->calculateWordCount();
             $desc->is_completed = (
                 !empty($desc->description) &&
@@ -100,6 +117,16 @@ class CourseDescriptionController extends Controller
                 'goals.min' => 'يجب إضافة 4 أهداف على الأقل',
                 'goals.max' => 'لا يمكن إضافة أكثر من 6 أهداف',
             ]);
+
+            foreach ($validated['goals'] as $index => $goal) {
+                $words = preg_split('/\s+/u', trim($goal), -1, PREG_SPLIT_NO_EMPTY);
+                if (count($words) < 4) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'الهدف رقم ' . ($index + 1) . ' يجب أن يتكون من أربع كلمات على الأقل',
+                    ], 422);
+                }
+            }
 
             Course::findOrFail($courseId);
 

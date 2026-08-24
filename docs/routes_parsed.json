@@ -1,0 +1,4219 @@
+{
+  "active_routes": [
+    {
+      "method": "GET",
+      "path": "/debug/password-algo",
+      "action": "function (",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "admin/security/policy",
+      "action": "[SettingsController::class, 'getPolicy']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "sync/bulk",
+      "action": "[SyncController::class, 'bulkSync']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "auth/login",
+      "action": "'login'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "auth/verify-otp",
+      "action": "'verifyOtp'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "auth/forgot-password",
+      "action": "'forgot'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "auth/reset-password",
+      "action": "'reset'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "auth/me",
+      "action": "[AuthController::class, 'me']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "auth/logout",
+      "action": "[AuthController::class, 'logout']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "auth/change-password",
+      "action": "[AuthController::class, 'changePassword']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "user-types",
+      "action": "'userTypes'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "permissions",
+      "action": "'permissions'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges",
+      "action": "'colleges'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "academic-years",
+      "action": "'academicYears'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/classrooms/availability",
+      "action": "[ClassroomsController::class, 'checkAvailability']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/dashboard",
+      "action": "[CollegesController::class, 'dashboard']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "dashboard/university-overview",
+      "action": "[DashboardController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports",
+      "action": "[ReportsController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/course-groups",
+      "action": "[ReportsController::class, 'getCourseGroups']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/group-students-attendance",
+      "action": "[ReportsController::class, 'getGroupStudentsAttendance']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/group-grades",
+      "action": "[ReportsController::class, 'getGroupGradesReport']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/qa-performance",
+      "action": "[ReportsController::class, 'getQAPerformanceReport']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/qa-details",
+      "action": "[ReportsController::class, 'getQACourseDetails']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/qa-detailed",
+      "action": "[ReportsController::class, 'getQADetailedReport']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/dashboard",
+      "action": "[ReportsController::class, 'dashboard']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/detailed",
+      "action": "[ReportsController::class, 'detailedReport']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "colleges/{college}/reports/builder",
+      "action": "[ReportsController::class, 'customBuilder']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/reports/lecturer/{lecturer}",
+      "action": "[ReportsController::class, 'lecturerDetails']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "user-types/{userTypeId}/permissions",
+      "action": "[UserTypePermissionController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "user-types/{userType}/permissions/bulk-assign",
+      "action": "[UserTypePermissionController::class, 'bulkAssign']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "lecturers/import-csv",
+      "action": "[LecturersController::class, 'importCsv']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "lecturers/financial-dues",
+      "action": "[LecturersController::class, 'getFinancialDues']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "my-courses",
+      "action": "'getMyCourses'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "gradebook",
+      "action": "'getGradebookData'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "assessments",
+      "action": "'addAssessmentColumn'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "assessments/{id}",
+      "action": "'deleteAssessmentColumn'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "grades/update",
+      "action": "'updateStudentGrade'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "upsert-and-attach",
+      "action": "'upsertAndAttach'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "students/bulk-move",
+      "action": "'bulkMoveStudents'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "{group}/move",
+      "action": "'moveGroupPath'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "import-csv",
+      "action": "'importCsv'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "import-external",
+      "action": "'importExternal'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "{group}/students",
+      "action": "'detachStudent'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "{student_group}/students",
+      "action": "'students'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "groups/{studentGroup}/students",
+      "action": "[StudentGroupsController::class, 'students']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "bulk",
+      "action": "'storeBulk'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "start",
+      "action": "'startSession'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/schedulable-lectures",
+      "action": "[LectureSessionsController::class, 'getSchedulableLectures']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "sessions/{id}/finish",
+      "action": "[LectureSessionsController::class, 'finishLecture']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "start-session",
+      "action": "'startSession'",
+      "type": "direct"
+    },
+    {
+      "method": "PATCH",
+      "path": "{qrCode}/refresh",
+      "action": "'refresh'",
+      "type": "direct"
+    },
+    {
+      "method": "PATCH",
+      "path": "{qrCode}/end",
+      "action": "'endSession'",
+      "type": "direct"
+    },
+    {
+      "method": "PATCH",
+      "path": "qr-codes/{qrCode}/extend",
+      "action": "[QrCodesController::class, 'extendDuration']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "scan",
+      "action": "'scan'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "manual",
+      "action": "'manualEntry'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "attendance/scan",
+      "action": "[StudentAttendanceController::class, 'scan']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "attendance/lecturers/check-in",
+      "action": "'checkIn'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "lecturer-attendance",
+      "action": "'store'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "attendance/finalize",
+      "action": "'finalizeSession'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "action": "'store'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{makeupLecture}/review",
+      "action": "'approve'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{makeupLecture}/approve",
+      "action": "'approve'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{makeupLecture}/schedule",
+      "action": "'schedule'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}/makeup-requests",
+      "action": "[MakeupLecturesController::class, 'indexByCollege']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "makeup-lectures/{id}/review",
+      "action": "[MakeupLecturesController::class, 'approve']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "action": "'store'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{excuse}/approve-by-head",
+      "action": "'approveByHead'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{excuse}/approve-by-lecturer",
+      "action": "'approveByLecturer'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{id}/status",
+      "action": "'updateStatus'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "notifications",
+      "action": "[NotificationsController::class, 'store']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "notifications",
+      "action": "[NotificationsController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "notifications/{id}",
+      "action": "[NotificationsController::class, 'update']",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "notifications/{id}",
+      "action": "[NotificationsController::class, 'destroy']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "action": "'index'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{device}/enable-auto-attendance",
+      "action": "'enableAutoAttendance'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{device}/disable-auto-attendance",
+      "action": "'disableAutoAttendance'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "{device}",
+      "action": "'destroy'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "sessions",
+      "action": "[SystemController::class, 'sessions']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "sessions/revoke",
+      "action": "[SystemController::class, 'revokeSession']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "audit-logs",
+      "action": "[SystemController::class, 'auditLogs']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "security/policy",
+      "action": "[SettingsController::class, 'getPolicy']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "security/policy",
+      "action": "[SettingsController::class, 'updatePolicy']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "action": "'index'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{device}/enable-auto-attendance",
+      "action": "'enableAutoAttendance'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{device}/disable-auto-attendance",
+      "action": "'disableAutoAttendance'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "{device}",
+      "action": "'destroy'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "{device}/toggle-attendance",
+      "action": "'toggleAutoAttendance'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "pending",
+      "action": "'getPendingEvaluations'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "submit",
+      "action": "'submitEvaluation'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "form/{campaign}",
+      "action": "'getEvaluationForm'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/{programId}",
+      "action": "[ProgramLearningOutcomeController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "action": "[ProgramLearningOutcomeController::class, 'store']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/{programId}/{ploId}",
+      "action": "[ProgramLearningOutcomeController::class, 'show']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "/{ploId}",
+      "action": "[ProgramLearningOutcomeController::class, 'update']",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{ploId}",
+      "action": "[ProgramLearningOutcomeController::class, 'destroy']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "description",
+      "action": "[CourseDescriptionController::class, 'show']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "description",
+      "action": "[CourseDescriptionController::class, 'updateDescription']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "goals",
+      "action": "[CourseDescriptionController::class, 'updateGoals']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "learning-outcomes/stats",
+      "action": "[CourseLearningOutcomeController::class, 'stats']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "learning-outcomes/domain/{domain}",
+      "action": "[CourseLearningOutcomeController::class, 'byDomain']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "topics/by-part/{part}",
+      "action": "[CourseTopicController::class, 'byPart']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "topics/stats",
+      "action": "[CourseTopicController::class, 'stats']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assignments/by-part/{part}",
+      "action": "[CourseAssignmentController::class, 'byPart']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assignments/total-grade",
+      "action": "[CourseAssignmentController::class, 'totalGrade']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assessments/by-type/{assessment_type}",
+      "action": "[CourseAssessmentController::class, 'byType']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assessments/stats",
+      "action": "[CourseAssessmentController::class, 'stats']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assessments/balance-check",
+      "action": "[CourseAssessmentController::class, 'balanceCheck']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "references/by-type/{type}",
+      "action": "[CourseReferenceController::class, 'byType']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "references/stats",
+      "action": "[CourseReferenceController::class, 'stats']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "policies/fixed-template",
+      "action": "[CoursePolicyController::class, 'fixedTemplate']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "policies/fixed-only",
+      "action": "[CoursePolicyController::class, 'fixedOnly']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "policies/additional-only",
+      "action": "[CoursePolicyController::class, 'additionalOnly']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "questions/by-type/{question_type}",
+      "action": "[TopicQuestionController::class, 'byType']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "questions/used-in-exams",
+      "action": "[TopicQuestionController::class, 'usedInExams']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "questions/stats",
+      "action": "[TopicQuestionController::class, 'stats']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "action": "[TopicQuestionController::class, 'courseBank']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "action": "[TopicQuestionController::class, 'storeCourseBank']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "/{question_id}",
+      "action": "[TopicQuestionController::class, 'updateCourseBank']",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{question_id}",
+      "action": "[TopicQuestionController::class, 'destroyCourseBank']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "teaching-strategies/by-category/{category}",
+      "action": "[TeachingStrategyController::class, 'byCategory']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "teaching-strategies/active-only",
+      "action": "[TeachingStrategyController::class, 'activeOnly']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assessment-methods/by-category/{category}",
+      "action": "[AssessmentMethodController::class, 'byCategory']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "assessment-methods/active-only",
+      "action": "[AssessmentMethodController::class, 'activeOnly']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "program-option-audits",
+      "action": "[ProgramOptionAuditController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "action": "[CourseOutcomeMappingController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "action": "[CourseOutcomeMappingController::class, 'store']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "/{clo_code}",
+      "action": "[CourseOutcomeMappingController::class, 'update']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "cycle",
+      "action": "[FinancialController::class, 'getCycleByMonth']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "generate",
+      "action": "[FinancialController::class, 'generateCycle']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "payouts/{payout}/adjustments",
+      "action": "[FinancialController::class, 'addAdjustment']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "cycles/{cycle}/status",
+      "action": "[FinancialController::class, 'updateStatus']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "forms",
+      "action": "'index'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "forms",
+      "action": "'store'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "forms/{form}",
+      "action": "'show'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "forms/{form}",
+      "action": "'update'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "forms/{form}",
+      "action": "'destroy'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "campaigns/create-meta",
+      "action": "'getCreationMeta'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "campaigns/year-details",
+      "action": "'getYearDetails'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "campaigns",
+      "action": "'index'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "campaigns",
+      "action": "'store'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "campaigns/{campaign}",
+      "action": "'update'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "campaigns/{campaign}",
+      "action": "'destroy'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "reports/campaign-summary",
+      "action": "'getCampaignSummary'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "reports/campaign-timetables",
+      "action": "'getCampaignTimetables'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "execution/list",
+      "action": "'index'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "execution/details/{timetable}",
+      "action": "'show'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "execution/filters-meta",
+      "action": "'getFiltersMeta'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "courses/{course}/qa-data",
+      "action": "[QualityAssuranceController::class, 'getCourseQaData']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "timetable/{timetable}/topics-status",
+      "action": "[TimetableController::class, 'getTopicsStatus']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "qa/outcomes",
+      "action": "[QualityAssuranceController::class, 'storeOutcome']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "qa/outcomes/{id}",
+      "action": "[QualityAssuranceController::class, 'updateOutcome']",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "qa/outcomes/{id}",
+      "action": "[QualityAssuranceController::class, 'destroyOutcome']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "qa/topics",
+      "action": "[QualityAssuranceController::class, 'storeTopic']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "qa/topics/{id}",
+      "action": "[QualityAssuranceController::class, 'updateTopic']",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "qa/topics/{id}",
+      "action": "[QualityAssuranceController::class, 'destroyTopic']",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "qa/questions",
+      "action": "[QualityAssuranceController::class, 'storeQuestion']",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "qa/questions/{id}",
+      "action": "[QualityAssuranceController::class, 'updateQuestion']",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "qa/questions/{id}",
+      "action": "[QualityAssuranceController::class, 'destroyQuestion']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "sessions/{sessionId}/attachments",
+      "action": "'index'",
+      "type": "direct"
+    },
+    {
+      "method": "POST",
+      "path": "attachments",
+      "action": "'store'",
+      "type": "direct"
+    },
+    {
+      "method": "PUT",
+      "path": "attachments/{id}",
+      "action": "'update'",
+      "type": "direct"
+    },
+    {
+      "method": "DELETE",
+      "path": "attachments/{id}",
+      "action": "'destroy'",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "reports/university-comprehensive",
+      "action": "[UniversityReportController::class, 'index']",
+      "type": "direct"
+    },
+    {
+      "method": "GET",
+      "path": "users",
+      "action": "UsersController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "users",
+      "action": "UsersController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "users/{user}",
+      "action": "UsersController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "users/{user}",
+      "action": "UsersController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "users/{user}",
+      "action": "UsersController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "colleges",
+      "action": "CollegesController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "colleges",
+      "action": "CollegesController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "colleges/{college}",
+      "action": "CollegesController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "colleges/{college}",
+      "action": "CollegesController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "colleges/{college}",
+      "action": "CollegesController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "departments",
+      "action": "DepartmentsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "departments",
+      "action": "DepartmentsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "departments/{department}",
+      "action": "DepartmentsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "departments/{department}",
+      "action": "DepartmentsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "departments/{department}",
+      "action": "DepartmentsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "programs",
+      "action": "ProgramsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "programs",
+      "action": "ProgramsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "programs/{program}",
+      "action": "ProgramsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "programs/{program}",
+      "action": "ProgramsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "programs/{program}",
+      "action": "ProgramsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "levels",
+      "action": "LevelsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "levels",
+      "action": "LevelsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "levels/{level}",
+      "action": "LevelsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "levels/{level}",
+      "action": "LevelsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "levels/{level}",
+      "action": "LevelsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "semesters",
+      "action": "SemestersController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "semesters",
+      "action": "SemestersController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "semesters/{semester}",
+      "action": "SemestersController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "semesters/{semester}",
+      "action": "SemestersController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "semesters/{semester}",
+      "action": "SemestersController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "courses",
+      "action": "CoursesController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "courses",
+      "action": "CoursesController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "courses/{course}",
+      "action": "CoursesController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "courses/{course}",
+      "action": "CoursesController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "courses/{course}",
+      "action": "CoursesController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "buildings",
+      "action": "BuildingsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "buildings",
+      "action": "BuildingsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "buildings/{building}",
+      "action": "BuildingsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "buildings/{building}",
+      "action": "BuildingsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "buildings/{building}",
+      "action": "BuildingsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "blocks",
+      "action": "BlockController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "blocks",
+      "action": "BlockController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "blocks/{block}",
+      "action": "BlockController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "blocks/{block}",
+      "action": "BlockController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "blocks/{block}",
+      "action": "BlockController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "classrooms",
+      "action": "ClassroomsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "classrooms",
+      "action": "ClassroomsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "classrooms/{classroom}",
+      "action": "ClassroomsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "classrooms/{classroom}",
+      "action": "ClassroomsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "classrooms/{classroom}",
+      "action": "ClassroomsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "periods",
+      "action": "PeriodsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "periods",
+      "action": "PeriodsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "periods/{period}",
+      "action": "PeriodsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "periods/{period}",
+      "action": "PeriodsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "periods/{period}",
+      "action": "PeriodsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "days",
+      "action": "DaysController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "days",
+      "action": "DaysController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "days/{day}",
+      "action": "DaysController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "days/{day}",
+      "action": "DaysController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "days/{day}",
+      "action": "DaysController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "academic-titles",
+      "action": "AcademicTitlesController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "academic-titles",
+      "action": "AcademicTitlesController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "academic-titles/{academic-title}",
+      "action": "AcademicTitlesController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "academic-titles/{academic-title}",
+      "action": "AcademicTitlesController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "academic-titles/{academic-title}",
+      "action": "AcademicTitlesController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "user-types",
+      "action": "UserTypeController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "user-types",
+      "action": "UserTypeController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "user-types/{user-type}",
+      "action": "UserTypeController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "user-types/{user-type}",
+      "action": "UserTypeController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "user-types/{user-type}",
+      "action": "UserTypeController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "lecturers",
+      "action": "LecturersController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "lecturers",
+      "action": "LecturersController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "lecturers/{lecturer}",
+      "action": "LecturersController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "lecturers/{lecturer}",
+      "action": "LecturersController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "lecturers/{lecturer}",
+      "action": "LecturersController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "students",
+      "action": "StudentsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "students",
+      "action": "StudentsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "students/{student}",
+      "action": "StudentsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "students/{student}",
+      "action": "StudentsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "students/{student}",
+      "action": "StudentsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "student-groups",
+      "action": "StudentGroupsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "student-groups",
+      "action": "StudentGroupsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "student-groups/{student-group}",
+      "action": "StudentGroupsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "student-groups/{student-group}",
+      "action": "StudentGroupsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "student-groups/{student-group}",
+      "action": "StudentGroupsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "timetable",
+      "action": "TimetableController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "timetable",
+      "action": "TimetableController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "timetable/{timetable}",
+      "action": "TimetableController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "timetable/{timetable}",
+      "action": "TimetableController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "timetable/{timetable}",
+      "action": "TimetableController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "lecture-sessions",
+      "action": "LectureSessionsController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "lecture-sessions",
+      "action": "LectureSessionsController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "lecture-sessions/{lecture-session}",
+      "action": "LectureSessionsController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "lecture-sessions/{lecture-session}",
+      "action": "LectureSessionsController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "lecture-sessions/{lecture-session}",
+      "action": "LectureSessionsController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "student-attendance",
+      "action": "StudentAttendanceController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "student-attendance",
+      "action": "StudentAttendanceController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "student-attendance/{student-attendance}",
+      "action": "StudentAttendanceController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "student-attendance/{student-attendance}",
+      "action": "StudentAttendanceController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "student-attendance/{student-attendance}",
+      "action": "StudentAttendanceController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "lecturer-attendance",
+      "action": "LecturerAttendanceController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "lecturer-attendance",
+      "action": "LecturerAttendanceController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "lecturer-attendance/{lecturer-attendance}",
+      "action": "LecturerAttendanceController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "lecturer-attendance/{lecturer-attendance}",
+      "action": "LecturerAttendanceController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "lecturer-attendance/{lecturer-attendance}",
+      "action": "LecturerAttendanceController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "ip-restrictions",
+      "action": "IpRestrictionController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "ip-restrictions",
+      "action": "IpRestrictionController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "ip-restrictions/{ip-restriction}",
+      "action": "IpRestrictionController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "ip-restrictions/{ip-restriction}",
+      "action": "IpRestrictionController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "ip-restrictions/{ip-restriction}",
+      "action": "IpRestrictionController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "learning-outcomes",
+      "action": "CourseLearningOutcomeController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "learning-outcomes",
+      "action": "CourseLearningOutcomeController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "learning-outcomes/{learning-outcome}",
+      "action": "CourseLearningOutcomeController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "learning-outcomes/{learning-outcome}",
+      "action": "CourseLearningOutcomeController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "learning-outcomes/{learning-outcome}",
+      "action": "CourseLearningOutcomeController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "topics",
+      "action": "CourseTopicController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "topics",
+      "action": "CourseTopicController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "topics/{topic}",
+      "action": "CourseTopicController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "topics/{topic}",
+      "action": "CourseTopicController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "topics/{topic}",
+      "action": "CourseTopicController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "assignments",
+      "action": "CourseAssignmentController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "assignments",
+      "action": "CourseAssignmentController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "assignments/{assignment}",
+      "action": "CourseAssignmentController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "assignments/{assignment}",
+      "action": "CourseAssignmentController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "assignments/{assignment}",
+      "action": "CourseAssignmentController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "assessments",
+      "action": "CourseAssessmentController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "assessments",
+      "action": "CourseAssessmentController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "assessments/{assessment}",
+      "action": "CourseAssessmentController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "assessments/{assessment}",
+      "action": "CourseAssessmentController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "assessments/{assessment}",
+      "action": "CourseAssessmentController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "references",
+      "action": "CourseReferenceController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "references",
+      "action": "CourseReferenceController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "references/{reference}",
+      "action": "CourseReferenceController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "references/{reference}",
+      "action": "CourseReferenceController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "references/{reference}",
+      "action": "CourseReferenceController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "policies",
+      "action": "CoursePolicyController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "policies",
+      "action": "CoursePolicyController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "policies/{policie}",
+      "action": "CoursePolicyController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "policies/{policie}",
+      "action": "CoursePolicyController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "policies/{policie}",
+      "action": "CoursePolicyController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "questions",
+      "action": "TopicQuestionController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "questions",
+      "action": "TopicQuestionController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "questions/{question}",
+      "action": "TopicQuestionController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "questions/{question}",
+      "action": "TopicQuestionController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "questions/{question}",
+      "action": "TopicQuestionController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "teaching-strategies",
+      "action": "TeachingStrategyController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "teaching-strategies",
+      "action": "TeachingStrategyController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "teaching-strategies/{teaching-strategie}",
+      "action": "TeachingStrategyController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "teaching-strategies/{teaching-strategie}",
+      "action": "TeachingStrategyController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "teaching-strategies/{teaching-strategie}",
+      "action": "TeachingStrategyController@destroy",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "assessment-methods",
+      "action": "AssessmentMethodController@index",
+      "type": "resource"
+    },
+    {
+      "method": "POST",
+      "path": "assessment-methods",
+      "action": "AssessmentMethodController@store",
+      "type": "resource"
+    },
+    {
+      "method": "GET",
+      "path": "assessment-methods/{assessment-method}",
+      "action": "AssessmentMethodController@show",
+      "type": "resource"
+    },
+    {
+      "method": "PUT/PATCH",
+      "path": "assessment-methods/{assessment-method}",
+      "action": "AssessmentMethodController@update",
+      "type": "resource"
+    },
+    {
+      "method": "DELETE",
+      "path": "assessment-methods/{assessment-method}",
+      "action": "AssessmentMethodController@destroy",
+      "type": "resource"
+    }
+  ],
+  "routes_by_controller": {
+    "unknown": [
+      {
+        "method": "GET",
+        "path": "/debug/password-algo",
+        "action": "function (",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "admin/security/policy",
+        "action": "[SettingsController::class, 'getPolicy']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "sync/bulk",
+        "action": "[SyncController::class, 'bulkSync']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "auth/login",
+        "action": "'login'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "auth/verify-otp",
+        "action": "'verifyOtp'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "auth/forgot-password",
+        "action": "'forgot'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "auth/reset-password",
+        "action": "'reset'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "auth/me",
+        "action": "[AuthController::class, 'me']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "auth/logout",
+        "action": "[AuthController::class, 'logout']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "auth/change-password",
+        "action": "[AuthController::class, 'changePassword']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "user-types",
+        "action": "'userTypes'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "permissions",
+        "action": "'permissions'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges",
+        "action": "'colleges'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "academic-years",
+        "action": "'academicYears'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/classrooms/availability",
+        "action": "[ClassroomsController::class, 'checkAvailability']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/dashboard",
+        "action": "[CollegesController::class, 'dashboard']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "dashboard/university-overview",
+        "action": "[DashboardController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports",
+        "action": "[ReportsController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/course-groups",
+        "action": "[ReportsController::class, 'getCourseGroups']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/group-students-attendance",
+        "action": "[ReportsController::class, 'getGroupStudentsAttendance']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/group-grades",
+        "action": "[ReportsController::class, 'getGroupGradesReport']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/qa-performance",
+        "action": "[ReportsController::class, 'getQAPerformanceReport']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/qa-details",
+        "action": "[ReportsController::class, 'getQACourseDetails']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/qa-detailed",
+        "action": "[ReportsController::class, 'getQADetailedReport']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/dashboard",
+        "action": "[ReportsController::class, 'dashboard']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/detailed",
+        "action": "[ReportsController::class, 'detailedReport']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "colleges/{college}/reports/builder",
+        "action": "[ReportsController::class, 'customBuilder']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/reports/lecturer/{lecturer}",
+        "action": "[ReportsController::class, 'lecturerDetails']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "user-types/{userTypeId}/permissions",
+        "action": "[UserTypePermissionController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "user-types/{userType}/permissions/bulk-assign",
+        "action": "[UserTypePermissionController::class, 'bulkAssign']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "lecturers/import-csv",
+        "action": "[LecturersController::class, 'importCsv']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "lecturers/financial-dues",
+        "action": "[LecturersController::class, 'getFinancialDues']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "my-courses",
+        "action": "'getMyCourses'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "gradebook",
+        "action": "'getGradebookData'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "assessments",
+        "action": "'addAssessmentColumn'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "assessments/{id}",
+        "action": "'deleteAssessmentColumn'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "grades/update",
+        "action": "'updateStudentGrade'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "upsert-and-attach",
+        "action": "'upsertAndAttach'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "students/bulk-move",
+        "action": "'bulkMoveStudents'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "{group}/move",
+        "action": "'moveGroupPath'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "import-csv",
+        "action": "'importCsv'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "import-external",
+        "action": "'importExternal'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "{group}/students",
+        "action": "'detachStudent'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "{student_group}/students",
+        "action": "'students'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "groups/{studentGroup}/students",
+        "action": "[StudentGroupsController::class, 'students']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "bulk",
+        "action": "'storeBulk'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "start",
+        "action": "'startSession'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/schedulable-lectures",
+        "action": "[LectureSessionsController::class, 'getSchedulableLectures']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "sessions/{id}/finish",
+        "action": "[LectureSessionsController::class, 'finishLecture']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "start-session",
+        "action": "'startSession'",
+        "type": "direct"
+      },
+      {
+        "method": "PATCH",
+        "path": "{qrCode}/refresh",
+        "action": "'refresh'",
+        "type": "direct"
+      },
+      {
+        "method": "PATCH",
+        "path": "{qrCode}/end",
+        "action": "'endSession'",
+        "type": "direct"
+      },
+      {
+        "method": "PATCH",
+        "path": "qr-codes/{qrCode}/extend",
+        "action": "[QrCodesController::class, 'extendDuration']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "scan",
+        "action": "'scan'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "manual",
+        "action": "'manualEntry'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "attendance/scan",
+        "action": "[StudentAttendanceController::class, 'scan']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "attendance/lecturers/check-in",
+        "action": "'checkIn'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "lecturer-attendance",
+        "action": "'store'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "attendance/finalize",
+        "action": "'finalizeSession'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "/",
+        "action": "'store'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{makeupLecture}/review",
+        "action": "'approve'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{makeupLecture}/approve",
+        "action": "'approve'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{makeupLecture}/schedule",
+        "action": "'schedule'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}/makeup-requests",
+        "action": "[MakeupLecturesController::class, 'indexByCollege']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "makeup-lectures/{id}/review",
+        "action": "[MakeupLecturesController::class, 'approve']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "/",
+        "action": "'store'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{excuse}/approve-by-head",
+        "action": "'approveByHead'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{excuse}/approve-by-lecturer",
+        "action": "'approveByLecturer'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{id}/status",
+        "action": "'updateStatus'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "notifications",
+        "action": "[NotificationsController::class, 'store']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "notifications",
+        "action": "[NotificationsController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "notifications/{id}",
+        "action": "[NotificationsController::class, 'update']",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "notifications/{id}",
+        "action": "[NotificationsController::class, 'destroy']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "action": "'index'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{device}/enable-auto-attendance",
+        "action": "'enableAutoAttendance'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{device}/disable-auto-attendance",
+        "action": "'disableAutoAttendance'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "{device}",
+        "action": "'destroy'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "sessions",
+        "action": "[SystemController::class, 'sessions']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "sessions/revoke",
+        "action": "[SystemController::class, 'revokeSession']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "audit-logs",
+        "action": "[SystemController::class, 'auditLogs']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "security/policy",
+        "action": "[SettingsController::class, 'getPolicy']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "security/policy",
+        "action": "[SettingsController::class, 'updatePolicy']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "action": "'index'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{device}/enable-auto-attendance",
+        "action": "'enableAutoAttendance'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{device}/disable-auto-attendance",
+        "action": "'disableAutoAttendance'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "{device}",
+        "action": "'destroy'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "{device}/toggle-attendance",
+        "action": "'toggleAutoAttendance'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "pending",
+        "action": "'getPendingEvaluations'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "submit",
+        "action": "'submitEvaluation'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "form/{campaign}",
+        "action": "'getEvaluationForm'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/{programId}",
+        "action": "[ProgramLearningOutcomeController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "/",
+        "action": "[ProgramLearningOutcomeController::class, 'store']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/{programId}/{ploId}",
+        "action": "[ProgramLearningOutcomeController::class, 'show']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "/{ploId}",
+        "action": "[ProgramLearningOutcomeController::class, 'update']",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "/{ploId}",
+        "action": "[ProgramLearningOutcomeController::class, 'destroy']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "description",
+        "action": "[CourseDescriptionController::class, 'show']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "description",
+        "action": "[CourseDescriptionController::class, 'updateDescription']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "goals",
+        "action": "[CourseDescriptionController::class, 'updateGoals']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "learning-outcomes/stats",
+        "action": "[CourseLearningOutcomeController::class, 'stats']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "learning-outcomes/domain/{domain}",
+        "action": "[CourseLearningOutcomeController::class, 'byDomain']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "topics/by-part/{part}",
+        "action": "[CourseTopicController::class, 'byPart']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "topics/stats",
+        "action": "[CourseTopicController::class, 'stats']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assignments/by-part/{part}",
+        "action": "[CourseAssignmentController::class, 'byPart']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assignments/total-grade",
+        "action": "[CourseAssignmentController::class, 'totalGrade']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assessments/by-type/{assessment_type}",
+        "action": "[CourseAssessmentController::class, 'byType']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assessments/stats",
+        "action": "[CourseAssessmentController::class, 'stats']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assessments/balance-check",
+        "action": "[CourseAssessmentController::class, 'balanceCheck']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "references/by-type/{type}",
+        "action": "[CourseReferenceController::class, 'byType']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "references/stats",
+        "action": "[CourseReferenceController::class, 'stats']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "policies/fixed-template",
+        "action": "[CoursePolicyController::class, 'fixedTemplate']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "policies/fixed-only",
+        "action": "[CoursePolicyController::class, 'fixedOnly']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "policies/additional-only",
+        "action": "[CoursePolicyController::class, 'additionalOnly']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "questions/by-type/{question_type}",
+        "action": "[TopicQuestionController::class, 'byType']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "questions/used-in-exams",
+        "action": "[TopicQuestionController::class, 'usedInExams']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "questions/stats",
+        "action": "[TopicQuestionController::class, 'stats']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "action": "[TopicQuestionController::class, 'courseBank']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "/",
+        "action": "[TopicQuestionController::class, 'storeCourseBank']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "/{question_id}",
+        "action": "[TopicQuestionController::class, 'updateCourseBank']",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "/{question_id}",
+        "action": "[TopicQuestionController::class, 'destroyCourseBank']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "teaching-strategies/by-category/{category}",
+        "action": "[TeachingStrategyController::class, 'byCategory']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "teaching-strategies/active-only",
+        "action": "[TeachingStrategyController::class, 'activeOnly']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assessment-methods/by-category/{category}",
+        "action": "[AssessmentMethodController::class, 'byCategory']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "assessment-methods/active-only",
+        "action": "[AssessmentMethodController::class, 'activeOnly']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "program-option-audits",
+        "action": "[ProgramOptionAuditController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "action": "[CourseOutcomeMappingController::class, 'index']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "/",
+        "action": "[CourseOutcomeMappingController::class, 'store']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "/{clo_code}",
+        "action": "[CourseOutcomeMappingController::class, 'update']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "cycle",
+        "action": "[FinancialController::class, 'getCycleByMonth']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "generate",
+        "action": "[FinancialController::class, 'generateCycle']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "payouts/{payout}/adjustments",
+        "action": "[FinancialController::class, 'addAdjustment']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "cycles/{cycle}/status",
+        "action": "[FinancialController::class, 'updateStatus']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "forms",
+        "action": "'index'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "forms",
+        "action": "'store'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "forms/{form}",
+        "action": "'show'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "forms/{form}",
+        "action": "'update'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "forms/{form}",
+        "action": "'destroy'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "campaigns/create-meta",
+        "action": "'getCreationMeta'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "campaigns/year-details",
+        "action": "'getYearDetails'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "campaigns",
+        "action": "'index'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "campaigns",
+        "action": "'store'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "campaigns/{campaign}",
+        "action": "'update'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "campaigns/{campaign}",
+        "action": "'destroy'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "reports/campaign-summary",
+        "action": "'getCampaignSummary'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "reports/campaign-timetables",
+        "action": "'getCampaignTimetables'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "execution/list",
+        "action": "'index'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "execution/details/{timetable}",
+        "action": "'show'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "execution/filters-meta",
+        "action": "'getFiltersMeta'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "courses/{course}/qa-data",
+        "action": "[QualityAssuranceController::class, 'getCourseQaData']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "timetable/{timetable}/topics-status",
+        "action": "[TimetableController::class, 'getTopicsStatus']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "qa/outcomes",
+        "action": "[QualityAssuranceController::class, 'storeOutcome']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "qa/outcomes/{id}",
+        "action": "[QualityAssuranceController::class, 'updateOutcome']",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "qa/outcomes/{id}",
+        "action": "[QualityAssuranceController::class, 'destroyOutcome']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "qa/topics",
+        "action": "[QualityAssuranceController::class, 'storeTopic']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "qa/topics/{id}",
+        "action": "[QualityAssuranceController::class, 'updateTopic']",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "qa/topics/{id}",
+        "action": "[QualityAssuranceController::class, 'destroyTopic']",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "qa/questions",
+        "action": "[QualityAssuranceController::class, 'storeQuestion']",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "qa/questions/{id}",
+        "action": "[QualityAssuranceController::class, 'updateQuestion']",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "qa/questions/{id}",
+        "action": "[QualityAssuranceController::class, 'destroyQuestion']",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "sessions/{sessionId}/attachments",
+        "action": "'index'",
+        "type": "direct"
+      },
+      {
+        "method": "POST",
+        "path": "attachments",
+        "action": "'store'",
+        "type": "direct"
+      },
+      {
+        "method": "PUT",
+        "path": "attachments/{id}",
+        "action": "'update'",
+        "type": "direct"
+      },
+      {
+        "method": "DELETE",
+        "path": "attachments/{id}",
+        "action": "'destroy'",
+        "type": "direct"
+      },
+      {
+        "method": "GET",
+        "path": "reports/university-comprehensive",
+        "action": "[UniversityReportController::class, 'index']",
+        "type": "direct"
+      }
+    ],
+    "UsersController": [
+      {
+        "method": "GET",
+        "path": "users",
+        "action_method": "index",
+        "full_action": "UsersController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "users",
+        "action_method": "store",
+        "full_action": "UsersController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "users/{user}",
+        "action_method": "show",
+        "full_action": "UsersController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "users/{user}",
+        "action_method": "update",
+        "full_action": "UsersController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "users/{user}",
+        "action_method": "destroy",
+        "full_action": "UsersController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CollegesController": [
+      {
+        "method": "GET",
+        "path": "colleges",
+        "action_method": "index",
+        "full_action": "CollegesController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "colleges",
+        "action_method": "store",
+        "full_action": "CollegesController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "colleges/{college}",
+        "action_method": "show",
+        "full_action": "CollegesController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "colleges/{college}",
+        "action_method": "update",
+        "full_action": "CollegesController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "colleges/{college}",
+        "action_method": "destroy",
+        "full_action": "CollegesController@destroy",
+        "type": "resource"
+      }
+    ],
+    "DepartmentsController": [
+      {
+        "method": "GET",
+        "path": "departments",
+        "action_method": "index",
+        "full_action": "DepartmentsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "departments",
+        "action_method": "store",
+        "full_action": "DepartmentsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "departments/{department}",
+        "action_method": "show",
+        "full_action": "DepartmentsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "departments/{department}",
+        "action_method": "update",
+        "full_action": "DepartmentsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "departments/{department}",
+        "action_method": "destroy",
+        "full_action": "DepartmentsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "ProgramsController": [
+      {
+        "method": "GET",
+        "path": "programs",
+        "action_method": "index",
+        "full_action": "ProgramsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "programs",
+        "action_method": "store",
+        "full_action": "ProgramsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "programs/{program}",
+        "action_method": "show",
+        "full_action": "ProgramsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "programs/{program}",
+        "action_method": "update",
+        "full_action": "ProgramsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "programs/{program}",
+        "action_method": "destroy",
+        "full_action": "ProgramsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "LevelsController": [
+      {
+        "method": "GET",
+        "path": "levels",
+        "action_method": "index",
+        "full_action": "LevelsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "levels",
+        "action_method": "store",
+        "full_action": "LevelsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "levels/{level}",
+        "action_method": "show",
+        "full_action": "LevelsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "levels/{level}",
+        "action_method": "update",
+        "full_action": "LevelsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "levels/{level}",
+        "action_method": "destroy",
+        "full_action": "LevelsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "SemestersController": [
+      {
+        "method": "GET",
+        "path": "semesters",
+        "action_method": "index",
+        "full_action": "SemestersController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "semesters",
+        "action_method": "store",
+        "full_action": "SemestersController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "semesters/{semester}",
+        "action_method": "show",
+        "full_action": "SemestersController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "semesters/{semester}",
+        "action_method": "update",
+        "full_action": "SemestersController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "semesters/{semester}",
+        "action_method": "destroy",
+        "full_action": "SemestersController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CoursesController": [
+      {
+        "method": "GET",
+        "path": "courses",
+        "action_method": "index",
+        "full_action": "CoursesController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "courses",
+        "action_method": "store",
+        "full_action": "CoursesController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "courses/{course}",
+        "action_method": "show",
+        "full_action": "CoursesController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "courses/{course}",
+        "action_method": "update",
+        "full_action": "CoursesController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "courses/{course}",
+        "action_method": "destroy",
+        "full_action": "CoursesController@destroy",
+        "type": "resource"
+      }
+    ],
+    "BuildingsController": [
+      {
+        "method": "GET",
+        "path": "buildings",
+        "action_method": "index",
+        "full_action": "BuildingsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "buildings",
+        "action_method": "store",
+        "full_action": "BuildingsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "buildings/{building}",
+        "action_method": "show",
+        "full_action": "BuildingsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "buildings/{building}",
+        "action_method": "update",
+        "full_action": "BuildingsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "buildings/{building}",
+        "action_method": "destroy",
+        "full_action": "BuildingsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "BlockController": [
+      {
+        "method": "GET",
+        "path": "blocks",
+        "action_method": "index",
+        "full_action": "BlockController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "blocks",
+        "action_method": "store",
+        "full_action": "BlockController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "blocks/{block}",
+        "action_method": "show",
+        "full_action": "BlockController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "blocks/{block}",
+        "action_method": "update",
+        "full_action": "BlockController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "blocks/{block}",
+        "action_method": "destroy",
+        "full_action": "BlockController@destroy",
+        "type": "resource"
+      }
+    ],
+    "ClassroomsController": [
+      {
+        "method": "GET",
+        "path": "classrooms",
+        "action_method": "index",
+        "full_action": "ClassroomsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "classrooms",
+        "action_method": "store",
+        "full_action": "ClassroomsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "classrooms/{classroom}",
+        "action_method": "show",
+        "full_action": "ClassroomsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "classrooms/{classroom}",
+        "action_method": "update",
+        "full_action": "ClassroomsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "classrooms/{classroom}",
+        "action_method": "destroy",
+        "full_action": "ClassroomsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "PeriodsController": [
+      {
+        "method": "GET",
+        "path": "periods",
+        "action_method": "index",
+        "full_action": "PeriodsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "periods",
+        "action_method": "store",
+        "full_action": "PeriodsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "periods/{period}",
+        "action_method": "show",
+        "full_action": "PeriodsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "periods/{period}",
+        "action_method": "update",
+        "full_action": "PeriodsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "periods/{period}",
+        "action_method": "destroy",
+        "full_action": "PeriodsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "DaysController": [
+      {
+        "method": "GET",
+        "path": "days",
+        "action_method": "index",
+        "full_action": "DaysController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "days",
+        "action_method": "store",
+        "full_action": "DaysController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "days/{day}",
+        "action_method": "show",
+        "full_action": "DaysController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "days/{day}",
+        "action_method": "update",
+        "full_action": "DaysController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "days/{day}",
+        "action_method": "destroy",
+        "full_action": "DaysController@destroy",
+        "type": "resource"
+      }
+    ],
+    "AcademicTitlesController": [
+      {
+        "method": "GET",
+        "path": "academic-titles",
+        "action_method": "index",
+        "full_action": "AcademicTitlesController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "academic-titles",
+        "action_method": "store",
+        "full_action": "AcademicTitlesController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "academic-titles/{academic-title}",
+        "action_method": "show",
+        "full_action": "AcademicTitlesController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "academic-titles/{academic-title}",
+        "action_method": "update",
+        "full_action": "AcademicTitlesController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "academic-titles/{academic-title}",
+        "action_method": "destroy",
+        "full_action": "AcademicTitlesController@destroy",
+        "type": "resource"
+      }
+    ],
+    "UserTypeController": [
+      {
+        "method": "GET",
+        "path": "user-types",
+        "action_method": "index",
+        "full_action": "UserTypeController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "user-types",
+        "action_method": "store",
+        "full_action": "UserTypeController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "user-types/{user-type}",
+        "action_method": "show",
+        "full_action": "UserTypeController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "user-types/{user-type}",
+        "action_method": "update",
+        "full_action": "UserTypeController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "user-types/{user-type}",
+        "action_method": "destroy",
+        "full_action": "UserTypeController@destroy",
+        "type": "resource"
+      }
+    ],
+    "LecturersController": [
+      {
+        "method": "GET",
+        "path": "lecturers",
+        "action_method": "index",
+        "full_action": "LecturersController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "lecturers",
+        "action_method": "store",
+        "full_action": "LecturersController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "lecturers/{lecturer}",
+        "action_method": "show",
+        "full_action": "LecturersController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "lecturers/{lecturer}",
+        "action_method": "update",
+        "full_action": "LecturersController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "lecturers/{lecturer}",
+        "action_method": "destroy",
+        "full_action": "LecturersController@destroy",
+        "type": "resource"
+      }
+    ],
+    "StudentsController": [
+      {
+        "method": "GET",
+        "path": "students",
+        "action_method": "index",
+        "full_action": "StudentsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "students",
+        "action_method": "store",
+        "full_action": "StudentsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "students/{student}",
+        "action_method": "show",
+        "full_action": "StudentsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "students/{student}",
+        "action_method": "update",
+        "full_action": "StudentsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "students/{student}",
+        "action_method": "destroy",
+        "full_action": "StudentsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "StudentGroupsController": [
+      {
+        "method": "GET",
+        "path": "student-groups",
+        "action_method": "index",
+        "full_action": "StudentGroupsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "student-groups",
+        "action_method": "store",
+        "full_action": "StudentGroupsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "student-groups/{student-group}",
+        "action_method": "show",
+        "full_action": "StudentGroupsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "student-groups/{student-group}",
+        "action_method": "update",
+        "full_action": "StudentGroupsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "student-groups/{student-group}",
+        "action_method": "destroy",
+        "full_action": "StudentGroupsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "TimetableController": [
+      {
+        "method": "GET",
+        "path": "timetable",
+        "action_method": "index",
+        "full_action": "TimetableController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "timetable",
+        "action_method": "store",
+        "full_action": "TimetableController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "timetable/{timetable}",
+        "action_method": "show",
+        "full_action": "TimetableController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "timetable/{timetable}",
+        "action_method": "update",
+        "full_action": "TimetableController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "timetable/{timetable}",
+        "action_method": "destroy",
+        "full_action": "TimetableController@destroy",
+        "type": "resource"
+      }
+    ],
+    "LectureSessionsController": [
+      {
+        "method": "GET",
+        "path": "lecture-sessions",
+        "action_method": "index",
+        "full_action": "LectureSessionsController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "lecture-sessions",
+        "action_method": "store",
+        "full_action": "LectureSessionsController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "lecture-sessions/{lecture-session}",
+        "action_method": "show",
+        "full_action": "LectureSessionsController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "lecture-sessions/{lecture-session}",
+        "action_method": "update",
+        "full_action": "LectureSessionsController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "lecture-sessions/{lecture-session}",
+        "action_method": "destroy",
+        "full_action": "LectureSessionsController@destroy",
+        "type": "resource"
+      }
+    ],
+    "StudentAttendanceController": [
+      {
+        "method": "GET",
+        "path": "student-attendance",
+        "action_method": "index",
+        "full_action": "StudentAttendanceController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "student-attendance",
+        "action_method": "store",
+        "full_action": "StudentAttendanceController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "student-attendance/{student-attendance}",
+        "action_method": "show",
+        "full_action": "StudentAttendanceController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "student-attendance/{student-attendance}",
+        "action_method": "update",
+        "full_action": "StudentAttendanceController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "student-attendance/{student-attendance}",
+        "action_method": "destroy",
+        "full_action": "StudentAttendanceController@destroy",
+        "type": "resource"
+      }
+    ],
+    "LecturerAttendanceController": [
+      {
+        "method": "GET",
+        "path": "lecturer-attendance",
+        "action_method": "index",
+        "full_action": "LecturerAttendanceController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "lecturer-attendance",
+        "action_method": "store",
+        "full_action": "LecturerAttendanceController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "lecturer-attendance/{lecturer-attendance}",
+        "action_method": "show",
+        "full_action": "LecturerAttendanceController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "lecturer-attendance/{lecturer-attendance}",
+        "action_method": "update",
+        "full_action": "LecturerAttendanceController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "lecturer-attendance/{lecturer-attendance}",
+        "action_method": "destroy",
+        "full_action": "LecturerAttendanceController@destroy",
+        "type": "resource"
+      }
+    ],
+    "IpRestrictionController": [
+      {
+        "method": "GET",
+        "path": "ip-restrictions",
+        "action_method": "index",
+        "full_action": "IpRestrictionController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "ip-restrictions",
+        "action_method": "store",
+        "full_action": "IpRestrictionController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "ip-restrictions/{ip-restriction}",
+        "action_method": "show",
+        "full_action": "IpRestrictionController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "ip-restrictions/{ip-restriction}",
+        "action_method": "update",
+        "full_action": "IpRestrictionController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "ip-restrictions/{ip-restriction}",
+        "action_method": "destroy",
+        "full_action": "IpRestrictionController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CourseLearningOutcomeController": [
+      {
+        "method": "GET",
+        "path": "learning-outcomes",
+        "action_method": "index",
+        "full_action": "CourseLearningOutcomeController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "learning-outcomes",
+        "action_method": "store",
+        "full_action": "CourseLearningOutcomeController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "learning-outcomes/{learning-outcome}",
+        "action_method": "show",
+        "full_action": "CourseLearningOutcomeController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "learning-outcomes/{learning-outcome}",
+        "action_method": "update",
+        "full_action": "CourseLearningOutcomeController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "learning-outcomes/{learning-outcome}",
+        "action_method": "destroy",
+        "full_action": "CourseLearningOutcomeController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CourseTopicController": [
+      {
+        "method": "GET",
+        "path": "topics",
+        "action_method": "index",
+        "full_action": "CourseTopicController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "topics",
+        "action_method": "store",
+        "full_action": "CourseTopicController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "topics/{topic}",
+        "action_method": "show",
+        "full_action": "CourseTopicController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "topics/{topic}",
+        "action_method": "update",
+        "full_action": "CourseTopicController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "topics/{topic}",
+        "action_method": "destroy",
+        "full_action": "CourseTopicController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CourseAssignmentController": [
+      {
+        "method": "GET",
+        "path": "assignments",
+        "action_method": "index",
+        "full_action": "CourseAssignmentController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "assignments",
+        "action_method": "store",
+        "full_action": "CourseAssignmentController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "assignments/{assignment}",
+        "action_method": "show",
+        "full_action": "CourseAssignmentController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "assignments/{assignment}",
+        "action_method": "update",
+        "full_action": "CourseAssignmentController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "assignments/{assignment}",
+        "action_method": "destroy",
+        "full_action": "CourseAssignmentController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CourseAssessmentController": [
+      {
+        "method": "GET",
+        "path": "assessments",
+        "action_method": "index",
+        "full_action": "CourseAssessmentController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "assessments",
+        "action_method": "store",
+        "full_action": "CourseAssessmentController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "assessments/{assessment}",
+        "action_method": "show",
+        "full_action": "CourseAssessmentController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "assessments/{assessment}",
+        "action_method": "update",
+        "full_action": "CourseAssessmentController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "assessments/{assessment}",
+        "action_method": "destroy",
+        "full_action": "CourseAssessmentController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CourseReferenceController": [
+      {
+        "method": "GET",
+        "path": "references",
+        "action_method": "index",
+        "full_action": "CourseReferenceController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "references",
+        "action_method": "store",
+        "full_action": "CourseReferenceController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "references/{reference}",
+        "action_method": "show",
+        "full_action": "CourseReferenceController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "references/{reference}",
+        "action_method": "update",
+        "full_action": "CourseReferenceController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "references/{reference}",
+        "action_method": "destroy",
+        "full_action": "CourseReferenceController@destroy",
+        "type": "resource"
+      }
+    ],
+    "CoursePolicyController": [
+      {
+        "method": "GET",
+        "path": "policies",
+        "action_method": "index",
+        "full_action": "CoursePolicyController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "policies",
+        "action_method": "store",
+        "full_action": "CoursePolicyController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "policies/{policie}",
+        "action_method": "show",
+        "full_action": "CoursePolicyController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "policies/{policie}",
+        "action_method": "update",
+        "full_action": "CoursePolicyController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "policies/{policie}",
+        "action_method": "destroy",
+        "full_action": "CoursePolicyController@destroy",
+        "type": "resource"
+      }
+    ],
+    "TopicQuestionController": [
+      {
+        "method": "GET",
+        "path": "questions",
+        "action_method": "index",
+        "full_action": "TopicQuestionController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "questions",
+        "action_method": "store",
+        "full_action": "TopicQuestionController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "questions/{question}",
+        "action_method": "show",
+        "full_action": "TopicQuestionController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "questions/{question}",
+        "action_method": "update",
+        "full_action": "TopicQuestionController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "questions/{question}",
+        "action_method": "destroy",
+        "full_action": "TopicQuestionController@destroy",
+        "type": "resource"
+      }
+    ],
+    "TeachingStrategyController": [
+      {
+        "method": "GET",
+        "path": "teaching-strategies",
+        "action_method": "index",
+        "full_action": "TeachingStrategyController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "teaching-strategies",
+        "action_method": "store",
+        "full_action": "TeachingStrategyController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "teaching-strategies/{teaching-strategie}",
+        "action_method": "show",
+        "full_action": "TeachingStrategyController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "teaching-strategies/{teaching-strategie}",
+        "action_method": "update",
+        "full_action": "TeachingStrategyController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "teaching-strategies/{teaching-strategie}",
+        "action_method": "destroy",
+        "full_action": "TeachingStrategyController@destroy",
+        "type": "resource"
+      }
+    ],
+    "AssessmentMethodController": [
+      {
+        "method": "GET",
+        "path": "assessment-methods",
+        "action_method": "index",
+        "full_action": "AssessmentMethodController@index",
+        "type": "resource"
+      },
+      {
+        "method": "POST",
+        "path": "assessment-methods",
+        "action_method": "store",
+        "full_action": "AssessmentMethodController@store",
+        "type": "resource"
+      },
+      {
+        "method": "GET",
+        "path": "assessment-methods/{assessment-method}",
+        "action_method": "show",
+        "full_action": "AssessmentMethodController@show",
+        "type": "resource"
+      },
+      {
+        "method": "PUT/PATCH",
+        "path": "assessment-methods/{assessment-method}",
+        "action_method": "update",
+        "full_action": "AssessmentMethodController@update",
+        "type": "resource"
+      },
+      {
+        "method": "DELETE",
+        "path": "assessment-methods/{assessment-method}",
+        "action_method": "destroy",
+        "full_action": "AssessmentMethodController@destroy",
+        "type": "resource"
+      }
+    ]
+  },
+  "commented_routes": [
+    {
+      "line": 227,
+      "content": "// Route::get('lecturer/schedule', [ScheduleController::class, 'getSchedule']);"
+    },
+    {
+      "line": 665,
+      "content": "// Route::middleware(['auth:api', 'throttle:100,1'])->group(function () {"
+    },
+    {
+      "line": 670,
+      "content": "//     Route::prefix('programs/{program_id}')->group(function () {"
+    },
+    {
+      "line": 671,
+      "content": "//         Route::get('learning-outcomes', [ProgramLearningOutcomeController::class, 'index'])"
+    },
+    {
+      "line": 674,
+      "content": "//         Route::get('learning-outcomes/{plo_id}', [ProgramLearningOutcomeController::class, 'show'])"
+    },
+    {
+      "line": 678,
+      "content": "//         Route::get('learning-outcomes/stats', [ProgramLearningOutcomeController::class, 'stats'])"
+    },
+    {
+      "line": 681,
+      "content": "//         Route::get('learning-outcomes/domain/{domain}', [ProgramLearningOutcomeController::class, 'byDomain'])"
+    },
+    {
+      "line": 689,
+      "content": "//     Route::prefix('courses/{course_id}')->group(function () {"
+    },
+    {
+      "line": 691,
+      "content": "//         Route::get('description', [CourseDescriptionController::class, 'show'])"
+    },
+    {
+      "line": 695,
+      "content": "//         Route::get('learning-outcomes', [CourseLearningOutcomeController::class, 'index'])"
+    },
+    {
+      "line": 698,
+      "content": "//         Route::get('learning-outcomes/{clo_id}', [CourseLearningOutcomeController::class, 'show'])"
+    },
+    {
+      "line": 702,
+      "content": "//         Route::get('learning-outcomes/domain/{domain}', [CourseLearningOutcomeController::class, 'byDomain'])"
+    },
+    {
+      "line": 707,
+      "content": "//         Route::get('topics', [CourseTopicController::class, 'index'])"
+    },
+    {
+      "line": 710,
+      "content": "//         Route::get('topics/{topic_id}', [CourseTopicController::class, 'show'])"
+    },
+    {
+      "line": 714,
+      "content": "//         Route::get('topics/by-part/{part}', [CourseTopicController::class, 'byPart'])"
+    },
+    {
+      "line": 719,
+      "content": "//         Route::get('assignments', [CourseAssignmentController::class, 'index'])"
+    },
+    {
+      "line": 722,
+      "content": "//         Route::get('assignments/{assignment_id}', [CourseAssignmentController::class, 'show'])"
+    },
+    {
+      "line": 726,
+      "content": "//         Route::get('assignments/by-part/{part}', [CourseAssignmentController::class, 'byPart'])"
+    },
+    {
+      "line": 731,
+      "content": "//         Route::get('assessments', [CourseAssessmentController::class, 'index'])"
+    },
+    {
+      "line": 734,
+      "content": "//         Route::get('assessments/{assessment_id}', [CourseAssessmentController::class, 'show'])"
+    },
+    {
+      "line": 738,
+      "content": "//         Route::get('assessments/by-type/{assessment_type}', [CourseAssessmentController::class, 'byType'])"
+    },
+    {
+      "line": 741,
+      "content": "//         Route::get('assessments/balance-check', [CourseAssessmentController::class, 'balanceCheck'])"
+    },
+    {
+      "line": 745,
+      "content": "//         Route::get('references', [CourseReferenceController::class, 'index'])"
+    },
+    {
+      "line": 748,
+      "content": "//         Route::get('references/{reference_id}', [CourseReferenceController::class, 'show'])"
+    },
+    {
+      "line": 752,
+      "content": "//         Route::get('references/by-type/{type}', [CourseReferenceController::class, 'byType'])"
+    },
+    {
+      "line": 757,
+      "content": "//         Route::get('policies', [CoursePolicyController::class, 'index'])"
+    },
+    {
+      "line": 760,
+      "content": "//         Route::get('policies/{policy_id}', [CoursePolicyController::class, 'show'])"
+    },
+    {
+      "line": 764,
+      "content": "//         Route::get('policies/fixed-template', [CoursePolicyController::class, 'fixedTemplate'])"
+    },
+    {
+      "line": 767,
+      "content": "//         Route::get('policies/fixed-only', [CoursePolicyController::class, 'fixedOnly'])"
+    },
+    {
+      "line": 770,
+      "content": "//         Route::get('policies/additional-only', [CoursePolicyController::class, 'additionalOnly'])"
+    },
+    {
+      "line": 777,
+      "content": "//     Route::prefix('topics/{topic_id}')->group(function () {"
+    },
+    {
+      "line": 778,
+      "content": "//         Route::get('questions', [TopicQuestionController::class, 'index'])"
+    },
+    {
+      "line": 781,
+      "content": "//         Route::get('questions/{question_id}', [TopicQuestionController::class, 'show'])"
+    },
+    {
+      "line": 785,
+      "content": "//         Route::get('questions/by-type/{question_type}', [TopicQuestionController::class, 'byType'])"
+    },
+    {
+      "line": 789,
+      "content": "//         Route::get('questions/used-in-exams', [TopicQuestionController::class, 'usedInExams'])"
+    },
+    {
+      "line": 796,
+      "content": "//     Route::get('teaching-strategies', [TeachingStrategyController::class, 'index'])"
+    },
+    {
+      "line": 799,
+      "content": "//     Route::get('teaching-strategies/{id}', [TeachingStrategyController::class, 'show'])"
+    },
+    {
+      "line": 803,
+      "content": "//     Route::get('teaching-strategies/by-category/{category}', [TeachingStrategyController::class, 'byCategory'])"
+    },
+    {
+      "line": 806,
+      "content": "//     Route::get('teaching-strategies/active-only', [TeachingStrategyController::class, 'activeOnly'])"
+    },
+    {
+      "line": 812,
+      "content": "//     Route::get('assessment-methods', [AssessmentMethodController::class, 'index'])"
+    },
+    {
+      "line": 815,
+      "content": "//     Route::get('assessment-methods/{id}', [AssessmentMethodController::class, 'show'])"
+    },
+    {
+      "line": 819,
+      "content": "//     Route::get('assessment-methods/by-category/{category}', [AssessmentMethodController::class, 'byCategory'])"
+    },
+    {
+      "line": 822,
+      "content": "//     Route::get('assessment-methods/active-only', [AssessmentMethodController::class, 'activeOnly'])"
+    },
+    {
+      "line": 849,
+      "content": "// داخل Route::prefix('v1')->middleware(...)->group(function () { ..."
+    }
+  ]
+}

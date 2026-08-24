@@ -67,6 +67,8 @@ use App\Http\Controllers\Api\V1\{
     AssessmentMethodController,
     CourseReferenceController,
     CoursePolicyController
+    ,CourseOutcomeMappingController
+    ,ProgramOptionAuditController
 };
 
 
@@ -249,6 +251,10 @@ Route::prefix('v1')->group(function ()
         Route::controller(StudentGroupsController::class)->prefix('student-groups')->group(function () {
 
             Route::post('upsert-and-attach', 'upsertAndAttach');
+
+            Route::post('students/bulk-move', 'bulkMoveStudents');
+
+            Route::post('{group}/move', 'moveGroupPath');
 
             Route::post('import-csv', 'importCsv');
 
@@ -605,6 +611,13 @@ Route::prefix('v1')->group(function ()
                 ->name('questions.stats');
         });
 
+        Route::prefix('courses/{course_id}/question-bank')->group(function () {
+            Route::get('/', [TopicQuestionController::class, 'courseBank']);
+            Route::post('/', [TopicQuestionController::class, 'storeCourseBank']);
+            Route::put('/{question_id}', [TopicQuestionController::class, 'updateCourseBank']);
+            Route::delete('/{question_id}', [TopicQuestionController::class, 'destroyCourseBank']);
+        });
+
         // ============================================================
         // استراتيجيات التدريس (Teaching Strategies) - CRUD كامل
         // ============================================================
@@ -634,6 +647,14 @@ Route::prefix('v1')->group(function ()
         // النشطة فقط
         Route::get('assessment-methods/active-only', [AssessmentMethodController::class, 'activeOnly'])
             ->name('assessment-methods.active-only');
+
+        Route::get('program-option-audits', [ProgramOptionAuditController::class, 'index']);
+
+        Route::prefix('courses/{course_id}/outcome-mappings')->group(function () {
+            Route::get('/', [CourseOutcomeMappingController::class, 'index']);
+            Route::post('/', [CourseOutcomeMappingController::class, 'store']);
+            Route::put('/{clo_code}', [CourseOutcomeMappingController::class, 'update']);
+        });
 
     }); // نهاية مجموعة ADMIN
 

@@ -104,6 +104,7 @@ class CourseAssessmentController extends Controller
                 'semester_id' => $course->semester_id,
                 'name' => $validated['name'],
                 'week' => $validated['week'] ?? null,
+                'max_score' => $validated['grade'],
                 'grade' => $validated['grade'],
                 'percentage' => $validated['percentage'],
                 'clo_ids' => $validated['clo_ids'] ?? [],
@@ -193,6 +194,10 @@ class CourseAssessmentController extends Controller
                         'message' => "مجموع النسب المئوية سيتجاوز 100% (المجموع الجديد: {$newTotal}%)",
                     ], 422);
                 }
+            }
+
+            if (isset($validated['grade'])) {
+                $validated['max_score'] = $validated['grade'];
             }
 
             $assessment->update($validated);

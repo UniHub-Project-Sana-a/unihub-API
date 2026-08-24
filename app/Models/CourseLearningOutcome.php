@@ -60,6 +60,26 @@ class CourseLearningOutcome extends Model
         return $this->belongsTo(ProgramLearningOutcome::class, 'plo_id', 'plo_id');
     }
 
+    public function teachingStrategies()
+    {
+        return $this->belongsToMany(
+            TeachingStrategy::class,
+            'outcome_teaching_strategy',
+            'clo_id',
+            'strategy_id'
+        )->withTimestamps();
+    }
+
+    public function assessmentMethods()
+    {
+        return $this->belongsToMany(
+            AssessmentMethod::class,
+            'outcome_assessment_method',
+            'clo_id',
+            'method_id'
+        )->withTimestamps();
+    }
+
     /**
      * ✅ Accessor: اسم المجال بالعربية
      */

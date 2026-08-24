@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Program;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -43,6 +44,44 @@ private function makePlaceholderEmail(?string $academic): string
 }
 
 
+    private function resolveGroupPathFields(Request $request): array
+    {
+        $payload = [
+            'college_id'    => $request->input('college_id'),
+            'department_id' => $request->input('department_id'),
+            'program_id'    => $request->input('program_id'),
+            'level_id'      => $request->input('level_id'),
+            'semester_id'   => $request->input('semester_id'),
+            'block_id'      => $request->input('block_id'),
+            'group_name'    => trim((string) $request->input('group_name', '')),
+        ];
+
+        $program = null;
+        if (!empty($payload['program_id'])) {
+            $program = Program::where('program_id', (int) $payload['program_id'])->first();
+        }
+
+        if (!$program && !empty($payload['department_id']) && !empty($payload['college_id'])) {
+            $payload['program_id'] = null;
+        }
+
+        if ($program) {
+            if ($program->academic_system === 'semester') {
+                if ($program->block_based) {
+                    $payload['semester_id'] = null;
+                }
+            } else {
+                $payload['level_id'] = null;
+                $payload['semester_id'] = null;
+                if (!$program->block_based) {
+                    $payload['block_id'] = null;
+                }
+            }
+        }
+
+        return array_filter($payload, fn ($value) => $value !== null && $value !== '');
+    }
+
     // GET /api/v1/student-groups?college_id=&department_id=&level_id=&semester_id=&with_counts=1
     public function index(Request $request)
     {
@@ -50,8 +89,10 @@ private function makePlaceholderEmail(?string $academic): string
 
         if ($request->filled('college_id'))    $q->where('g.college_id',    $request->integer('college_id'));
         if ($request->filled('department_id')) $q->where('g.department_id', $request->integer('department_id'));
+        if ($request->filled('program_id'))    $q->where('g.program_id',    $request->integer('program_id'));
         if ($request->filled('level_id'))      $q->where('g.level_id',      $request->integer('level_id'));
         if ($request->filled('semester_id'))   $q->where('g.semester_id',   $request->integer('semester_id'));
+        if ($request->filled('block_id'))      $q->where('g.block_id',      $request->integer('block_id'));
 
         $withCounts = (bool) $request->get('with_counts', false);
 
@@ -73,24 +114,59 @@ private function makePlaceholderEmail(?string $academic): string
     // POST /api/v1/student-groups
     public function store(Request $request)
     {
-        // تأكيد الحقول وربطها بالمفاتيح الأجنبية الصحيحة
-        $data = $request->validate([
+        $program = null;
+        if ($request->filled('program_id')) {
+            $program = Program::where('program_id', (int) $request->program_id)->first();
+        }
+
+        $rules = [
             'college_id'    => 'required|integer|exists:colleges,college_id',
             'department_id' => 'required|integer|exists:departments,department_id',
-            'level_id'      => 'required|integer|exists:levels,level_id',
-            'semester_id'   => 'required|integer|exists:semesters,semester_id',
+            'program_id'    => ['nullable', 'integer', 'exists:programs,program_id'],
+            'level_id'      => ['nullable', 'integer', 'exists:levels,level_id'],
+            'semester_id'   => ['nullable', 'integer', 'exists:semesters,semester_id'],
+            'block_id'      => ['nullable', 'integer', 'exists:blocks,id'],
             'group_name'    => 'required|string|max:100',
-        ]);
-    
-        // تجهيز مفاتيح المسار + تنظيف الاسم
+            'max_students'  => ['nullable', 'integer', 'min:1', 'max:500'],
+        ];
+
+        if (!$program) {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['required', 'integer', 'exists:semesters,semester_id'];
+        } elseif ($program->academic_system === 'semester' && $program->block_based) {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['block_id'] = ['required', 'integer', 'exists:blocks,id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+        } elseif ($program->academic_system === 'semester') {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['required', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+        } elseif ($program->block_based) {
+            $rules['block_id'] = ['required', 'integer', 'exists:blocks,id'];
+            $rules['level_id'] = ['nullable', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+        } else {
+            $rules['program_id'] = ['required', 'integer', 'exists:programs,program_id'];
+            $rules['level_id'] = ['nullable', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+        }
+
+        $data = $request->validate($rules);
+        $maxStudents = (int) ($data['max_students'] ?? 30);
+
         $path = [
             'college_id'    => (int) $data['college_id'],
             'department_id' => (int) $data['department_id'],
-            'level_id'      => (int) $data['level_id'],
-            'semester_id'   => (int) $data['semester_id'],
+            'program_id'    => $data['program_id'] ?? null,
+            'level_id'      => $data['level_id'] ?? null,
+            'semester_id'   => $data['semester_id'] ?? null,
+            'block_id'      => $data['block_id'] ?? null,
             'group_name'    => trim($data['group_name']),
         ];
     
+        $path = array_filter($path, fn ($value) => $value !== null && $value !== '');
+
         // 1) فحص وجود مجموعة فعّالة بنفس المسار (تجاهل المحذوفة Soft)
         $activeDup = DB::table('student_groups')
             ->whereNull('deleted_at')
@@ -129,15 +205,18 @@ private function makePlaceholderEmail(?string $academic): string
             $id = DB::table('student_groups')->insertGetId([
                 'college_id'    => $path['college_id'],
                 'department_id' => $path['department_id'],
-                'level_id'      => $path['level_id'],
-                'semester_id'   => $path['semester_id'],
+                'program_id'    => $path['program_id'] ?? null,
+                'level_id'      => $path['level_id'] ?? null,
+                'semester_id'   => $path['semester_id'] ?? null,
+                'block_id'      => $path['block_id'] ?? null,
                 'group_name'    => $path['group_name'],
+                'max_students'  => $maxStudents,
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ]);
-    
+
             $group = DB::table('student_groups')->where('group_id', $id)->first();
-    
+
             return response()->json([
                 'group_id' => $id,
                 'group'    => $group,
@@ -175,24 +254,54 @@ private function makePlaceholderEmail(?string $academic): string
     // PUT/PATCH /api/v1/student-groups/{group}
     public function update(Request $request, $group)
     {
-        $exists = DB::table('student_groups')
+        $existing = DB::table('student_groups')
             ->where('group_id', (int)$group)
             ->whereNull('deleted_at')
-            ->exists();
+            ->first();
 
-        if (!$exists) return response()->json(['message' => 'Not found'], 404);
+        if (!$existing) return response()->json(['message' => 'Not found'], 404);
 
-        $data = $request->validate([
-            'college_id'    => 'sometimes|integer|exists:colleges,college_id',
-            'department_id' => 'sometimes|integer|exists:departments,department_id',
-            'level_id'      => 'sometimes|integer|exists:levels,level_id',
-            'semester_id'   => 'sometimes|integer|exists:semesters,semester_id',
-            'group_name'    => 'sometimes|string|max:100',
-        ]);
+        $rules = [
+            'group_name'   => 'sometimes|string|max:100',
+            'max_students' => 'sometimes|integer|min:1|max:500',
+        ];
+
+        $data = $request->validate($rules);
+
+        if (isset($data['group_name'])) {
+            $data['group_name'] = trim($data['group_name']);
+            if ($data['group_name'] === '') {
+                return response()->json(['message' => 'اسم المجموعة مطلوب'], 422);
+            }
+        }
+
+        if (isset($data['max_students'])) {
+            $data['max_students'] = (int) $data['max_students'];
+        }
 
         $data['updated_at'] = now();
 
         try {
+            $duplicate = DB::table('student_groups')
+                ->whereNull('deleted_at')
+                ->where('group_id', '!=', (int)$group)
+                ->where('college_id', $existing->college_id)
+                ->where('department_id', $existing->department_id)
+                ->when($existing->program_id !== null, fn($q) => $q->where('program_id', $existing->program_id))
+                ->when($existing->program_id === null, fn($q) => $q->whereNull('program_id'))
+                ->when($existing->level_id !== null, fn($q) => $q->where('level_id', $existing->level_id))
+                ->when($existing->level_id === null, fn($q) => $q->whereNull('level_id'))
+                ->when($existing->semester_id !== null, fn($q) => $q->where('semester_id', $existing->semester_id))
+                ->when($existing->semester_id === null, fn($q) => $q->whereNull('semester_id'))
+                ->when($existing->block_id !== null, fn($q) => $q->where('block_id', $existing->block_id))
+                ->when($existing->block_id === null, fn($q) => $q->whereNull('block_id'))
+                ->where('group_name', trim($data['group_name'] ?? $existing->group_name))
+                ->exists();
+
+            if ($duplicate) {
+                return response()->json(['message' => 'يوجد اسم مجموعة مكرر في نفس المسار الدراسي'], 409);
+            }
+
             DB::table('student_groups')->where('group_id', (int)$group)->update($data);
             return response()->json(['message' => 'Updated']);
         } catch (Throwable $e) {
@@ -212,26 +321,313 @@ private function makePlaceholderEmail(?string $academic): string
         return $deleted ? response()->json(['message' => 'Deleted']) : response()->json(['message' => 'Not found'], 404);
     }
 
+    private function validateSameProgramTransfer(array $source, array $target): bool
+    {
+        if (($source['college_id'] ?? null) !== ($target['college_id'] ?? null)) {
+            return false;
+        }
+
+        if (($source['department_id'] ?? null) !== ($target['department_id'] ?? null)) {
+            return false;
+        }
+
+        if (($source['program_id'] ?? null) !== ($target['program_id'] ?? null)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function normalizeGroupTransferPayload(array $base, Request $request): array
+    {
+        $programId = $request->input('program_id', $base['program_id'] ?? null);
+        $program = $programId ? Program::where('program_id', (int) $programId)->first() : null;
+
+        $payload = [
+            'college_id'    => (int) ($request->input('college_id', $base['college_id'] ?? 0)),
+            'department_id' => (int) ($request->input('department_id', $base['department_id'] ?? 0)),
+            'program_id'    => $programId !== null ? (int) $programId : null,
+            'level_id'      => $request->filled('level_id') ? (int) $request->input('level_id') : ($base['level_id'] ?? null),
+            'semester_id'   => $request->filled('semester_id') ? (int) $request->input('semester_id') : ($base['semester_id'] ?? null),
+            'block_id'      => $request->filled('block_id') ? (int) $request->input('block_id') : ($base['block_id'] ?? null),
+        ];
+
+        if ($program) {
+            if ($program->academic_system === 'semester' && $program->block_based) {
+                $payload['semester_id'] = $request->filled('semester_id') ? (int) $request->input('semester_id') : ($base['semester_id'] ?? null);
+                $payload['level_id'] = $request->filled('level_id') ? (int) $request->input('level_id') : ($base['level_id'] ?? null);
+                $payload['block_id'] = $request->filled('block_id') ? (int) $request->input('block_id') : ($base['block_id'] ?? null);
+            } elseif ($program->academic_system === 'semester') {
+                $payload['level_id'] = $request->filled('level_id') ? (int) $request->input('level_id') : ($base['level_id'] ?? null);
+                $payload['semester_id'] = $request->filled('semester_id') ? (int) $request->input('semester_id') : ($base['semester_id'] ?? null);
+                $payload['block_id'] = null;
+            } elseif ($program->block_based) {
+                $payload['level_id'] = null;
+                $payload['semester_id'] = null;
+                $payload['block_id'] = $request->filled('block_id') ? (int) $request->input('block_id') : ($base['block_id'] ?? null);
+            } else {
+                $payload['level_id'] = null;
+                $payload['semester_id'] = null;
+                $payload['block_id'] = null;
+            }
+        }
+
+        return array_filter($payload, fn ($value) => $value !== null && $value !== '');
+    }
+
+    public function bulkMoveStudents(Request $request)
+    {
+        $data = $request->validate([
+            'student_ids' => ['required', 'array', 'min:1'],
+            'student_ids.*' => ['integer', 'distinct'],
+            'college_id' => ['nullable', 'integer', 'exists:colleges,college_id'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,department_id'],
+            'program_id' => ['nullable', 'integer', 'exists:programs,program_id'],
+            'level_id' => ['nullable', 'integer', 'exists:levels,level_id'],
+            'semester_id' => ['nullable', 'integer', 'exists:semesters,semester_id'],
+            'block_id' => ['nullable', 'integer', 'exists:blocks,id'],
+            'action' => ['nullable', 'in:promote,demote,pass,fail,move'],
+            'status' => ['nullable', 'in:passed,failed,active,inactive'],
+        ]);
+
+        $studentIds = array_map('intval', $data['student_ids']);
+        $students = DB::table('students')->whereIn('student_id', $studentIds)->get();
+
+        if ($students->count() !== count($studentIds)) {
+            return response()->json(['message' => 'One or more students were not found.'], 404);
+        }
+
+        $firstStudent = $students->first();
+        $baseTarget = [
+            'college_id' => (int) ($data['college_id'] ?? $firstStudent->college_id),
+            'department_id' => (int) ($data['department_id'] ?? $firstStudent->department_id),
+            'program_id' => $data['program_id'] ?? $firstStudent->program_id,
+            'level_id' => $data['level_id'] ?? $firstStudent->level_id,
+            'semester_id' => $data['semester_id'] ?? $firstStudent->semester_id,
+            'block_id' => $data['block_id'] ?? $firstStudent->block_id,
+        ];
+
+        $program = $baseTarget['program_id'] ? Program::where('program_id', (int) $baseTarget['program_id'])->first() : null;
+
+        if ($program) {
+            if ($program->academic_system === 'semester' && $program->block_based) {
+                $baseTarget['level_id'] = $data['level_id'] ?? $firstStudent->level_id;
+                $baseTarget['block_id'] = $data['block_id'] ?? $firstStudent->block_id;
+                $baseTarget['semester_id'] = $data['semester_id'] ?? $firstStudent->semester_id;
+            } elseif ($program->academic_system === 'semester') {
+                $baseTarget['level_id'] = $data['level_id'] ?? $firstStudent->level_id;
+                $baseTarget['semester_id'] = $data['semester_id'] ?? $firstStudent->semester_id;
+                $baseTarget['block_id'] = null;
+            } elseif ($program->block_based) {
+                $baseTarget['level_id'] = null;
+                $baseTarget['semester_id'] = null;
+                $baseTarget['block_id'] = $data['block_id'] ?? $firstStudent->block_id;
+            } else {
+                $baseTarget['level_id'] = null;
+                $baseTarget['semester_id'] = null;
+                $baseTarget['block_id'] = null;
+            }
+        }
+
+        $action = $data['action'] ?? 'move';
+
+        foreach ($students as $student) {
+            $source = [
+                'college_id' => (int) $student->college_id,
+                'department_id' => (int) $student->department_id,
+                'program_id' => $student->program_id !== null ? (int) $student->program_id : null,
+                'level_id' => $student->level_id !== null ? (int) $student->level_id : null,
+                'semester_id' => $student->semester_id !== null ? (int) $student->semester_id : null,
+                'block_id' => $student->block_id !== null ? (int) $student->block_id : null,
+            ];
+
+            if (in_array($action, ['promote', 'demote', 'move'], true)) {
+                if (!$this->validateSameProgramTransfer($source, $baseTarget)) {
+                    return response()->json([
+                        'message' => 'لا يمكن نقل الطلاب خارج نفس البرنامج أو نفس الكلية/القسم.',
+                        'student_id' => $student->student_id,
+                    ], 422);
+                }
+            }
+
+            $update = [
+                'college_id' => $baseTarget['college_id'],
+                'department_id' => $baseTarget['department_id'],
+                'program_id' => $baseTarget['program_id'],
+                'level_id' => $baseTarget['level_id'] ?? null,
+                'semester_id' => $baseTarget['semester_id'] ?? null,
+                'block_id' => $baseTarget['block_id'] ?? null,
+                'updated_at' => now(),
+            ];
+
+            if (in_array($action, ['pass', 'passed'], true)) {
+                $update['status'] = 1;
+            }
+
+            if (in_array($action, ['fail', 'failed'], true)) {
+                $update['status'] = 0;
+            }
+
+            DB::table('students')->where('student_id', $student->student_id)->update($update);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم تحديث مسار الطلاب بنجاح.',
+            'updated_count' => $students->count(),
+            'action' => $action,
+        ]);
+    }
+
+    public function moveGroupPath(Request $request, $group)
+    {
+        $groupRow = DB::table('student_groups')->where('group_id', (int) $group)->whereNull('deleted_at')->first();
+
+        if (!$groupRow) {
+            return response()->json(['message' => 'Group not found'], 404);
+        }
+
+        $baseTarget = [
+            'college_id' => (int) ($groupRow->college_id ?? 0),
+            'department_id' => (int) ($groupRow->department_id ?? 0),
+            'program_id' => $groupRow->program_id !== null ? (int) $groupRow->program_id : null,
+            'level_id' => $groupRow->level_id !== null ? (int) $groupRow->level_id : null,
+            'semester_id' => $groupRow->semester_id !== null ? (int) $groupRow->semester_id : null,
+            'block_id' => $groupRow->block_id !== null ? (int) $groupRow->block_id : null,
+        ];
+
+        $target = $this->normalizeGroupTransferPayload($baseTarget, $request);
+
+        if (!$this->validateSameProgramTransfer($baseTarget, $target)) {
+            return response()->json(['message' => 'لا يمكن نقل المجموعة خارج نفس البرنامج أو نفس الكلية/القسم.'], 422);
+        }
+
+        $program = $target['program_id'] ? Program::where('program_id', (int) $target['program_id'])->first() : null;
+        if ($program) {
+            if ($program->academic_system === 'semester' && $program->block_based) {
+                $required = ['level_id', 'block_id'];
+            } elseif ($program->academic_system === 'semester') {
+                $required = ['level_id', 'semester_id'];
+            } elseif ($program->block_based) {
+                $required = ['block_id'];
+            } else {
+                $required = [];
+            }
+
+            foreach ($required as $field) {
+                if (empty($target[$field])) {
+                    return response()->json(['message' => 'المسار الجديد غير مكتمل لهذا البرنامج.'], 422);
+                }
+            }
+        }
+
+        $duplicate = DB::table('student_groups')
+            ->whereNull('deleted_at')
+            ->where('group_id', '!=', (int) $group)
+            ->where('college_id', $target['college_id'])
+            ->where('department_id', $target['department_id'])
+            ->where('program_id', $target['program_id'] ?? null)
+            ->where('level_id', $target['level_id'] ?? null)
+            ->where('semester_id', $target['semester_id'] ?? null)
+            ->where('block_id', $target['block_id'] ?? null)
+            ->where('group_name', $groupRow->group_name)
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json(['message' => 'يوجد اسم مجموعة مكرر في هذا المسار الجديد.'], 409);
+        }
+
+        $updateData = [
+            'college_id' => $target['college_id'],
+            'department_id' => $target['department_id'],
+            'program_id' => $target['program_id'] ?? null,
+            'level_id' => $target['level_id'] ?? null,
+            'semester_id' => $target['semester_id'] ?? null,
+            'block_id' => $target['block_id'] ?? null,
+            'updated_at' => now(),
+        ];
+
+        DB::table('student_groups')->where('group_id', (int) $group)->update($updateData);
+
+        $memberIds = DB::table('student_group_members')->where('group_id', (int) $group)->pluck('student_id');
+        if ($memberIds->isNotEmpty()) {
+            DB::table('students')->whereIn('student_id', $memberIds)->update([
+                'college_id' => $target['college_id'],
+                'department_id' => $target['department_id'],
+                'program_id' => $target['program_id'] ?? null,
+                'level_id' => $target['level_id'] ?? null,
+                'semester_id' => $target['semester_id'] ?? null,
+                'block_id' => $target['block_id'] ?? null,
+                'updated_at' => now(),
+            ]);
+        }
+
+        $updatedGroup = DB::table('student_groups')->where('group_id', (int) $group)->first();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم نقل المجموعة داخل نفس البرنامج بنجاح.',
+            'group' => $updatedGroup,
+        ]);
+    }
+
     // POST /api/v1/student-groups/upsert-and-attach
     public function upsertAndAttach(Request $request)
     {
-        // التحقق من صحة المُدخلات وربطها بالمفاتيح الأجنبية
-        $data = $request->validate([
+        $requestData = $request->all();
+        $program = null;
+        if (!empty($requestData['program_id'])) {
+            $program = Program::where('program_id', (int) $requestData['program_id'])->first();
+        }
+
+        $rules = [
             'college_id'    => 'required|integer|exists:colleges,college_id',
             'department_id' => 'required|integer|exists:departments,department_id',
-            'level_id'      => 'required|integer|exists:levels,level_id',
-            'semester_id'   => 'required|integer|exists:semesters,semester_id',
+            'program_id'    => ['nullable', 'integer', 'exists:programs,program_id'],
+            'level_id'      => ['nullable', 'integer', 'exists:levels,level_id'],
+            'semester_id'   => ['nullable', 'integer', 'exists:semesters,semester_id'],
+            'block_id'      => ['nullable', 'integer', 'exists:blocks,id'],
             'group_name'    => 'required|string|max:100',
-        ]);
-    
-        // توحيد المسار + تنظيف الاسم
+            'max_students'  => ['nullable', 'integer', 'min:1', 'max:500'],
+        ];
+
+        if (!$program) {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['required', 'integer', 'exists:semesters,semester_id'];
+        } elseif ($program->academic_system === 'semester' && $program->block_based) {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['block_id'] = ['required', 'integer', 'exists:blocks,id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+        } elseif ($program->academic_system === 'semester') {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['required', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+        } elseif ($program->block_based) {
+            $rules['block_id'] = ['required', 'integer', 'exists:blocks,id'];
+            $rules['level_id'] = ['nullable', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+        } else {
+            $rules['program_id'] = ['required', 'integer', 'exists:programs,program_id'];
+            $rules['level_id'] = ['nullable', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+        }
+
+        $data = $request->validate($rules);
+
+        $maxStudents = (int) ($data['max_students'] ?? 30);
+
         $path = [
             'college_id'    => (int) $data['college_id'],
             'department_id' => (int) $data['department_id'],
-            'level_id'      => (int) $data['level_id'],
-            'semester_id'   => (int) $data['semester_id'],
+            'program_id'    => $data['program_id'] ?? null,
+            'level_id'      => $data['level_id'] ?? null,
+            'semester_id'   => $data['semester_id'] ?? null,
+            'block_id'      => $data['block_id'] ?? null,
             'group_name'    => trim($data['group_name']),
         ];
+
+        $path = array_filter($path, fn ($value) => $value !== null && $value !== '');
     
         // 1) هل هناك مجموعة فعّالة (غير محذوفة) بهذا المسار؟
         $existing = DB::table('student_groups')
@@ -275,15 +671,18 @@ private function makePlaceholderEmail(?string $academic): string
             $id = DB::table('student_groups')->insertGetId([
                 'college_id'    => $path['college_id'],
                 'department_id' => $path['department_id'],
-                'level_id'      => $path['level_id'],
-                'semester_id'   => $path['semester_id'],
+                'program_id'    => $path['program_id'] ?? null,
+                'level_id'      => $path['level_id'] ?? null,
+                'semester_id'   => $path['semester_id'] ?? null,
+                'block_id'      => $path['block_id'] ?? null,
                 'group_name'    => $path['group_name'],
+                'max_students'  => $maxStudents,
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ]);
-    
+
             $group = DB::table('student_groups')->where('group_id', $id)->first();
-    
+
             return response()->json([
                 'status'  => 'created',
                 'group'   => $group,
@@ -362,6 +761,77 @@ private function makePlaceholderEmail(?string $academic): string
             ->delete();
 
         return response()->json(['deleted' => (bool)$deleted]);
+    }
+
+    private function studentMatchesGroupPath(object $student, object $group): bool
+    {
+        if ((int) ($student->college_id ?? 0) !== (int) ($group->college_id ?? 0)) {
+            return false;
+        }
+
+        if ((int) ($student->department_id ?? 0) !== (int) ($group->department_id ?? 0)) {
+            return false;
+        }
+
+        if (!is_null($group->program_id) && !is_null($student->program_id) && (int) $student->program_id !== (int) $group->program_id) {
+            return false;
+        }
+
+        if (!is_null($group->program_id) && is_null($student->program_id)) {
+            return false;
+        }
+
+        if (!is_null($group->level_id) && !is_null($student->level_id) && (int) $student->level_id !== (int) $group->level_id) {
+            return false;
+        }
+
+        if (!is_null($group->level_id) && is_null($student->level_id)) {
+            return false;
+        }
+
+        if (!is_null($group->semester_id) && !is_null($student->semester_id) && (int) $student->semester_id !== (int) $group->semester_id) {
+            return false;
+        }
+
+        if (!is_null($group->semester_id) && is_null($student->semester_id)) {
+            return false;
+        }
+
+        if (!is_null($group->block_id) && !is_null($student->block_id) && (int) $student->block_id !== (int) $group->block_id) {
+            return false;
+        }
+
+        if (!is_null($group->block_id) && is_null($student->block_id)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function studentAlreadyBelongsToDifferentProgram(int $studentId, int $groupId): bool
+    {
+        $conflict = DB::table('student_group_members as sgm')
+            ->join('student_groups as sg', 'sg.group_id', '=', 'sgm.group_id')
+            ->where('sgm.student_id', $studentId)
+            ->where('sg.group_id', '!=', $groupId)
+            ->select('sg.program_id', 'sg.level_id', 'sg.semester_id', 'sg.block_id', 'sg.college_id', 'sg.department_id')
+            ->first();
+
+        if (!$conflict) {
+            return false;
+        }
+
+        $group = DB::table('student_groups')->where('group_id', $groupId)->first();
+        if (!$group) {
+            return false;
+        }
+
+        return (int) ($conflict->program_id ?? 0) !== (int) ($group->program_id ?? 0)
+            || (int) ($conflict->college_id ?? 0) !== (int) ($group->college_id ?? 0)
+            || (int) ($conflict->department_id ?? 0) !== (int) ($group->department_id ?? 0)
+            || (int) ($conflict->level_id ?? 0) !== (int) ($group->level_id ?? 0)
+            || (int) ($conflict->semester_id ?? 0) !== (int) ($group->semester_id ?? 0)
+            || (int) ($conflict->block_id ?? 0) !== (int) ($group->block_id ?? 0);
     }
 
     // POST /api/v1/student-groups/import-csv (form-data: file, group_id)
@@ -524,16 +994,17 @@ private function makePlaceholderEmail(?string $academic): string
     
             // أنشئ User عند عدم الوجود
             if (!$user) {
-                if (!$fullName || !$email || $genderV === null) {
+                if (!$fullName || $genderV === null || (!$academic && !$email && !$phone)) {
                     $skippedMissing++; $errors[] = ['reason' => 'missing_user_fields', 'row' => $row]; continue;
                 }
                 $gender = $parseGender($genderV);
-                $academicNumber = $academic ?: $makeAcademicNumberFromEmail($email);
-    
+                $resolvedEmail = $email ?: ($academic ? strtolower($academic) . '@local.invalid' : 'student-' . date('YmdHis') . '-' . random_int(1000, 9999) . '@local.invalid');
+                $academicNumber = $academic ?: $makeAcademicNumberFromEmail($resolvedEmail);
+
                 try {
                     $userId = \Illuminate\Support\Facades\DB::table('users')->insertGetId([
                         'full_name'       => $fullName,
-                        'email'           => $email,
+                        'email'           => $resolvedEmail,
                         'phone'           => $phone,
                         'college_id'      => $group->college_id,
                         'password'        => \Illuminate\Support\Facades\Hash::make($defaultPassword),
@@ -571,8 +1042,10 @@ private function makePlaceholderEmail(?string $academic): string
                         'user_id'       => $user->user_id,
                         'college_id'    => $group->college_id,
                         'department_id' => $group->department_id,
-                        'level_id'      => $group->level_id,
-                        'program_id'    => null,
+                        'program_id'    => $group->program_id ?? null,
+                        'level_id'      => $group->level_id ?? null,
+                        'semester_id'   => $group->semester_id ?? null,
+                        'block_id'      => $group->block_id ?? null,
                         'status'        => 1,
                         'created_at'    => now(),
                         'updated_at'    => now(),
@@ -594,7 +1067,34 @@ private function makePlaceholderEmail(?string $academic): string
                 }
             }
     
-            // 6) ربط الطالب بالمجموعة
+            // 6) التحقق النهائي: لا يسمح للطالب بأن يربط بمسار مختلف عن مساره الأكاديمي الحالي
+            if (!$this->studentMatchesGroupPath($student, $group) || $this->studentAlreadyBelongsToDifferentProgram((int) $student->student_id, (int) $groupId)) {
+                $skippedConflicts++;
+                $errors[] = [
+                    'reason' => 'student_path_mismatch',
+                    'student_id' => $student->student_id,
+                    'group_id' => $groupId,
+                    'student_path' => [
+                        'college_id' => $student->college_id ?? null,
+                        'department_id' => $student->department_id ?? null,
+                        'program_id' => $student->program_id ?? null,
+                        'level_id' => $student->level_id ?? null,
+                        'semester_id' => $student->semester_id ?? null,
+                        'block_id' => $student->block_id ?? null,
+                    ],
+                    'group_path' => [
+                        'college_id' => $group->college_id ?? null,
+                        'department_id' => $group->department_id ?? null,
+                        'program_id' => $group->program_id ?? null,
+                        'level_id' => $group->level_id ?? null,
+                        'semester_id' => $group->semester_id ?? null,
+                        'block_id' => $group->block_id ?? null,
+                    ],
+                ];
+                continue;
+            }
+
+            // 7) ربط الطالب بالمجموعة
             try {
                 \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
                     'student_id' => $student->student_id,
@@ -610,6 +1110,21 @@ private function makePlaceholderEmail(?string $academic): string
         }
     
         // 7) النتيجة
+        if ($skippedConflicts > 0 && $attached === 0 && $createdStudents === 0 && $createdUsers === 0 && $restoredStudents === 0 && $restoredUsers === 0) {
+            return response()->json([
+                'status'             => 'error',
+                'message'            => 'تعذر إضافة أي طالب إلى هذه المجموعة. السبب الشائع هو أن الطالب مسجل في برنامج/مسار مختلف، أو أن البيانات ناقصة.',
+                'created_users'      => 0,
+                'restored_users'     => 0,
+                'created_students'   => 0,
+                'restored_students'  => 0,
+                'attached_to_group'  => 0,
+                'skipped_missing'    => $skippedMissing,
+                'skipped_conflicts'  => $skippedConflicts,
+                'errors'             => $errors,
+            ], 422);
+        }
+
         return response()->json([
             'status'             => 'success',
             'created_users'      => $createdUsers,

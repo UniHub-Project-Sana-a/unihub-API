@@ -17,4 +17,13 @@ require __DIR__.'/../vendor/autoload.php';
 /** @var Application $app */
 $app = require_once __DIR__.'/../bootstrap/app.php';
 
+// Apache Alias exposes the public directory below /unihub-api. Normalize
+// that deployment prefix so Laravel matches the same routes as artisan serve.
+$requestUri = $_SERVER['REQUEST_URI'] ?? '';
+$deploymentPrefix = '/unihub-api';
+
+if (str_starts_with($requestUri, $deploymentPrefix.'/')) {
+    $_SERVER['REQUEST_URI'] = substr($requestUri, strlen($deploymentPrefix));
+}
+
 $app->handleRequest(Request::capture());

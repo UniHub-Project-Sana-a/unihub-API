@@ -213,6 +213,22 @@ class StoreCourseRequest extends FormRequest
                     ]);
                 }
             }
+
+            // ✅ مجموع أوزان المقررات لا يتجاوز مجموع أوزان مخرجات البرنامج المضافة
+            if ($program) {
+                $programWeight = (float) \App\Models\ProgramLearningOutcome::where('program_id', $program->program_id)
+                    ->sum('weight');
+                $currentCourseWeight = (float) \App\Models\Course::where('program_id', $program->program_id)
+                    ->sum('weight');
+                $remainingWeight = max(0, $programWeight - $currentCourseWeight);
+
+                if ((float) ($this->weight ?? 0) > $remainingWeight) {
+                    $validator->errors()->add(
+                        'weight',
+                        "وزن المقرر يتجاوز الرصيد المتاح. أوزان مخرجات البرنامج: {$programWeight}%. المتبقي للمقررات: {$remainingWeight}%."
+                    );
+                }
+            }
         });
     }
 }

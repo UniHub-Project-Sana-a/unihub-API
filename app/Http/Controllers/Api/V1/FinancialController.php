@@ -49,12 +49,11 @@ class FinancialController extends Controller
 
         if (!$cycle) {
             return response()->json([
-                'status' => false, 
-                'message' => 'No cycle found', 
-                'code' => 'NOT_FOUND',
-                // (اختياري) لمعرفة ماذا كان يبحث النظام
-                // 'debug_searched_key' => $monthYearKey 
-            ], 404);
+                'status' => true,
+                'data' => null,
+                'message' => 'No cycle found for the selected month/year.',
+                'code' => 'NOT_FOUND'
+            ], 200);
         }
 
         return response()->json(['status' => true, 'data' => $cycle]);

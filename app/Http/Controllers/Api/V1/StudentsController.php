@@ -16,6 +16,8 @@ class StudentsController extends Controller
         $deptId     = $request->query('department_id');
         $programId  = $request->query('program_id');
         $levelId    = $request->query('level_id');
+        $semesterId = $request->query('semester_id');
+        $blockId    = $request->query('block_id');
         $gender     = $request->query('gender'); // 1/2
         $status     = $request->query('status'); // 1/0
         $q          = $request->query('q');      // بحث في اسم الطالب/البريد/الهاتف/الرقم الأكاديمي
@@ -26,6 +28,8 @@ class StudentsController extends Controller
             ->when($deptId, fn($qq) => $qq->where('department_id', (int)$deptId))
             ->when($programId, fn($qq) => $qq->where('program_id', (int)$programId))
             ->when($levelId, fn($qq) => $qq->where('level_id', (int)$levelId))
+            ->when($semesterId, fn($qq) => $qq->where('semester_id', (int)$semesterId))
+            ->when($blockId, fn($qq) => $qq->where('block_id', (int)$blockId))
             ->when(isset($status), fn($qq) => $qq->where('status', (bool)$status))
             ->when($gender, function ($qq) use ($gender) {
                 $qq->whereHas('user', fn($uq) => $uq->where('gender', (int)$gender));

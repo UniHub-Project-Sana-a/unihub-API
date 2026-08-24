@@ -14,6 +14,7 @@ class AssessmentMethod extends Model
     protected $guarded = ['id'];
 
     protected $fillable = [
+        'program_id',
         'name',
         'description',
         'category',
@@ -22,6 +23,7 @@ class AssessmentMethod extends Model
     ];
 
     protected $casts = [
+        'program_id' => 'integer',
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

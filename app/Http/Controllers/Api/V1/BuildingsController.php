@@ -12,9 +12,15 @@ class BuildingsController extends Controller {
         $collegeId = $request->query('college_id');
         $query = Building::query()
         ->with('college')
-        ->when($q, fn($qq) => $qq->where('building_name', 'like', "%{$q}%"))
-        ->when($collegeId, fn($qq) => $qq->where('college_id', $collegeId));
-        return response()->json($query->get());
+        ->when($q, fn($qq) => $qq->where(function ($w) use ($q) {
+            $w->where('building_name', 'like', "%{$q}%")
+              ->orWhere('building_code', 'like', "%{$q}%");
+        }))
+        ->when($collegeId, fn($qq) => $qq->where(function ($w) use ($collegeId) {
+            // نعرض مباني الكلية المحددة بالإضافة إلى المباني العامة المشتركة (بدون كلية)
+            $w->where('college_id', $collegeId)->orWhereNull('college_id');
+        }));
+        return response()->json($query->orderBy('building_name')->get());
     }
     public function store(StoreBuildingRequest $request) {
         $building = Building::create($request->validated());
@@ -28,6 +34,11 @@ class BuildingsController extends Controller {
         return response()->json($building->load('college'));
     }
     public function destroy(Building $building) {
+        if ($building->classrooms()->exists()) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذا المبنى لأنه يحتوي على قاعات مرتبطة به.',
+            ], 422);
+        }
         $building->delete();
         return response()->json(['message' => 'Building deleted']);
     }

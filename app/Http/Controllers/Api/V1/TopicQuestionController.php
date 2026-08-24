@@ -10,6 +10,54 @@ use Illuminate\Http\JsonResponse;
 
 class TopicQuestionController extends Controller
 {
+    public function courseBank(int $courseId, Request $request): JsonResponse
+    {
+        $validated = $request->validate(['part' => 'required|in:نظري,عملي,تمارين,سريري']);
+        $questions = TopicQuestion::where('course_id', $courseId)
+            ->where('part', $validated['part'])->orderBy('order')->get();
+        return response()->json(['success' => true, 'questions' => $questions]);
+    }
+
+    public function storeCourseBank(Request $request, int $courseId): JsonResponse
+    {
+        return $this->saveCourseQuestion($request, $courseId, null);
+    }
+
+    public function updateCourseBank(Request $request, int $courseId, int $questionId): JsonResponse
+    {
+        $question = TopicQuestion::where('course_id', $courseId)->whereNull('topic_id')->findOrFail($questionId);
+        $validated = $request->validate([
+            'part' => 'required|in:نظري,عملي,تمارين,سريري',
+            'subtopic' => 'nullable|string|max:300',
+            'question_text' => 'string|min:10',
+            'question_type' => 'required|in:MCQ,essay',
+            'difficulty_level' => 'integer|min:1|max:5',
+            'clo_code' => 'nullable|string|max:10',
+            'options' => 'required_if:question_type,MCQ|array|size:4',
+            'options.*.id' => 'required|string',
+            'options.*.text' => 'required|string|min:2',
+            'options.*.is_correct' => 'required|boolean',
+            'correct_answer' => 'required_if:question_type,essay|string',
+        ]);
+        if ($validated['question_type'] === 'MCQ' && collect($validated['options'])->where('is_correct', true)->count() !== 1) {
+            return response()->json(['success' => false, 'message' => 'يجب أن يكون هناك خيار واحد صحيح فقط'], 422);
+        }
+        $question->update([
+            'part' => $validated['part'], 'subtopic' => $validated['subtopic'] ?? null,
+            'question_text' => $validated['question_text'], 'question_type' => $validated['question_type'],
+            'difficulty_level' => $validated['difficulty_level'] ?? 1, 'clo_code' => $validated['clo_code'] ?? null,
+            'options' => $validated['question_type'] === 'MCQ' ? $validated['options'] : null,
+            'correct_answer' => $validated['question_type'] === 'essay' ? $validated['correct_answer'] : null,
+        ]);
+        return response()->json(['success' => true, 'data' => $question]);
+    }
+
+    public function destroyCourseBank(int $courseId, int $questionId): JsonResponse
+    {
+        TopicQuestion::where('course_id', $courseId)->whereNull('topic_id')->findOrFail($questionId)->delete();
+        return response()->json(['success' => true, 'message' => 'تم حذف السؤال بنجاح']);
+    }
+
     /**
      * عرض جميع الأسئلة في موضوع
      * GET /api/v1/topics/{topic_id}/questions
@@ -94,6 +142,8 @@ class TopicQuestionController extends Controller
             }
 
             $question = TopicQuestion::create([
+                'course_id' => $topic->course_id,
+                'part' => $topic->part,
                 'topic_id' => $topicId,
                 'subtopic' => $validated['subtopic'] ?? null,
                 'question_text' => $validated['question_text'],
@@ -122,6 +172,40 @@ class TopicQuestionController extends Controller
                 'message' => 'خطأ: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function saveCourseQuestion(Request $request, int $courseId, ?int $topicId): JsonResponse
+    {
+        $validated = $request->validate([
+            'part' => 'required|in:نظري,عملي,تمارين,سريري',
+            'subtopic' => 'nullable|string|max:300',
+            'question_text' => 'required|string|min:10',
+            'question_type' => 'required|in:MCQ,essay',
+            'difficulty_level' => 'integer|min:1|max:5',
+            'clo_code' => 'nullable|string|max:10',
+            'options' => 'required_if:question_type,MCQ|array|size:4',
+            'options.*.id' => 'required|string',
+            'options.*.text' => 'required|string|min:2',
+            'options.*.is_correct' => 'required|boolean',
+            'correct_answer' => 'required_if:question_type,essay|string',
+        ]);
+        if ($validated['question_type'] === 'MCQ' && collect($validated['options'])->where('is_correct', true)->count() !== 1) {
+            return response()->json(['success' => false, 'message' => 'يجب أن يكون هناك خيار واحد صحيح فقط'], 422);
+        }
+        $question = TopicQuestion::create([
+            'course_id' => $courseId,
+            'part' => $validated['part'],
+            'topic_id' => $topicId,
+            'subtopic' => $validated['subtopic'] ?? null,
+            'question_text' => $validated['question_text'],
+            'question_type' => $validated['question_type'],
+            'difficulty_level' => $validated['difficulty_level'] ?? 1,
+            'clo_code' => $validated['clo_code'] ?? null,
+            'options' => $validated['question_type'] === 'MCQ' ? $validated['options'] : null,
+            'correct_answer' => $validated['question_type'] === 'essay' ? $validated['correct_answer'] : null,
+            'is_active' => true,
+        ]);
+        return response()->json(['success' => true, 'data' => $question], 201);
     }
 
     /**
@@ -183,6 +267,11 @@ class TopicQuestionController extends Controller
             }
 
             $question->update($validated);
+
+            $question->update([
+                'course_id' => $question->course_id ?? $question->topic?->course_id,
+                'part' => $question->part ?? $question->topic?->part,
+            ]);
 
             return response()->json([
                 'success' => true,

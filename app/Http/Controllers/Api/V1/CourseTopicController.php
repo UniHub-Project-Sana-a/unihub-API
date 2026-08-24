@@ -88,6 +88,25 @@ class CourseTopicController extends Controller
 
             $course = Course::findOrFail($courseId);
 
+            $configuredPart = collect($course->course_parts ?? [])
+                ->firstWhere('name', $validated['part']);
+            if (!$configuredPart) {
+                return response()->json(['success' => false, 'message' => 'هذا الجزء غير موجود في المقرر'], 422);
+            }
+
+            $weekLimit = $validated['part'] === 'نظري' ? 16 : 15;
+            if ($validated['week'] === $weekLimit && ($validated['exam_type'] ?? null) !== 'final') {
+                return response()->json(['success' => false, 'message' => "الأسبوع {$weekLimit} محجوز للاختبار النهائي ولا يقبل موضوعات"], 422);
+            }
+            if (($validated['exam_type'] ?? null) === 'final' && $validated['week'] !== $weekLimit) {
+                return response()->json(['success' => false, 'message' => "الاختبار النهائي يجب أن يكون في الأسبوع {$weekLimit}"], 422);
+            }
+
+            $actualHours = (float) ($configuredPart['actual_hours'] ?? $configuredPart['total_hours'] ?? 0);
+            $hours = in_array($validated['part'], ['عملي', 'تمارين'], true)
+                ? $actualHours / 2
+                : ($validated['part'] === 'سريري' ? $actualHours / 3 : $actualHours);
+
             // التحقق من عدم تكرار نفس الموضوع في نفس الأسبوع والجزء
             $exists = CourseTopic::where('course_id', $courseId)
                 ->where('part', $validated['part'])
@@ -118,7 +137,7 @@ class CourseTopicController extends Controller
                 'subtopics' => $validated['subtopics'] ?? [],
                 'is_exam' => $validated['is_exam'] ?? false,
                 'exam_type' => $validated['exam_type'] ?? null,
-                'hours' => $validated['hours'],
+                'hours' => $hours,
                 'clo_ids' => $validated['clo_ids'] ?? [],
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -186,6 +205,19 @@ class CourseTopicController extends Controller
                 'clo_ids' => 'nullable|array',
                 'notes' => 'nullable|string',
             ], $this->getArabicMessages());
+
+            $course = Course::findOrFail($courseId);
+            $weekLimit = $topic->part === 'نظري' ? 16 : 15;
+            if (($validated['exam_type'] ?? $topic->exam_type) === 'final' && ($validated['week'] ?? $topic->week) !== $weekLimit) {
+                return response()->json(['success' => false, 'message' => "الاختبار النهائي يجب أن يكون في الأسبوع {$weekLimit}"], 422);
+            }
+            $configuredPart = collect($course->course_parts ?? [])->firstWhere('name', $topic->part);
+            if ($configuredPart) {
+                $actualHours = (float) ($configuredPart['actual_hours'] ?? $configuredPart['total_hours'] ?? 0);
+                $validated['hours'] = in_array($topic->part, ['عملي', 'تمارين'], true)
+                    ? $actualHours / 2
+                    : ($topic->part === 'سريري' ? $actualHours / 3 : $actualHours);
+            }
 
             $topic->update($validated);
 

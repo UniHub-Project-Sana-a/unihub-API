@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\AssessmentMethod;
+use App\Models\ProgramOptionAudit;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class AssessmentMethodController extends Controller
 {
@@ -18,6 +20,13 @@ class AssessmentMethodController extends Controller
         try {
             $query = AssessmentMethod::query();
 
+            if ($request->filled('program_id')) {
+                $query->where(function ($q) use ($request) {
+                    $q->where('program_id', (int) $request->program_id)
+                        ->orWhereNull('program_id');
+                });
+            }
+
             // فلترة حسب الفئة
             if ($request->has('category')) {
                 $query->where('category', $request->category);
@@ -28,11 +37,12 @@ class AssessmentMethodController extends Controller
                 $query->where('is_active', true);
             }
 
-            $methods = $query->orderBy('order')->get()->groupBy('category');
+            $methods = $query->orderBy('order')->get();
 
             return response()->json([
                 'success' => true,
                 'methods' => $methods,
+                'data' => $methods,
                 'total_count' => AssessmentMethod::count(),
                 'active_count' => AssessmentMethod::where('is_active', true)->count(),
             ], 200);
@@ -52,7 +62,8 @@ class AssessmentMethodController extends Controller
     {
         try {
             $validated = $request->validate([
-                'name' => 'required|string|max:200|unique:assessment_methods,name',
+                'program_id' => 'nullable|integer|exists:programs,program_id',
+                'name' => ['required', 'string', 'max:200', Rule::unique('assessment_methods', 'name')->where(fn ($q) => $q->where('program_id', $request->program_id))],
                 'description' => 'nullable|string',
                 'category' => 'required|in:exam,assignment,project,presentation,participation,portfolio,other',
                 'order' => 'integer|min:0',
@@ -60,12 +71,14 @@ class AssessmentMethodController extends Controller
             ], $this->getArabicMessages());
 
             $method = AssessmentMethod::create([
+                'program_id' => $validated['program_id'] ?? null,
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'category' => $validated['category'],
                 'order' => $validated['order'] ?? 0,
                 'is_active' => $validated['is_active'] ?? true,
             ]);
+            $this->audit($method, 'created', null, $method->toArray());
 
             return response()->json([
                 'success' => true,
@@ -118,14 +131,17 @@ class AssessmentMethodController extends Controller
             $method = AssessmentMethod::findOrFail($id);
 
             $validated = $request->validate([
-                'name' => 'string|max:200|unique:assessment_methods,name,' . $id,
+                'program_id' => 'nullable|integer|exists:programs,program_id',
+                'name' => ['string', 'max:200', Rule::unique('assessment_methods', 'name')->ignore($id)->where(fn ($q) => $q->where('program_id', $request->program_id ?? $method->program_id))],
                 'description' => 'nullable|string',
                 'category' => 'in:exam,assignment,project,presentation,participation,portfolio,other',
                 'order' => 'integer|min:0',
                 'is_active' => 'boolean',
             ], $this->getArabicMessages());
 
+            $before = $method->toArray();
             $method->update($validated);
+            $this->audit($method, 'updated', $before, $method->fresh()->toArray());
 
             return response()->json([
                 'success' => true,
@@ -157,6 +173,8 @@ class AssessmentMethodController extends Controller
                 ], 422);
             }
 
+            $before = $method->toArray();
+            $this->audit($method, 'deleted', $before, null);
             $method->delete();
 
             return response()->json([
@@ -178,5 +196,18 @@ class AssessmentMethodController extends Controller
             'name.unique' => 'هذه الطريقة موجودة بالفعل',
             'category.required' => 'الفئة مطلوبة',
         ];
+    }
+
+    private function audit(AssessmentMethod $method, string $action, ?array $before, ?array $after): void
+    {
+        if (!$method->program_id) return;
+        ProgramOptionAudit::create([
+            'program_id' => $method->program_id,
+            'option_type' => 'assessment_method',
+            'option_id' => $method->id,
+            'action' => $action,
+            'details' => ['before' => $before, 'after' => $after],
+            'changed_by' => request()->user()?->getAuthIdentifier(),
+        ]);
     }
 }

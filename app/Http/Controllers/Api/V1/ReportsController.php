@@ -200,7 +200,7 @@ class ReportsController extends Controller
 
             $courses = $coursesQuery
                 ->with(['department', 'program', 'level', 'semester'])
-                ->withCount(['timetable as total_sessions_count' => function($q) use ($year) {
+                ->withCount(['timetables as total_sessions_count' => function($q) use ($year) {
                      if ($year && $year !== 'all') $q->where('academic_year', $year);
                 }])
                 ->take(50) // تحديد العدد للأداء

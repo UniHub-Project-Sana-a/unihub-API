@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Timetable;
+use App\Models\Program;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,86 @@ use App\Models\CourseTopic;
 
 class TimetableController extends Controller
 {
+    private function resolveProgramPathRules(?Program $program): array
+    {
+        $rules = [
+            'program_id' => ['nullable', 'integer', 'exists:programs,program_id'],
+            'level_id' => ['nullable', 'integer', 'exists:levels,level_id'],
+            'semester_id' => ['nullable', 'integer', 'exists:semesters,semester_id'],
+            'block_id' => ['nullable', 'integer', 'exists:blocks,id'],
+        ];
+
+        if (!$program) {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['required', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+            return $rules;
+        }
+
+        if ($program->academic_system === 'semester' && $program->block_based) {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['required', 'integer', 'exists:blocks,id'];
+            return $rules;
+        }
+
+        if ($program->academic_system === 'semester') {
+            $rules['level_id'] = ['required', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['required', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+            return $rules;
+        }
+
+        if ($program->academic_system === 'credit' && $program->block_based) {
+            $rules['level_id'] = ['nullable', 'integer', 'exists:levels,level_id'];
+            $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+            $rules['block_id'] = ['required', 'integer', 'exists:blocks,id'];
+            return $rules;
+        }
+
+        $rules['program_id'] = ['required', 'integer', 'exists:programs,program_id'];
+        $rules['level_id'] = ['nullable', 'integer', 'exists:levels,level_id'];
+        $rules['semester_id'] = ['nullable', 'integer', 'exists:semesters,semester_id'];
+        $rules['block_id'] = ['nullable', 'integer', 'exists:blocks,id'];
+
+        return $rules;
+    }
+
+    private function normalizeProgramPath(array $data): array
+    {
+        $programId = $data['program_id'] ?? null;
+        if (!$programId) {
+            return $data;
+        }
+
+        $program = Program::find($programId);
+        if (!$program) {
+            return $data;
+        }
+
+        if ($program->academic_system === 'semester' && $program->block_based) {
+            $data['semester_id'] = null;
+            return array_filter($data, fn($value) => $value !== null && $value !== '');
+        }
+
+        if ($program->academic_system === 'semester') {
+            $data['block_id'] = null;
+            return array_filter($data, fn($value) => $value !== null && $value !== '');
+        }
+
+        if ($program->academic_system === 'credit' && $program->block_based) {
+            $data['level_id'] = null;
+            $data['semester_id'] = null;
+            return array_filter($data, fn($value) => $value !== null && $value !== '');
+        }
+
+        $data['level_id'] = null;
+        $data['semester_id'] = null;
+        $data['block_id'] = null;
+
+        return array_filter($data, fn($value) => $value !== null && $value !== '');
+    }
+
     /**
      * Display a listing of the resource.
      * يدعم الفلترة والتحميل المسبق للعلاقات.
@@ -34,8 +115,17 @@ class TimetableController extends Controller
         if ($request->has('department_id')) {
             $query->where('department_id', $request->department_id);
         }
+        if ($request->has('program_id')) {
+            $query->where('program_id', $request->program_id);
+        }
         if ($request->has('level_id')) {
             $query->where('level_id', $request->level_id);
+        }
+        if ($request->has('semester_id')) {
+            $query->where('semester_id', $request->semester_id);
+        }
+        if ($request->has('block_id')) {
+            $query->where('block_id', $request->block_id);
         }
 
         // ✅ --- التعديل هنا: إضافة فلتر المحاضر --- ✅
@@ -71,13 +161,12 @@ class TimetableController extends Controller
      */
     public function store(Request $request)  
     {
-        // 1. التحقق الأساسي (Validation)
-        // هذا الجزء ضروري جداً لأن دالة التعارض تعتمد على وجود start_date و end_date
-        $validator = Validator::make($request->all(), [
+        $program = $request->filled('program_id') ? Program::find($request->program_id) : null;
+
+        $rules = [
             'course_id'     => 'required|integer|exists:courses,course_id',
             'lecturer_id'   => 'required|integer|exists:lecturers,lecturer_id',
             'group_id'      => 'required|integer|exists:student_groups,group_id',
-            'level_id'      => 'required|integer|exists:levels,level_id',
             'classroom_id'  => 'required|integer|exists:classrooms,classroom_id',
             'day_id'        => 'required|integer|exists:days,day_id',
             'period_id'     => 'required|integer|exists:periods,period_id',
@@ -91,15 +180,21 @@ class TimetableController extends Controller
             'gender_type'   => 'required|integer|in:0,1,2',
             'status'        => 'required|integer|in:0,1',
             'allowance_minutes' => 'required|integer|min:0|max:60',
-        ]);
+        ];
+
+        $rules = array_merge($rules, $this->resolveProgramPathRules($program));
+
+        $validator = Validator::make($request->all(), $rules);
     
         if ($validator->fails()) {
             return response()->json(['status' => false, 'message' => 'خطأ في التحقق', 'errors' => $validator->errors()], 422);
         }
         
+        $validatedData = $this->normalizeProgramPath($validator->validated());
+
         // 2. التحقق من التعارضات (باستخدام الدالة الجديدة الشاملة)
         // نمرر البيانات كاملة لأن الدالة الجديدة تحتاج التواريخ والقاعة والمحاضر
-        $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $request->all());
+        $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $validatedData);
         
         if (!empty($conflicts)) {
             return response()->json([
@@ -111,7 +206,6 @@ class TimetableController extends Controller
         
         // 3. إنشاء السجل وإنشاء الجلسة التلقائية (كما عدلناها سابقاً)
         try {
-            $validatedData = $validator->validated();
             $timetableEntry = Timetable::create($validatedData);
     
             // إنشاء جلسة تلقائية إذا كان تاريخ البدء هو نفسه تاريخ الانتهاء
@@ -167,11 +261,12 @@ class TimetableController extends Controller
     public function update(Request $request, Timetable $timetable)
     {
         // 1. التحقق من صحة البيانات (استخدام 'sometimes' للسماح بالتحديث الجزئي)
-        $validator = Validator::make($request->all(), [
+        $program = $request->filled('program_id') ? Program::find($request->program_id) : $timetable->program;
+
+        $rules = [
             'course_id'     => 'sometimes|required|integer|exists:courses,course_id',
             'lecturer_id'   => 'sometimes|required|integer|exists:lecturers,lecturer_id',
             'group_id'      => 'sometimes|required|integer|exists:student_groups,group_id',
-            'level_id'      => 'sometimes|required|integer|exists:levels,level_id',
             'classroom_id'  => 'sometimes|required|integer|exists:classrooms,classroom_id',
             'day_id'        => 'sometimes|required|integer|exists:days,day_id',
             'period_id'     => 'sometimes|required|integer|exists:periods,period_id',
@@ -182,15 +277,19 @@ class TimetableController extends Controller
             'academic_year' => 'sometimes|required|string|max:20',
             'college_id'    => 'sometimes|required|integer|exists:colleges,college_id',
             'department_id' => 'sometimes|required|integer|exists:departments,department_id',
-            'gender_type'   => 'sometimes|required|integer|in:0,1.2',
+            'gender_type'   => 'sometimes|required|integer|in:0,1,2',
             'lecture_hours' => 'sometimes|required|numeric|min:0',
-        ]);
+        ];
+
+        $rules = array_merge($rules, $this->resolveProgramPathRules($program));
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json(['status' => false, 'message' => 'خطأ في التحقق', 'errors' => $validator->errors()], 422);
         }
 
-        $validatedData = $validator->validated();
+        $validatedData = $this->normalizeProgramPath($validator->validated());
         
         // 2. التحقق من التعارضات، مع استثناء السجل الحالي
         $day_id = $validatedData['day_id'] ?? $timetable->day_id;
@@ -338,34 +437,94 @@ class TimetableController extends Controller
         return $conflicts;
     }
 
-    public function getTopicsStatus($timetableId)
+    public function getTopicsStatus($timetableId, Request $request)
     {
-        // 1. جلب بيانات الجدول لمعرفة المادة
         $timetable = Timetable::with('course')->findOrFail($timetableId);
         $courseId = $timetable->course_id;
-    
-        // 2. جلب جميع مواضيع المادة
-        $allTopics = CourseTopic::where('course_id', $courseId)
-            ->orderBy('order_index')
-            ->get(['topic_id', 'title']);
-    
-        // 3. جلب المواضيع التي تم تغطيتها في جلسات تابعة لهذا الجدول تحديداً
-        // (هنا يكمن حل مشكلة التمييز بين الفصول الدراسية)
+
+        $lectureTypeMap = [
+            0 => 'نظري',
+            1 => 'عملي',
+            2 => 'تمارين',
+            3 => 'سريري',
+        ];
+
+        $requestedPart = trim((string) ($request->input('part') ?? ''));
+        $resolvedPart = $requestedPart !== '' ? $requestedPart : ($lectureTypeMap[(int) $timetable->lecture_type] ?? 'نظري');
+
+        $normalizePart = function (?string $value): string {
+            return strtolower(str_replace([' ', '\t', '\n', '\r'], '', trim((string) ($value ?? ''))));
+        };
+
+        $baseQuery = CourseTopic::where('course_id', $courseId)
+            ->orderBy('week')
+            ->orderBy('order')
+            ->get([
+                'topic_id',
+                'part',
+                'week',
+                'unit_name',
+                'subtopics',
+                'is_exam',
+                'exam_type',
+            ]);
+
+        $matchingTopics = $baseQuery->filter(function ($topic) use ($resolvedPart, $normalizePart) {
+            if ($normalizePart($topic->part) === $normalizePart($resolvedPart)) {
+                return true;
+            }
+
+            $partAliases = [
+                'نظري' => ['نظري', 'نظريه', 'theory', 'theoretical'],
+                'عملي' => ['عملي', 'practical', 'practice'],
+                'تمارين' => ['تمارين', 'training', 'exercise', 'exercises'],
+                'سريري' => ['سريري', 'clinical', 'clinic'],
+            ];
+
+            $expected = $partAliases[$resolvedPart] ?? [$resolvedPart];
+            foreach ($expected as $alias) {
+                if ($normalizePart($topic->part) === $normalizePart($alias)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        if ($matchingTopics->isEmpty() && $baseQuery->isNotEmpty()) {
+            $matchingTopics = $baseQuery;
+        }
+
         $coveredTopicIds = DB::table('session_topics_covered')
             ->join('lecture_sessions', 'session_topics_covered.session_id', '=', 'lecture_sessions.session_id')
-            ->where('lecture_sessions.timetable_id', $timetableId) // 🔥 الفلترة حسب الجدول الحالي فقط
+            ->join('course_topics', 'session_topics_covered.topic_id', '=', 'course_topics.topic_id')
+            ->where('lecture_sessions.timetable_id', $timetableId)
             ->pluck('session_topics_covered.topic_id')
             ->toArray();
-    
-        // 4. دمج البيانات
-        $result = $allTopics->map(function ($topic) use ($coveredTopicIds) {
+
+        $result = $matchingTopics->map(function ($topic) use ($coveredTopicIds) {
+            $subtopics = is_array($topic->subtopics)
+                ? $topic->subtopics
+                : (json_decode($topic->subtopics ?? '[]', true) ?: []);
+
             return [
                 'topic_id' => $topic->topic_id,
-                'title' => $topic->title,
-                'is_covered' => in_array($topic->topic_id, $coveredTopicIds),
+                'title' => $topic->unit_name ?: 'وحدة بدون عنوان',
+                'unit_name' => $topic->unit_name ?: 'وحدة بدون عنوان',
+                'part' => $topic->part,
+                'week' => $topic->week,
+                'subtopics' => $subtopics,
+                'is_exam' => (bool) $topic->is_exam,
+                'exam_type' => $topic->exam_type,
+                'is_covered' => in_array($topic->topic_id, $coveredTopicIds, true),
             ];
         });
-    
-        return response()->json(['data' => $result]);
+
+        return response()->json([
+            'data' => $result,
+            'part' => $resolvedPart,
+            'lecture_type' => (int) ($timetable->lecture_type ?? 0),
+            'course_id' => $courseId,
+        ]);
     }
 }

@@ -125,14 +125,15 @@ class ProgramLearningOutcomeController extends Controller
                 ], 422);
             }
 
-            // ✅ التحقق من مجموع الأوزان
+            // ✅ الرصيد المتبقي من وزن البرنامج (100%)
             $currentTotalWeight = ProgramLearningOutcome::where('program_id', $validated['program_id'])
                 ->sum('weight');
+            $remainingWeight = 100 - (float) $currentTotalWeight;
 
-            if (($currentTotalWeight + $validated['weight']) > 100) {
+            if ((float) $validated['weight'] > $remainingWeight) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'مجموع الأوزان سيتجاوز 100%. المجموع الحالي: ' . $currentTotalWeight . '%',
+                    'message' => 'لا يمكن إضافة هذا الوزن. المتبقي من وزن البرنامج: ' . number_format(max(0, $remainingWeight), 2) . '%',
                 ], 422);
             }
 
@@ -256,16 +257,17 @@ class ProgramLearningOutcomeController extends Controller
                 }
             }
 
-            // ✅ التحقق من مجموع الأوزان
+            // ✅ إعادة وزن المخرج الحالي إلى الرصيد ثم خصم الوزن الجديد
             if (isset($validated['weight'])) {
                 $currentTotalWeight = ProgramLearningOutcome::where('program_id', $outcome->program_id)
                     ->where('plo_id', '!=', $ploId)
                     ->sum('weight');
+                $remainingWeight = 100 - (float) $currentTotalWeight;
 
-                if (($currentTotalWeight + $validated['weight']) > 100) {
+                if ((float) $validated['weight'] > $remainingWeight) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'مجموع الأوزان سيتجاوز 100%. المجموع الحالي (بدون هذا المخرج): ' . $currentTotalWeight . '%',
+                        'message' => 'لا يمكن تحديث هذا الوزن. المتبقي بعد إعادة الوزن السابق: ' . number_format(max(0, $remainingWeight), 2) . '%',
                     ], 422);
                 }
             }

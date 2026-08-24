@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\TeachingStrategy;
+use App\Models\ProgramOptionAudit;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class TeachingStrategyController extends Controller
 {
@@ -18,6 +20,13 @@ class TeachingStrategyController extends Controller
         try {
             $query = TeachingStrategy::query();
 
+            if ($request->filled('program_id')) {
+                $query->where(function ($q) use ($request) {
+                    $q->where('program_id', (int) $request->program_id)
+                        ->orWhereNull('program_id');
+                });
+            }
+
             // فلترة حسب الفئة
             if ($request->has('category')) {
                 $query->where('category', $request->category);
@@ -28,11 +37,12 @@ class TeachingStrategyController extends Controller
                 $query->where('is_active', true);
             }
 
-            $strategies = $query->orderBy('order')->get()->groupBy('category');
+            $strategies = $query->orderBy('order')->get();
 
             return response()->json([
                 'success' => true,
                 'strategies' => $strategies,
+                'data' => $strategies,
                 'total_count' => TeachingStrategy::count(),
                 'active_count' => TeachingStrategy::where('is_active', true)->count(),
             ], 200);
@@ -52,7 +62,8 @@ class TeachingStrategyController extends Controller
     {
         try {
             $validated = $request->validate([
-                'name' => 'required|string|max:200|unique:teaching_strategies,name',
+                'program_id' => 'nullable|integer|exists:programs,program_id',
+                'name' => ['required', 'string', 'max:200', Rule::unique('teaching_strategies', 'name')->where(fn ($q) => $q->where('program_id', $request->program_id))],
                 'description' => 'nullable|string',
                 'category' => 'required|in:lecture,practical,discussion,collaboration,project_based,problem_solving,simulation,other',
                 'order' => 'integer|min:0',
@@ -60,12 +71,14 @@ class TeachingStrategyController extends Controller
             ], $this->getArabicMessages());
 
             $strategy = TeachingStrategy::create([
+                'program_id' => $validated['program_id'] ?? null,
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'category' => $validated['category'],
                 'order' => $validated['order'] ?? 0,
                 'is_active' => $validated['is_active'] ?? true,
             ]);
+            $this->audit($strategy, 'created', null, $strategy->toArray());
 
             return response()->json([
                 'success' => true,
@@ -118,14 +131,17 @@ class TeachingStrategyController extends Controller
             $strategy = TeachingStrategy::findOrFail($id);
 
             $validated = $request->validate([
-                'name' => 'string|max:200|unique:teaching_strategies,name,' . $id,
+                'program_id' => 'nullable|integer|exists:programs,program_id',
+                'name' => ['string', 'max:200', Rule::unique('teaching_strategies', 'name')->ignore($id)->where(fn ($q) => $q->where('program_id', $request->program_id ?? $strategy->program_id))],
                 'description' => 'nullable|string',
                 'category' => 'in:lecture,practical,discussion,collaboration,project_based,problem_solving,simulation,other',
                 'order' => 'integer|min:0',
                 'is_active' => 'boolean',
             ], $this->getArabicMessages());
 
+            $before = $strategy->toArray();
             $strategy->update($validated);
+            $this->audit($strategy, 'updated', $before, $strategy->fresh()->toArray());
 
             return response()->json([
                 'success' => true,
@@ -157,6 +173,8 @@ class TeachingStrategyController extends Controller
                 ], 422);
             }
 
+            $before = $strategy->toArray();
+            $this->audit($strategy, 'deleted', $before, null);
             $strategy->delete();
 
             return response()->json([
@@ -178,5 +196,18 @@ class TeachingStrategyController extends Controller
             'name.unique' => 'هذه الاستراتيجية موجودة بالفعل',
             'category.required' => 'الفئة مطلوبة',
         ];
+    }
+
+    private function audit(TeachingStrategy $strategy, string $action, ?array $before, ?array $after): void
+    {
+        if (!$strategy->program_id) return;
+        ProgramOptionAudit::create([
+            'program_id' => $strategy->program_id,
+            'option_type' => 'teaching_strategy',
+            'option_id' => $strategy->id,
+            'action' => $action,
+            'details' => ['before' => $before, 'after' => $after],
+            'changed_by' => request()->user()?->getAuthIdentifier(),
+        ]);
     }
 }

@@ -9,6 +9,42 @@ use Illuminate\Support\Facades\Storage;
 
 class LectureAttachmentsController extends Controller
 {
+    private function isValidHttpUrl(?string $url): bool
+    {
+        if (!is_string($url) || trim($url) === '') {
+            return false;
+        }
+
+        $url = trim($url);
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $parsed = parse_url($url);
+        return is_array($parsed)
+            && !empty($parsed['scheme'])
+            && in_array(strtolower($parsed['scheme']), ['http', 'https'], true)
+            && !empty($parsed['host']);
+    }
+
+    private function isValidYoutubeUrl(?string $url): bool
+    {
+        if (!$this->isValidHttpUrl($url)) {
+            return false;
+        }
+
+        $host = strtolower(parse_url(trim($url), PHP_URL_HOST) ?? '');
+        $allowedHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be'];
+
+        if (!in_array($host, $allowedHosts, true)) {
+            return false;
+        }
+
+        $pattern = '/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)/i';
+
+        return preg_match($pattern, trim($url)) === 1;
+    }
+
     /**
      * جلب مرفقات جلسة معينة
      */
@@ -30,9 +66,25 @@ class LectureAttachmentsController extends Controller
             'session_id' => 'required|exists:lecture_sessions,session_id',
             'type' => 'required|in:file,video,link',
             'title' => 'required|string|max:200',
-            // إذا كان ملفاً، يجب أن يكون file، وإذا كان رابطاً يجب أن يكون url
-            'file' => 'required_if:type,file|file|max:10240', // Max 10MB
-            'url' => 'required_if:type,video,link|nullable|url',
+            'file' => 'required_if:type,file|file|max:10240',
+            'url' => [
+                'required_if:type,video,link',
+                'nullable',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($value === null || trim((string) $value) === '') {
+                        return;
+                    }
+
+                    if ($request->type === 'video' && !$this->isValidYoutubeUrl($value)) {
+                        $fail('رابط الفيديو يجب أن يكون رابط YouTube صحيحاً.');
+                        return;
+                    }
+
+                    if ($request->type === 'link' && !$this->isValidHttpUrl($value)) {
+                        $fail('الرابط الخارجي غير صالح، يجب أن يبدأ بـ http أو https.');
+                    }
+                },
+            ],
         ]);
 
         $url = $request->url;
@@ -72,8 +124,27 @@ class LectureAttachmentsController extends Controller
 
         $request->validate([
             'title' => 'required|string|max:200',
-            // نسمح بتعديل الرابط فقط إذا لم يكن ملفاً مرفوعاً
-            'url' => $attachment->type === 'file' ? 'nullable' : 'required|url',
+            'url' => [
+                $attachment->type === 'file' ? 'nullable' : 'required',
+                function ($attribute, $value, $fail) use ($attachment) {
+                    if ($attachment->type === 'file') {
+                        return;
+                    }
+
+                    if ($value === null || trim((string) $value) === '') {
+                        return;
+                    }
+
+                    if ($attachment->type === 'video' && !$this->isValidYoutubeUrl($value)) {
+                        $fail('رابط الفيديو يجب أن يكون رابط YouTube صحيحاً.');
+                        return;
+                    }
+
+                    if ($attachment->type === 'link' && !$this->isValidHttpUrl($value)) {
+                        $fail('الرابط الخارجي غير صالح، يجب أن يبدأ بـ http أو https.');
+                    }
+                },
+            ],
         ]);
 
         $attachment->title = $request->title;

@@ -156,6 +156,25 @@ class UpdateCourseRequest extends FormRequest
                     }
                 }
             }
+
+            // ✅ استثناء وزن المقرر الحالي ثم التحقق من الرصيد المتبقي
+            if ($program && $this->has('weight')) {
+                $programWeight = (float) \App\Models\ProgramLearningOutcome::where('program_id', $program->program_id)
+                    ->sum('weight');
+                $course = $this->route('course');
+                $courseId = $course instanceof Course ? $course->course_id : $course;
+                $currentCourseWeight = (float) \App\Models\Course::where('program_id', $program->program_id)
+                    ->where('course_id', '!=', $courseId)
+                    ->sum('weight');
+                $remainingWeight = max(0, $programWeight - $currentCourseWeight);
+
+                if ((float) $this->weight > $remainingWeight) {
+                    $validator->errors()->add(
+                        'weight',
+                        "وزن المقرر يتجاوز الرصيد المتاح. أوزان مخرجات البرنامج: {$programWeight}%. المتاح لهذا المقرر: {$remainingWeight}%."
+                    );
+                }
+            }
     
             // ✅ التحقق من توازن الساعات (مع تسامح أكبر)
             if ($this->has('course_parts') && $this->course_parts && count($this->course_parts) > 0) {

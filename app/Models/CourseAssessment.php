@@ -23,6 +23,7 @@ class CourseAssessment extends Model
         'academic_year',
         'name',
         'week',
+        'max_score',
         'grade',
         'weight',
         'percentage',
@@ -33,6 +34,7 @@ class CourseAssessment extends Model
     ];
 
     protected $casts = [
+        'max_score' => 'decimal:2',
         'grade' => 'decimal:2',
         'weight' => 'integer',
         'percentage' => 'decimal:2',

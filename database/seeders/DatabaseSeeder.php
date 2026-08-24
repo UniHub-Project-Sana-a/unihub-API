@@ -27,16 +27,21 @@ class DatabaseSeeder extends Seeder
         // 3. إنشاء المستخدم المشرف العام
         $adminType = UserType::where('user_type_code', 'admin')->first();
         if ($adminType) {
-            User::create([
-                'full_name' => 'علاء حسين سعيد زيد علي',
-                'email' => 'ala.hussein002@gmail.com',
-                'phone' => '711155980',
-                'password' => Hash::make('Admin@12345'),
-                'academic_number' => 'ADM0001',
-                'gender' => 0,
-                'user_type_id' => $adminType->user_type_id,
-                'college_id' => null,
-            ]);
+            User::updateOrCreate(
+                ['academic_number' => 'ADM0001'],
+                [
+                    'full_name' => 'علاء حسين سعيد زيد علي',
+                    'email' => 'ala.hussein002@gmail.com',
+                    'phone' => '711155980',
+                    'password' => Hash::make('Admin@12345'),
+                    'gender' => 0,
+                    'user_type_id' => $adminType->user_type_id,
+                    'college_id' => null,
+                ]
+            );
         }
+
+        // 4. إنشاء الكلية الأولى وربط كل الصلاحيات بالمستخدم الإداري
+        $this->call(InitialCollegeSeeder::class);
     }
 }

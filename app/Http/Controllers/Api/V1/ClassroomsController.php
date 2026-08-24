@@ -11,12 +11,16 @@ class ClassroomsController extends Controller {
 // App\Http\Controllers\Api\V1\ClassroomsController.php
     public function index(Request $request)
     {
-        $query = Classroom::query();
+        $query = Classroom::query()->with(['building', 'college']);
     
-        // الفلترة حسب الكلية (عبر علاقة المبنى)
+        // الفلترة حسب الكلية: مباشرة على القاعة أو عبر علاقة المبنى (للقاعات المشتركة قديماً)
         if ($request->filled('college_id')) {
-            $query->whereHas('building', function ($q) use ($request) {
-                $q->where('college_id', (int)$request->college_id);
+            $collegeId = (int)$request->college_id;
+            $query->where(function ($q) use ($collegeId) {
+                $q->where('college_id', $collegeId)
+                  ->orWhereHas('building', function ($b) use ($collegeId) {
+                      $b->where('college_id', $collegeId);
+                  });
             });
         }
     
@@ -35,14 +39,14 @@ class ClassroomsController extends Controller {
     }
     public function store(StoreClassroomRequest $request) {
         $classroom = Classroom::create($request->validated());
-        return response()->json($classroom->load('building'), 201);
+        return response()->json($classroom->load(['building', 'college']), 201);
     }
     public function show(Classroom $classroom) {
-        return response()->json($classroom->load('building'));
+        return response()->json($classroom->load(['building', 'college']));
     }
     public function update(UpdateClassroomRequest $request, Classroom $classroom) {
         $classroom->update($request->validated());
-        return response()->json($classroom->load('building'));
+        return response()->json($classroom->load(['building', 'college']));
     }
     public function destroy(Classroom $classroom) {
         $classroom->delete();

@@ -14,7 +14,7 @@ class Student extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'user_id','college_id','department_id','level_id','program_id','status',
+        'user_id','college_id','department_id','level_id','program_id','semester_id','block_id','status',
     ];
 
     protected $casts = [
@@ -39,6 +39,16 @@ class Student extends Model
     public function level()
     {
         return $this->belongsTo(Level::class, 'level_id', 'level_id');
+    }
+
+    public function semester()
+    {
+        return $this->belongsTo(Semester::class, 'semester_id', 'semester_id');
+    }
+
+    public function block()
+    {
+        return $this->belongsTo(Block::class, 'block_id', 'id');
     }
 
     public function groups()

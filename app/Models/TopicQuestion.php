@@ -15,6 +15,8 @@ class TopicQuestion extends Model
     protected $guarded = ['question_id'];
 
     protected $fillable = [
+        'course_id',
+        'part',
         'topic_id',
         'subtopic',
         'question_text',
