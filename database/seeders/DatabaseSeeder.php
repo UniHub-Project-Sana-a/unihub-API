@@ -31,9 +31,9 @@ class DatabaseSeeder extends Seeder
                 ['academic_number' => 'ADM0001'],
                 [
                     'full_name' => ' عبدالله الهاشمي ',
-                    'email' => '3bduad@gmail.com',
+                    'email' => 'ala.hussein002@gmail.com',
                     'phone' => '734637112',
-                    'password' => Hash::make('2025_8_21'),
+                    'password' => Hash::make('Admin@12345'),
                     'gender' => 0,
                     'user_type_id' => $adminType->user_type_id,
                     'college_id' => null,
