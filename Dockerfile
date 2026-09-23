@@ -26,15 +26,22 @@ RUN a2enmod rewrite headers
 # تعيين مجلد العمل
 WORKDIR /var/www/html
 
-# نسخ ملفات المشروع
-COPY . /var/www/html
+# نسخ ملفات composer أولاً للاستفادة من Docker cache
+COPY composer.json composer.lock ./
 
 # تثبيت تبعيات PHP
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# نسخ باقي ملفات المشروع
+COPY . .
+
+# إكمال composer autoload
+RUN composer dump-autoload --optimize
 
 # إنشاء مجلدات التخزين
 RUN mkdir -p storage/framework/{sessions,views,cache} \
     && mkdir -p storage/logs \
+    && mkdir -p storage/app/public \
     && mkdir -p bootstrap/cache
 
 # ضبط الصلاحيات
@@ -45,14 +52,18 @@ RUN chown -R www-data:www-data /var/www/html \
 # تعديل Apache DocumentRoot
 RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
 
-# السماح بـ .htaccess overrides
-RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+# إضافة تكوين Apache للـ Laravel
+RUN echo '<Directory /var/www/html/public>\n\
+    Options Indexes FollowSymLinks\n\
+    AllowOverride All\n\
+    Require all granted\n\
+</Directory>' >> /etc/apache2/sites-available/000-default.conf
 
 # نسخ سكريبت البدء
 COPY render-start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-# فتح المنفذ (Render يستخدم 10000 افتراضياً)
+# فتح المنفذ 
 EXPOSE 80
 
 # نقطة الدخول
