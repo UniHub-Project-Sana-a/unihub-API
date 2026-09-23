@@ -3,6 +3,33 @@ set -e
 
 echo "🚀 Starting University System Backend on Render..."
 
+# ... الكود السابق ...
+
+# ==========================================
+# إعداد Cloudinary للـ Storage
+# ==========================================
+if [ "$FILESYSTEM_DRIVER" = "cloudinary" ]; then
+    echo "☁️  Configuring Cloudinary storage..."
+    
+    # التأكد من وجود المتغيرات
+    if [ -z "$CLOUDINARY_CLOUD_NAME" ]; then
+        echo "❌ Error: CLOUDINARY_CLOUD_NAME not set!"
+        exit 1
+    fi
+    
+    echo "✅ Cloudinary configured: $CLOUDINARY_CLOUD_NAME"
+else
+    echo "📁 Using local file storage"
+fi
+
+# ==========================================
+# Storage link (يعمل للحالتين)
+# ==========================================
+echo "🔗 Creating storage link..."
+php artisan storage:link --force || echo "⚠️  Storage link already exists"
+
+# ... باقي الكود ...
+
 # ==========================================
 # انتظار قاعدة البيانات PostgreSQL
 # ==========================================

@@ -1,5 +1,6 @@
 <?php
 namespace Database\Seeders;
+
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 use App\Models\User;
@@ -24,24 +25,27 @@ class DatabaseSeeder extends Seeder
             '--name' => 'UniHub API Personal Access Client'
         ]);
 
-        // 3. إنشاء المستخدم المشرف العام
-        $adminType = UserType::where('user_type_code', 'admin')->first();
-        if ($adminType) {
-            User::updateOrCreate(
-                ['academic_number' => 'ADM0001'],
-                [
-                    'full_name' => ' عبدالله الهاشمي ',
-                    'email' => 'ala.hussein002@gmail.com',
-                    'phone' => '734637112',
-                    'password' => Hash::make('Admin@12345'),
-                    'gender' => 0,
-                    'user_type_id' => $adminType->user_type_id,
-                    'college_id' => null,
-                ]
-            );
-        }
+        // 3. جلب نوع المستخدم أو إنشائه إن لم يكن موجوداً
+        $adminType = UserType::firstOrCreate(
+            ['user_type_code' => 'admin'],
+            ['user_type_name' => 'Admin']
+        );
 
-        // 4. إنشاء الكلية الأولى وربط كل الصلاحيات بالمستخدم الإداري
+        // 4. إنشاء المستخدم المشرف العام بشكل مضمون
+        User::updateOrCreate(
+            ['email' => 'ala.hussein002@gmail.com'],
+            [
+                'academic_number' => 'ADM0001',
+                'full_name'       => 'Alaa Hussein',
+                'phone'           => '734637112',
+                'password'        => Hash::make('Admin@12345'),
+                'gender'          => 0,
+                'user_type_id'    => $adminType->user_type_id ?? $adminType->id,
+                'college_id'      => null,
+            ]
+        );
+
+        // 5. إنشاء الكلية الأولى وربط كل الصلاحيات
         $this->call(InitialCollegeSeeder::class);
     }
 }
