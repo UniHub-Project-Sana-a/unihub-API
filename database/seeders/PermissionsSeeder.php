@@ -9,10 +9,21 @@ class PermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        // تنظيف الجدول
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        DB::table('permissions')->truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        // تنظيف الجدول بطريقة متوافقة مع جميع قواعد البيانات
+        $driver = DB::connection()->getDriverName();
+        
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            DB::table('permissions')->truncate();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } elseif ($driver === 'pgsql') {
+            DB::statement('SET session_replication_role = replica;');
+            DB::table('permissions')->truncate();
+            DB::statement('SET session_replication_role = DEFAULT;');
+        } else {
+            // SQLite or others
+            DB::table('permissions')->delete();
+        }
 
         $permissions = [
             // =======================================================
@@ -70,10 +81,10 @@ class PermissionsSeeder extends Seeder
             // =======================================================
             // 7. الرتب الأكاديمية (Academic Titles)
             // =======================================================
-            ['key' => 'academic_titles.view',   'name' => 'عرض الرتب الأكاديمية', 'desc' => ''],
-            ['key' => 'academic_titles.create', 'name' => 'إضافة رتبة أكاديمية',  'desc' => ''],
-            ['key' => 'academic_titles.update', 'name' => 'تعديل رتبة أكاديمية',  'desc' => ''],
-            ['key' => 'academic_titles.delete', 'name' => 'حذف رتبة أكاديمية',    'desc' => ''],
+            ['key' => 'academic_titles.view',   'name' => 'عرض الرتب الأكاديمية', 'desc' => 'عرض قائمة الرتب العلمية'],
+            ['key' => 'academic_titles.create', 'name' => 'إضافة رتبة أكاديمية',  'desc' => 'إضافة رتبة علمية جديدة'],
+            ['key' => 'academic_titles.update', 'name' => 'تعديل رتبة أكاديمية',  'desc' => 'تعديل بيانات الرتبة'],
+            ['key' => 'academic_titles.delete', 'name' => 'حذف رتبة أكاديمية',    'desc' => 'حذف رتبة علمية'],
 
             // =======================================================
             // 8. هيئة التدريس (Staff)
@@ -81,7 +92,7 @@ class PermissionsSeeder extends Seeder
             ['key' => 'staff.view',   'name' => 'عرض هيئة التدريس',    'desc' => 'عرض قائمة المحاضرين'],
             ['key' => 'staff.create', 'name' => 'إضافة عضو هيئة تدريس', 'desc' => 'إضافة محاضر جديد'],
             ['key' => 'staff.update', 'name' => 'تعديل بيانات عضو',     'desc' => 'تعديل الملف الشخصي للمحاضر'],
-            ['key' => 'staff.delete', 'name' => 'حذف عضو هيئة تدريس',   'desc' => ''],
+            ['key' => 'staff.delete', 'name' => 'حذف عضو هيئة تدريس',   'desc' => 'حذف محاضر من النظام'],
 
             // =======================================================
             // 9. الجدول الدراسي (Timetable)
@@ -91,7 +102,6 @@ class PermissionsSeeder extends Seeder
             ['key' => 'timetable.create_lecture', 'name' => 'إنشاء محاضرة',        'desc' => 'إضافة محاضرة للجدول'],
             ['key' => 'timetable.update_lecture', 'name' => 'تعديل محاضرة',        'desc' => 'تغيير وقت أو قاعة المحاضرة'],
             ['key' => 'timetable.delete_lecture', 'name' => 'حذف محاضرة',          'desc' => 'إزالة محاضرة من الجدول'],
-            // ['key' => 'timetable.create_makeup',  'name' => 'إنشاء محاضرة تعويضية','desc' => 'جدولة محاضرة تعويضية يدوياً'],
 
             // =======================================================
             // 10. التسجيل والطلاب (Registration)
@@ -99,37 +109,36 @@ class PermissionsSeeder extends Seeder
             ['key' => 'groups.view',     'name' => 'عرض المجموعات',     'desc' => 'عرض المجموعات الطلابية'],
             ['key' => 'groups.create',   'name' => 'إنشاء مجموعة',      'desc' => 'إنشاء مجموعة جديدة'],
             ['key' => 'students.add',    'name' => 'إضافة طالب',        'desc' => 'تسجيل طالب في النظام'],
-            ['key' => 'students.update', 'name' => 'تعديل بيانات طالب', 'desc' => ''],
-            ['key' => 'students.delete', 'name' => 'حذف طالب',          'desc' => ''],
+            ['key' => 'students.update', 'name' => 'تعديل بيانات طالب', 'desc' => 'تعديل معلومات الطالب'],
+            ['key' => 'students.delete', 'name' => 'حذف طالب',          'desc' => 'حذف طالب من النظام'],
 
             // =======================================================
             // 11. الفترات الزمنية (Periods)
             // =======================================================
-            ['key' => 'periods.view',   'name' => 'عرض الفترات',    'desc' => ''],
-            ['key' => 'periods.create', 'name' => 'إضافة فترة',     'desc' => ''],
-            ['key' => 'periods.update', 'name' => 'تعديل فترة',     'desc' => ''],
-            ['key' => 'periods.delete', 'name' => 'حذف فترة',       'desc' => ''],
+            ['key' => 'periods.view',   'name' => 'عرض الفترات',    'desc' => 'عرض الفترات الزمنية'],
+            ['key' => 'periods.create', 'name' => 'إضافة فترة',     'desc' => 'إضافة فترة زمنية جديدة'],
+            ['key' => 'periods.update', 'name' => 'تعديل فترة',     'desc' => 'تعديل بيانات فترة'],
+            ['key' => 'periods.delete', 'name' => 'حذف فترة',       'desc' => 'حذف فترة زمنية'],
 
             // =======================================================
             // 12. طلبات التعويض (Requests)
             // =======================================================
-            ['key' => 'requests.approve_makeup', 'name' => 'الموافقة على طلبات التعويض', 'desc' => 'قبول أو رفض طلبات المحاضرين'],
-            ['key' => 'requests.rejected_makeup', 'name' => ' أعادة الطلبات المرفوضة  ', 'desc' => 'إعادة تقديم طلبات المحاضرين المرفوضة'],
-            ['key' => 'requests.view_makeup',    'name' => 'عرض طلبات التعويض',        'desc' => 'عرض كافة طلبات المحاضرين للتعويض'],
-            ['key' => 'requests.schedule_makeup', 'name' => 'جدولة المحاضرة التعويضية',   'desc' => 'تحديد الوقت والقاعة للطلب بعد الموافقة عليه'],
-
+            ['key' => 'requests.approve_makeup',   'name' => 'الموافقة على طلبات التعويض',  'desc' => 'قبول أو رفض طلبات المحاضرين'],
+            ['key' => 'requests.rejected_makeup',  'name' => 'أعادة الطلبات المرفوضة',      'desc' => 'إعادة تقديم طلبات المحاضرين المرفوضة'],
+            ['key' => 'requests.view_makeup',      'name' => 'عرض طلبات التعويض',           'desc' => 'عرض كافة طلبات المحاضرين للتعويض'],
+            ['key' => 'requests.schedule_makeup',  'name' => 'جدولة المحاضرة التعويضية',    'desc' => 'تحديد الوقت والقاعة للطلب بعد الموافقة عليه'],
 
             // =======================================================
             // 13. التقارير (Reports)
             // =======================================================
-            ['key' => 'reports.financial_manage',   'name' => 'إدارة التقارير المالية',   'desc' => 'عرض وإنشاء كشوف الاستحقاق'],
-            ['key' => 'reports.lecturer_attendance','name' => 'تقرير حضور المحاضرين',     'desc' => 'عرض سجلات حضور الدكاترة'],
-            ['key' => 'reports.student_attendance', 'name' => 'تقرير حضور الطلاب',        'desc' => 'عرض سجلات حضور وغياب الطلاب'],
-            ['key' => 'reports.semester_results',   'name' => 'نتائج أعمال الفصل',        'desc' => 'عرض درجات ونتائج الفصل'],
-            ['key' => 'reports.view_custom',          'name' => 'عرض التقارير المخصصة',     'desc' => 'إنشاء تقارير مخصصة حسب الحاجة'],
+            ['key' => 'reports.financial_manage',    'name' => 'إدارة التقارير المالية',   'desc' => 'عرض وإنشاء كشوف الاستحقاق'],
+            ['key' => 'reports.lecturer_attendance', 'name' => 'تقرير حضور المحاضرين',     'desc' => 'عرض سجلات حضور الدكاترة'],
+            ['key' => 'reports.student_attendance',  'name' => 'تقرير حضور الطلاب',        'desc' => 'عرض سجلات حضور وغياب الطلاب'],
+            ['key' => 'reports.semester_results',    'name' => 'نتائج أعمال الفصل',        'desc' => 'عرض درجات ونتائج الفصل'],
+            ['key' => 'reports.view_custom',         'name' => 'عرض التقارير المخصصة',     'desc' => 'إنشاء تقارير مخصصة حسب الحاجة'],
 
             // =======================================================
-            // 14. لوحة التحكم (Dashboards) - تم التحديث
+            // 14. لوحة التحكم (Dashboards)
             // =======================================================
             ['key' => 'dashboard.view_global',  'name' => 'عرض لوحة التحكم العامة',   'desc' => 'اللوحة الرئيسية للنظام (تشمل جميع الكليات)'],
             ['key' => 'dashboard.view_college', 'name' => 'عرض لوحة تحكم الكلية',     'desc' => 'اللوحة الخاصة بإحصائيات الكلية الواحدة'],
@@ -138,15 +147,17 @@ class PermissionsSeeder extends Seeder
         $this->command->info('Start Seeding Permissions...');
 
         foreach ($permissions as $perm) {
-            DB::table('permissions')->insert([
-                'permission_key'  => $perm['key'],
-                'permission_name' => $perm['name'],
-                'description'     => $perm['desc'],
-                'created_at'      => now(),
-                'updated_at'      => now()
-            ]);
+            DB::table('permissions')->updateOrInsert(
+                ['permission_key' => $perm['key']], // الشرط
+                [
+                    'permission_name' => $perm['name'],
+                    'description'     => $perm['desc'],
+                    'created_at'      => now(),
+                    'updated_at'      => now()
+                ]
+            );
         }
 
-        $this->command->info('Permissions updated successfully! Total: ' . count($permissions));
+        $this->command->info('✅ Permissions seeded successfully! Total: ' . count($permissions));
     }
 }
