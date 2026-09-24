@@ -94,27 +94,47 @@ php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
 php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
 php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
 php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
-# Passport
+# ==========================================
+# Passport Setup
+# ==========================================
 echo "🔐 Setting up Passport..."
 
 # Generate keys if not exist
 if [ ! -f storage/oauth-private.key ]; then
     echo "→ Generating keys..."
-    timeout 30 php artisan passport:keys --force || echo "⚠️  Key generation timeout, using existing"
+    timeout 30 php artisan passport:keys --force || echo "⚠️  Key generation timeout"
+fi
+
+# Fix permissions (مهم جداً!)
+if [ -f storage/oauth-private.key ]; then
+    chmod 600 storage/oauth-private.key
+    chmod 600 storage/oauth-public.key
+    chown www-data:www-data storage/oauth-*.key
+    echo "✓ Keys permissions fixed"
 fi
 
 # Create client if needed
 if [ -z "$PASSPORT_CLIENT_ID" ]; then
     echo "→ Creating client..."
     
-    # Delete old password clients
-    php artisan tinker --execute="
-        \$column = Schema::hasColumn('oauth_clients', 'password_client') ? 'password_client' : 'is_password_client';
-        DB::table('oauth_clients')->where(\$column, 1)->delete();
-    " 2>/dev/null || true
+    # Check which column exists (Laravel Passport version compatibility)
+    COLUMN_CHECK=$(php artisan tinker --execute="
+        echo Schema::hasColumn('oauth_clients', 'password_client') ? 'password_client' : 'personal_access_client';
+    " 2>/dev/null || echo "personal_access_client")
+    
+    # Delete old password/personal access clients
+    if [ "$COLUMN_CHECK" = "password_client" ]; then
+        php artisan tinker --execute="
+            DB::table('oauth_clients')->where('password_client', 1)->delete();
+        " 2>/dev/null || true
+    else
+        php artisan tinker --execute="
+            DB::table('oauth_clients')->where('personal_access_client', 1)->delete();
+        " 2>/dev/null || true
+    fi
     
     # Create new client with timeout
-    OUTPUT=$(timeout 30 php artisan passport:client --password --name="UniHub" 2>&1) || {
+    OUTPUT=$(timeout 30 php artisan passport:client --personal --name="UniHub" --no-interaction 2>&1) || {
         echo "⚠️  Client creation timeout"
         OUTPUT=""
     }
