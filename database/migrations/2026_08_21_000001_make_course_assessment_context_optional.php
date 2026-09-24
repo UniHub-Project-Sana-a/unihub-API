@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,13 +12,25 @@ return new class extends Migration
             return;
         }
 
-        DB::statement('ALTER TABLE course_assessments MODIFY group_id INT UNSIGNED NULL');
-        DB::statement('ALTER TABLE course_assessments MODIFY created_by INT UNSIGNED NULL');
-        DB::statement('ALTER TABLE course_assessments MODIFY academic_year VARCHAR(20) NULL');
+        Schema::table('course_assessments', function (Blueprint $table) {
+            // Make columns nullable (works for both MySQL and PostgreSQL)
+            $table->unsignedInteger('group_id')->nullable()->change();
+            $table->unsignedInteger('created_by')->nullable()->change();
+            $table->string('academic_year', 20)->nullable()->change();
+        });
     }
 
     public function down(): void
     {
-        // Existing records may not have these context values, so rollback is non-destructive.
+        if (!Schema::hasTable('course_assessments')) {
+            return;
+        }
+
+        Schema::table('course_assessments', function (Blueprint $table) {
+            // Revert to non-nullable (optional rollback)
+            $table->unsignedInteger('group_id')->nullable(false)->change();
+            $table->unsignedInteger('created_by')->nullable(false)->change();
+            $table->string('academic_year', 20)->nullable(false)->change();
+        });
     }
 };
