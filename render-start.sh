@@ -92,7 +92,8 @@ php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
 php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
 php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
 php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
-
+php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
+php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
 # Passport
 echo "🔐 Setting up Passport..."
 
@@ -107,7 +108,10 @@ if [ -z "$PASSPORT_CLIENT_ID" ]; then
     echo "→ Creating client..."
     
     # Delete old password clients
-    php artisan tinker --execute="DB::table('oauth_clients')->where('password_client', 1)->delete();" 2>/dev/null || true
+    php artisan tinker --execute="
+        \$column = Schema::hasColumn('oauth_clients', 'password_client') ? 'password_client' : 'is_password_client';
+        DB::table('oauth_clients')->where(\$column, 1)->delete();
+    " 2>/dev/null || true
     
     # Create new client with timeout
     OUTPUT=$(timeout 30 php artisan passport:client --password --name="UniHub" 2>&1) || {

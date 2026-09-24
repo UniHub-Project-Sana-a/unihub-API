@@ -17,9 +17,10 @@ class PermissionsSeeder extends Seeder
             DB::table('permissions')->truncate();
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         } elseif ($driver === 'pgsql') {
-            DB::statement('SET session_replication_role = replica;');
-            DB::table('permissions')->truncate();
-            DB::statement('SET session_replication_role = DEFAULT;');
+            // DB::statement('SET session_replication_role = replica;');
+            // DB::table('permissions')->truncate();
+            // DB::statement('SET session_replication_role = DEFAULT;');
+            DB::table('permissions')->delete();
         } else {
             // SQLite or others
             DB::table('permissions')->delete();

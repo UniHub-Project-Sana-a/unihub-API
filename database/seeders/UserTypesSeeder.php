@@ -20,6 +20,17 @@ class UserTypesSeeder extends Seeder
             ['user_type_name' => 'محاضر', 'user_type_code' => 'lecturer'], // استخدمنا lecturer بدلاً من lecter
         ];
 
-        DB::table('user_types')->insert($types);
+        foreach ($types as $type) {
+            DB::table('user_types')->updateOrInsert(
+                ['user_type_code' => $type['user_type_code']],
+                [
+                    'user_type_name' => $type['user_type_name'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        $this->command->info('✅ User types seeded successfully!');
     }
 }
