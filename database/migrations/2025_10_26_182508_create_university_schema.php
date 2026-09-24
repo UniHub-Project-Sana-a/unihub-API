@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 /**
  * UniHub university schema.
@@ -581,7 +582,13 @@ return new class extends Migration
             $table->decimal('total_bonuses', 12, 2)->default(0);
             $table->decimal('total_deductions', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
-            $table->decimal('net_amount', 12, 2)->storedAs('`base_amount` + `total_bonuses` - `total_deductions` - `tax_amount`');
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                // PostgreSQL Syntax (بدون backticks)
+                DB::statement('ALTER TABLE lecturer_payouts ADD COLUMN net_amount DECIMAL(12,2) GENERATED ALWAYS AS (base_amount + total_bonuses - total_deductions - tax_amount) STORED');
+            } else {
+                // MySQL Syntax (الكود الأصلي)
+                $table->decimal('net_amount', 12, 2)->storedAs('`base_amount` + `total_bonuses` - `total_deductions` - `tax_amount`');
+            }
             $table->string('status', 20)->default('pending');
             $table->string('notes', 255)->nullable();
             $table->timestamps();
@@ -1503,6 +1510,15 @@ return new class extends Migration
             $table->foreign('session_id', 'session_topics_covered_session_id_foreign')->references('session_id')->on('lecture_sessions')->onDelete('cascade');
             $table->foreign('topic_id', 'session_topics_covered_topic_id_foreign')->references('topic_id')->on('course_topics')->onDelete('cascade');
         });
+
+        // في نهاية الـ up() function
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('
+                ALTER TABLE lecturer_payouts 
+                ADD COLUMN net_amount DECIMAL(12,2) 
+                GENERATED ALWAYS AS (base_amount + total_bonuses - total_deductions - tax_amount) STORED
+            ');
+        }
     }
 
     /**
