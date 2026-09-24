@@ -12,6 +12,8 @@ storage/framework/sessions/*
 !storage/framework/sessions/.gitkeep
 storage/framework/views/*
 !storage/framework/views/.gitkeep
+storage/logs/laravel.log
+.gitignore
 tests
 .phpunit.result.cache
 *.log
