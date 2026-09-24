@@ -70,7 +70,12 @@ use App\Http\Controllers\Api\V1\{
     ,CourseOutcomeMappingController
     ,ProgramOptionAuditController
 };
+use App\Http\Controllers\Api\HealthController;
 
+// Health Check Routes (لا تحتاج Authentication)
+Route::get('/health', [HealthController::class, 'index']);
+Route::get('/health/detailed', [HealthController::class, 'detailed']);
+Route::get('/ping', [HealthController::class, 'ping']);
 
 Route::get('/debug/password-algo', function () {
 
