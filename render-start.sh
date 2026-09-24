@@ -6,19 +6,19 @@ echo "============================="
 
 # Clear cache
 echo "🧹 Clearing cache..."
-rm -rf bootstrap/cache/*.php
-rm -rf storage/framework/cache/data/*
+rm -rf bootstrap/cache/*.php 2>/dev/null || true
+rm -rf storage/framework/cache/data/* 2>/dev/null || true
 
-# Check variables
+# Check environment
 echo "🔍 Checking environment..."
 
 if [ -z "$DATABASE_URL" ]; then
-    echo "❌ DATABASE_URL is missing!"
+    echo "❌ DATABASE_URL missing!"
     exit 1
 fi
 
 if [ -z "$APP_KEY" ]; then
-    echo "❌ APP_KEY is missing!"
+    echo "❌ APP_KEY missing!"
     exit 1
 fi
 
@@ -29,12 +29,14 @@ DB_NAME=$(echo $DATABASE_URL | sed -n 's|.*/\([^?]*\).*|\1|p')
 DB_USER=$(echo $DATABASE_URL | sed -n 's|.*://\([^:]*\):.*|\1|p')
 DB_PASS=$(echo $DATABASE_URL | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
 
+DB_PORT=${DB_PORT:-5432}
+
 echo "✓ Database: $DB_NAME @ $DB_HOST"
 
 # Wait for database
 echo "⏳ Waiting for PostgreSQL..."
 for i in {1..30}; do
-    if PGPASSWORD=$DB_PASS psql -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; then
+    if PGPASSWORD=$DB_PASS psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; then
         echo "✅ Database connected"
         break
     fi
@@ -45,7 +47,7 @@ done
 # Create .env
 echo "📝 Creating .env..."
 cat > .env << EOF
-APP_NAME=$APP_NAME
+APP_NAME=UniHub
 APP_ENV=production
 APP_KEY=$APP_KEY
 APP_DEBUG=false
@@ -66,13 +68,13 @@ QUEUE_CONNECTION=sync
 FILESYSTEM_DISK=local
 
 MAIL_MAILER=smtp
-MAIL_HOST=$MAIL_HOST
-MAIL_PORT=$MAIL_PORT
-MAIL_USERNAME=$MAIL_USERNAME
+MAIL_HOST=${MAIL_HOST:-smtp.resend.com}
+MAIL_PORT=${MAIL_PORT:-587}
+MAIL_USERNAME=${MAIL_USERNAME:-resend}
 MAIL_PASSWORD=$MAIL_PASSWORD
-MAIL_ENCRYPTION=$MAIL_ENCRYPTION
-MAIL_FROM_ADDRESS=$MAIL_FROM_ADDRESS
-MAIL_FROM_NAME=$MAIL_FROM_NAME
+MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
+MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-noreply@unihub.dev}
+MAIL_FROM_NAME=UniHub
 
 PASSPORT_CLIENT_ID=${PASSPORT_CLIENT_ID:-}
 PASSPORT_CLIENT_SECRET=${PASSPORT_CLIENT_SECRET:-}
@@ -82,45 +84,62 @@ EOF
 
 # Migrations
 echo "📊 Running migrations..."
-php artisan migrate --force || exit 1
+php artisan migrate --force 2>&1 | head -20
 
 # Seeders
 echo "🌱 Seeding database..."
-php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -2
-php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -2
-php artisan db:seed --class=DaysSeeder --force 2>&1 | head -2
-php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -2
+php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
+php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
+php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
+php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
 
 # Passport
 echo "🔐 Setting up Passport..."
+
+# Generate keys if not exist
 if [ ! -f storage/oauth-private.key ]; then
-    php artisan passport:keys --force
+    echo "→ Generating keys..."
+    timeout 30 php artisan passport:keys --force || echo "⚠️  Key generation timeout, using existing"
 fi
 
+# Create client if needed
 if [ -z "$PASSPORT_CLIENT_ID" ]; then
-    OUTPUT=$(php artisan passport:client --password --name="UniHub" 2>&1)
-    CLIENT_ID=$(echo "$OUTPUT" | grep -oP 'Client ID:\s*\K\d+')
-    CLIENT_SECRET=$(echo "$OUTPUT" | grep -oP 'Client secret:\s*\K\S+')
+    echo "→ Creating client..."
     
-    if [ -n "$CLIENT_ID" ]; then
+    # Delete old password clients
+    php artisan tinker --execute="DB::table('oauth_clients')->where('password_client', 1)->delete();" 2>/dev/null || true
+    
+    # Create new client with timeout
+    OUTPUT=$(timeout 30 php artisan passport:client --password --name="UniHub" 2>&1) || {
+        echo "⚠️  Client creation timeout"
+        OUTPUT=""
+    }
+    
+    CLIENT_ID=$(echo "$OUTPUT" | grep -oP 'Client ID:\s*\K\d+' || echo "")
+    CLIENT_SECRET=$(echo "$OUTPUT" | grep -oP 'Client secret:\s*\K\S+' || echo "")
+    
+    if [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]; then
         echo ""
-        echo "================================"
+        echo "======================================"
         echo "PASSPORT_CLIENT_ID=$CLIENT_ID"
         echo "PASSPORT_CLIENT_SECRET=$CLIENT_SECRET"
-        echo "================================"
-        echo "⚠️  ADD THESE TO ENVIRONMENT!"
+        echo "======================================"
+        echo "⚠️  ADD TO RENDER ENV!"
     fi
 fi
 
-# Optimize
-echo "⚡ Optimizing..."
+# Storage & Optimization
+echo "⚡ Final steps..."
 php artisan storage:link --force 2>/dev/null || true
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+
+# Optimize without view cache (faster)
+php artisan config:cache 2>&1 | head -5
+php artisan route:cache 2>&1 | head -5
 
 echo ""
-echo "✅ DEPLOYMENT SUCCESSFUL!"
+echo "✅ DEPLOYMENT SUCCESSFUL"
 echo "🌐 $APP_URL"
 
+# Start Apache
+echo "🚀 Starting server..."
 exec apache2-foreground
