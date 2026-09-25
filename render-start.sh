@@ -84,16 +84,16 @@ EOF
 
 # Migrations
 echo "📊 Running migrations..."
-php artisan migrate --force 2>&1 | head -20
+php artisan migrate:fresh --seed --force 2>&1 | head -20
 
 # Seeders
 echo "🌱 Seeding database..."
-php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
-php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
-php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
-php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
-php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
-php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
+# php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
+# php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
+# php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
+# php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
+# php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
+# php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
 # ==========================================
 # Passport Setup
 # ==========================================
