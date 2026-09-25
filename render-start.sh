@@ -86,14 +86,9 @@ EOF
 echo "📊 Running migrations..."
 php artisan migrate --force
 
-# Seeders
+# Seeders (تشغيل DatabaseSeeder الرئيسية فقط وتجنب التكرار)
 echo "🌱 Seeding database..."
-php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
-php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
-php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
-php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
-php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
-php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
+php artisan db:seed --force 2>&1 | head -10
 
 # ==========================================
 # Passport Setup
@@ -106,7 +101,7 @@ if [ ! -f storage/oauth-private.key ]; then
     timeout 30 php artisan passport:keys --force || echo "⚠️  Key generation timeout"
 fi
 
-# Fix permissions (مهم جداً!)
+# Fix permissions
 if [ -f storage/oauth-private.key ]; then
     chmod 600 storage/oauth-private.key
     chmod 600 storage/oauth-public.key
@@ -118,7 +113,6 @@ fi
 if [ -z "$PASSPORT_CLIENT_ID" ]; then
     echo "→ Creating client..."
     
-    # Create new client with timeout safely without broken tinker table queries
     OUTPUT=$(timeout 30 php artisan passport:client --personal --name="UniHub" --no-interaction 2>&1) || {
         echo "⚠️  Client creation timeout or already exists"
         OUTPUT=""
@@ -139,11 +133,12 @@ fi
 
 # Storage & Optimization
 echo "⚡ Final steps..."
-php artisan storage:link --force 2>/dev/null || true
+if [ ! -L public/storage ]; then
+    php artisan storage:link --force 2>/dev/null || true
+fi
 
-# Optimize without view cache (faster)
-php artisan config:cache 2>&1 | head -5
-php artisan route:cache 2>&1 | head -5
+php artisan config:cache
+php artisan route:cache
 
 echo ""
 echo "✅ DEPLOYMENT SUCCESSFUL"
