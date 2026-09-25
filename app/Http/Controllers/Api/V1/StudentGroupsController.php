@@ -928,8 +928,16 @@ private function makePlaceholderEmail(?string $academic): string
     
         // 3) قراءة الملف (Excel أو CSV)
         $file = $request->file('file');
-        $path = $file->getPathname(); // أدق في بعض البيئات
+        $path = $file->getPathname();
         $ext  = strtolower($file->getClientOriginalExtension());
+    
+        // تسجيل بداية العملية
+        Log::info('Starting CSV import', [
+            'group_id' => $groupId,
+            'file_name' => $file->getClientOriginalName(),
+            'file_size' => $file->getSize(),
+            'extension' => $ext,
+        ]);
     
         $rows = [];
         if (in_array($ext, ['xlsx','xls'])) {
@@ -948,6 +956,9 @@ private function makePlaceholderEmail(?string $academic): string
                 }
     
                 $header = array_map(fn($h) => $normalizeHeader((string)$h), array_values($sheet[1]));
+                
+                Log::info('Excel headers parsed', ['headers' => $header]);
+                
                 $rowCount = count($sheet);
                 for ($i = 2; $i <= $rowCount; $i++) {
                     $line = array_values($sheet[$i] ?? []);
@@ -959,7 +970,7 @@ private function makePlaceholderEmail(?string $academic): string
                     $rows[] = $row;
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to read Excel', ['err' => $e->getMessage()]);
+                Log::error('Failed to read Excel', ['error' => $e->getMessage()]);
                 return response()->json([
                     'message' => 'Failed to read Excel file',
                     'error'   => $e->getMessage(),
@@ -970,10 +981,16 @@ private function makePlaceholderEmail(?string $academic): string
             $handle = fopen($path, 'r');
             if (!$handle) return response()->json(['message' => 'Cannot open file'], 422);
             $first = fgets($handle);
-            if ($first === false) { fclose($handle); return response()->json(['message' => 'Empty file'], 422); }
+            if ($first === false) { 
+                fclose($handle); 
+                return response()->json(['message' => 'Empty file'], 422); 
+            }
             $delimiter = str_contains($first, ';') ? ';' : ',';
             $first = preg_replace('/^\xEF\xBB\xBF/', '', $first);
             $header = array_map(fn($h) => $normalizeHeader($h), str_getcsv($first, $delimiter));
+            
+            Log::info('CSV headers parsed', ['headers' => $header]);
+            
             while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
                 if (count(array_filter($data, fn($v) => $v !== null && trim((string)$v) !== '')) === 0) continue;
                 $row = [];
@@ -985,76 +1002,237 @@ private function makePlaceholderEmail(?string $academic): string
             fclose($handle);
         }
     
+        Log::info('File parsed successfully', [
+            'total_rows' => count($rows),
+            'first_row_sample' => $rows[0] ?? null,
+        ]);
+    
         // 4) عدادات
-        $createdUsers = 0; $restoredUsers = 0; $createdStudents = 0; $restoredStudents = 0; $attached = 0; $skippedMissing = 0; $skippedConflicts = 0; $errors = [];
+        $createdUsers = 0; 
+        $restoredUsers = 0; 
+        $createdStudents = 0; 
+        $restoredStudents = 0; 
+        $attached = 0; 
+        $skippedMissing = 0; 
+        $skippedConflicts = 0; 
+        $errors = [];
         $defaultPassword = env('DEFAULT_STUDENT_PASSWORD', '12345678');
     
-        // 5) معالجة كل صف (إنشاء/استرجاع User + Student + الربط بالمجموعة)
-        foreach ($rows as $row) {
+        // 5) معالجة كل صف
+        foreach ($rows as $rowIndex => $row) {
             $academic = $row['academic_number'] ?? null;
             $email    = $row['email'] ?? null;
-            $phone    = $row['phone'] ?? null;
+            $phoneRaw = $row['phone'] ?? null;
             $fullName = $row['full_name'] ?? null;
             $genderV  = $row['gender'] ?? null;
-
-            $phoneRaw = $row['phone'] ?? null;
+    
+            // تنظيف الهاتف
             $phone = ($phoneRaw !== null && trim((string)$phoneRaw) !== '') ? trim((string)$phoneRaw) : null;
     
+            // تسجيل أول 3 صفوف للتشخيص
+            if ($rowIndex < 3) {
+                Log::info("Processing row #{$rowIndex}", [
+                    'academic_number' => $academic,
+                    'full_name' => $fullName,
+                    'email' => $email,
+                    'phone' => $phone,
+                    'gender' => $genderV,
+                ]);
+            }
+    
+            // التحقق من وجود بيانات تعريفية
             if (!$academic && !$email && !$phone) {
-                $skippedMissing++; $errors[] = ['reason' => 'missing_keys', 'row' => $row]; continue;
+                if ($rowIndex < 3) {
+                    Log::warning("Row #{$rowIndex} skipped - missing all identifiers");
+                }
+                $skippedMissing++; 
+                $errors[] = [
+                    'row_number' => $rowIndex + 1,
+                    'reason' => 'missing_keys', 
+                    'data' => $row
+                ]; 
+                continue;
             }
     
             // ابحث عن المستخدم
             $user = null;
-            if ($academic) $user = \Illuminate\Support\Facades\DB::table('users')->where('academic_number', $academic)->first();
-            if (!$user && $email) $user = \Illuminate\Support\Facades\DB::table('users')->where('email', $email)->first();
-            if (!$user && $phone) $user = \Illuminate\Support\Facades\DB::table('users')->where('phone', $phone)->first();
+            if ($academic) {
+                $user = \Illuminate\Support\Facades\DB::table('users')
+                    ->where('academic_number', $academic)
+                    ->first();
+                if ($user && $rowIndex < 3) {
+                    Log::info("User found by academic_number", ['user_id' => $user->user_id]);
+                }
+            }
+            if (!$user && $email) {
+                $user = \Illuminate\Support\Facades\DB::table('users')
+                    ->where('email', $email)
+                    ->first();
+                if ($user && $rowIndex < 3) {
+                    Log::info("User found by email", ['user_id' => $user->user_id]);
+                }
+            }
+            if (!$user && $phone) {
+                $user = \Illuminate\Support\Facades\DB::table('users')
+                    ->where('phone', $phone)
+                    ->first();
+                if ($user && $rowIndex < 3) {
+                    Log::info("User found by phone", ['user_id' => $user->user_id]);
+                }
+            }
     
             // أنشئ User عند عدم الوجود
             if (!$user) {
-                if (!$fullName || $genderV === null || (!$academic && !$email && !$phone)) {
-                    $skippedMissing++; $errors[] = ['reason' => 'missing_user_fields', 'row' => $row]; continue;
+                if ($rowIndex < 3) {
+                    Log::info("User not found, attempting to create new user");
                 }
+    
+                // التحقق من البيانات المطلوبة للإنشاء
+                if (!$fullName || trim($fullName) === '') {
+                    if ($rowIndex < 3) {
+                        Log::warning("Row #{$rowIndex} skipped - missing full_name", ['data' => $row]);
+                    }
+                    $skippedMissing++; 
+                    $errors[] = [
+                        'row_number' => $rowIndex + 1,
+                        'reason' => 'missing_full_name', 
+                        'data' => $row
+                    ]; 
+                    continue;
+                }
+    
+                if ($genderV === null || trim((string)$genderV) === '') {
+                    if ($rowIndex < 3) {
+                        Log::warning("Row #{$rowIndex} skipped - missing gender", ['data' => $row]);
+                    }
+                    $skippedMissing++; 
+                    $errors[] = [
+                        'row_number' => $rowIndex + 1,
+                        'reason' => 'missing_gender', 
+                        'data' => $row
+                    ]; 
+                    continue;
+                }
+    
                 $gender = $parseGender($genderV);
-                $resolvedEmail = $email ?: ($academic ? strtolower($academic) . '@local.invalid' : 'student-' . date('YmdHis') . '-' . random_int(1000, 9999) . '@local.invalid');
-                $academicNumber = $academic ?: $makeAcademicNumberFromEmail($resolvedEmail);
-
+                
+                if ($rowIndex < 3) {
+                    Log::info("Gender parsed", [
+                        'original' => $genderV,
+                        'parsed' => $gender,
+                    ]);
+                }
+    
+                // توليد البريد الإلكتروني إذا لم يكن موجوداً
+                if (!$email || trim($email) === '') {
+                    if ($academic && trim($academic) !== '') {
+                        $email = strtolower(trim($academic)) . '@local.invalid';
+                    } else {
+                        $email = 'student-' . date('YmdHis') . '-' . random_int(1000, 9999) . '@local.invalid';
+                    }
+                } else {
+                    $email = trim($email);
+                }
+    
+                // توليد الرقم الجامعي إذا لم يكن موجوداً
+                if (!$academic || trim($academic) === '') {
+                    $academic = $makeAcademicNumberFromEmail($email);
+                } else {
+                    $academic = trim($academic);
+                }
+    
+                if ($rowIndex < 3) {
+                    Log::info("Prepared user data", [
+                        'full_name' => $fullName,
+                        'email' => $email,
+                        'academic_number' => $academic,
+                        'phone' => $phone,
+                        'gender' => $gender,
+                    ]);
+                }
+    
                 try {
                     $userId = \Illuminate\Support\Facades\DB::table('users')->insertGetId([
-                        'full_name'       => $fullName,
-                        'email'           => $resolvedEmail,
+                        'full_name'       => trim($fullName),
+                        'email'           => $email,
                         'phone'           => $phone,
                         'college_id'      => $group->college_id,
                         'password'        => \Illuminate\Support\Facades\Hash::make($defaultPassword),
-                        'academic_number' => $academicNumber,
+                        'academic_number' => $academic,
                         'gender'          => $gender,
                         'user_type_id'    => $studentTypeId,
                         'created_at'      => now(),
                         'updated_at'      => now(),
                     ]);
+                    
                     $user = \Illuminate\Support\Facades\DB::table('users')->where('user_id', $userId)->first();
                     $createdUsers++;
+                    
+                    if ($rowIndex < 3) {
+                        Log::info("User created successfully", ['user_id' => $userId]);
+                    }
                 } catch (\Illuminate\Database\QueryException $e) {
-                    \Illuminate\Support\Facades\Log::warning('importCsv user insert failed', ['msg' => $e->getMessage(), 'row' => $row]);
-                    $skippedConflicts++; continue;
+                    Log::error("User insert failed for row #{$rowIndex}", [
+                        'error' => $e->getMessage(),
+                        'code' => $e->getCode(),
+                        'data' => $row
+                    ]);
+                    $skippedConflicts++; 
+                    $errors[] = [
+                        'row_number' => $rowIndex + 1,
+                        'reason' => 'user_insert_failed',
+                        'error' => $e->getMessage(),
+                        'data' => $row
+                    ];
+                    continue;
                 }
             } else {
+                // المستخدم موجود - تحديث الهاتف إذا كان فارغاً
                 if (is_null($user->phone) && $phone) {
-                     \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->update(['phone' => $phone]);
+                    \Illuminate\Support\Facades\DB::table('users')
+                        ->where('user_id', $user->user_id)
+                        ->update(['phone' => $phone]);
                 }
+                
+                // استعادة المستخدم إذا كان محذوفاً
                 if (!is_null($user->deleted_at)) {
-                    \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->update([
-                        'deleted_at' => null,
-                        'updated_at' => now(),
-                    ]);
-                    $user = \Illuminate\Support\Facades\DB::table('users')->where('user_id', $user->user_id)->first();
+                    \Illuminate\Support\Facades\DB::table('users')
+                        ->where('user_id', $user->user_id)
+                        ->update([
+                            'deleted_at' => null,
+                            'updated_at' => now(),
+                        ]);
+                    $user = \Illuminate\Support\Facades\DB::table('users')
+                        ->where('user_id', $user->user_id)
+                        ->first();
                     $restoredUsers++;
+                    
+                    if ($rowIndex < 3) {
+                        Log::info("User restored from soft delete", ['user_id' => $user->user_id]);
+                    }
                 }
             }
     
             // تأكد من وجود سجل الطالب
-            $student = \Illuminate\Support\Facades\DB::table('students')->where('user_id', $user->user_id)->first();
+            $student = \Illuminate\Support\Facades\DB::table('students')
+                ->where('user_id', $user->user_id)
+                ->first();
+                
             if (!$student) {
+                if ($rowIndex < 3) {
+                    Log::info("Creating student record", [
+                        'user_id' => $user->user_id,
+                        'group_path' => [
+                            'college_id' => $group->college_id,
+                            'department_id' => $group->department_id,
+                            'program_id' => $group->program_id,
+                            'level_id' => $group->level_id,
+                            'semester_id' => $group->semester_id,
+                            'block_id' => $group->block_id,
+                        ]
+                    ]);
+                }
+    
                 try {
                     \Illuminate\Support\Facades\DB::table('students')->insert([
                         'user_id'       => $user->user_id,
@@ -1068,30 +1246,90 @@ private function makePlaceholderEmail(?string $academic): string
                         'created_at'    => now(),
                         'updated_at'    => now(),
                     ]);
-                    $student = \Illuminate\Support\Facades\DB::table('students')->where('user_id', $user->user_id)->first();
+                    
+                    $student = \Illuminate\Support\Facades\DB::table('students')
+                        ->where('user_id', $user->user_id)
+                        ->first();
+                        
                     $createdStudents++;
+                    
+                    if ($rowIndex < 3) {
+                        Log::info("Student created successfully", ['student_id' => $student->student_id]);
+                    }
                 } catch (\Illuminate\Database\QueryException $e) {
-                    \Illuminate\Support\Facades\Log::warning('importCsv student insert failed', ['msg' => $e->getMessage(), 'row' => $row]);
-                    $skippedConflicts++; continue;
+                    Log::error("Student insert failed for row #{$rowIndex}", [
+                        'error' => $e->getMessage(),
+                        'user_id' => $user->user_id,
+                    ]);
+                    $skippedConflicts++; 
+                    $errors[] = [
+                        'row_number' => $rowIndex + 1,
+                        'reason' => 'student_insert_failed',
+                        'error' => $e->getMessage(),
+                    ];
+                    continue;
                 }
             } else {
+                // استعادة الطالب إذا كان محذوفاً
                 if (!is_null($student->deleted_at)) {
-                    \Illuminate\Support\Facades\DB::table('students')->where('student_id', $student->student_id)->update([
-                        'deleted_at' => null,
-                        'updated_at' => now(),
-                    ]);
-                    $student = \Illuminate\Support\Facades\DB::table('students')->where('student_id', $student->student_id)->first();
+                    \Illuminate\Support\Facades\DB::table('students')
+                        ->where('student_id', $student->student_id)
+                        ->update([
+                            'deleted_at' => null,
+                            'updated_at' => now(),
+                        ]);
+                    $student = \Illuminate\Support\Facades\DB::table('students')
+                        ->where('student_id', $student->student_id)
+                        ->first();
                     $restoredStudents++;
+                    
+                    if ($rowIndex < 3) {
+                        Log::info("Student restored from soft delete", ['student_id' => $student->student_id]);
+                    }
                 }
             }
     
-            // 6) التحقق النهائي: لا يسمح للطالب بأن يربط بمسار مختلف عن مساره الأكاديمي الحالي
-            if (!$this->studentMatchesGroupPath($student, $group) || $this->studentAlreadyBelongsToDifferentProgram((int) $student->student_id, (int) $groupId)) {
+            // 6) التحقق من تطابق المسار
+            $pathMatches = $this->studentMatchesGroupPath($student, $group);
+            $alreadyInDifferentProgram = $this->studentAlreadyBelongsToDifferentProgram((int) $student->student_id, (int) $groupId);
+    
+            if ($rowIndex < 3) {
+                Log::info("Path verification for row #{$rowIndex}", [
+                    'student_id' => $student->student_id,
+                    'path_matches' => $pathMatches,
+                    'already_in_different_program' => $alreadyInDifferentProgram,
+                    'student_path' => [
+                        'college_id' => $student->college_id,
+                        'department_id' => $student->department_id,
+                        'program_id' => $student->program_id,
+                        'level_id' => $student->level_id,
+                        'semester_id' => $student->semester_id,
+                        'block_id' => $student->block_id,
+                    ],
+                    'group_path' => [
+                        'college_id' => $group->college_id,
+                        'department_id' => $group->department_id,
+                        'program_id' => $group->program_id,
+                        'level_id' => $group->level_id,
+                        'semester_id' => $group->semester_id,
+                        'block_id' => $group->block_id,
+                    ],
+                ]);
+            }
+    
+            if (!$pathMatches || $alreadyInDifferentProgram) {
+                Log::warning("Path mismatch for row #{$rowIndex}", [
+                    'student_id' => $student->student_id,
+                    'academic_number' => $academic,
+                ]);
+                
                 $skippedConflicts++;
                 $errors[] = [
+                    'row_number' => $rowIndex + 1,
                     'reason' => 'student_path_mismatch',
                     'student_id' => $student->student_id,
-                    'group_id' => $groupId,
+                    'academic_number' => $academic,
+                    'full_name' => $fullName,
                     'student_path' => [
                         'college_id' => $student->college_id ?? null,
                         'department_id' => $student->department_id ?? null,
@@ -1111,21 +1349,57 @@ private function makePlaceholderEmail(?string $academic): string
                 ];
                 continue;
             }
-
+    
             // 7) ربط الطالب بالمجموعة
             try {
-                \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
+                $inserted = \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
                     'student_id' => $student->student_id,
                     'group_id'   => $groupId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-                $attached++;
+                
+                if ($inserted > 0) {
+                    $attached++;
+                    if ($rowIndex < 3) {
+                        Log::info("Student attached to group", [
+                            'student_id' => $student->student_id,
+                            'group_id' => $groupId,
+                        ]);
+                    }
+                } else {
+                    if ($rowIndex < 3) {
+                        Log::info("Student already in group", [
+                            'student_id' => $student->student_id,
+                            'group_id' => $groupId,
+                        ]);
+                    }
+                }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('importCsv attach failed', ['msg' => $e->getMessage(), 'row' => $row]);
+                Log::error("Attach failed for row #{$rowIndex}", [
+                    'error' => $e->getMessage(),
+                    'student_id' => $student->student_id,
+                ]);
                 $skippedConflicts++;
+                $errors[] = [
+                    'row_number' => $rowIndex + 1,
+                    'reason' => 'attach_failed',
+                    'error' => $e->getMessage(),
+                ];
             }
         }
+    
+        // تسجيل النتائج النهائية
+        Log::info('CSV import completed', [
+            'created_users' => $createdUsers,
+            'restored_users' => $restoredUsers,
+            'created_students' => $createdStudents,
+            'restored_students' => $restoredStudents,
+            'attached_to_group' => $attached,
+            'skipped_missing' => $skippedMissing,
+            'skipped_conflicts' => $skippedConflicts,
+            'total_errors' => count($errors),
+        ]);
     
         // 7) النتيجة
         if ($skippedConflicts > 0 && $attached === 0 && $createdStudents === 0 && $createdUsers === 0 && $restoredStudents === 0 && $restoredUsers === 0) {
@@ -1139,10 +1413,10 @@ private function makePlaceholderEmail(?string $academic): string
                 'attached_to_group'  => 0,
                 'skipped_missing'    => $skippedMissing,
                 'skipped_conflicts'  => $skippedConflicts,
-                'errors'             => $errors,
+                'errors'             => array_slice($errors, 0, 10), // أول 10 أخطاء فقط
             ], 422);
         }
-
+    
         return response()->json([
             'status'             => 'success',
             'created_users'      => $createdUsers,
@@ -1152,7 +1426,7 @@ private function makePlaceholderEmail(?string $academic): string
             'attached_to_group'  => $attached,
             'skipped_missing'    => $skippedMissing,
             'skipped_conflicts'  => $skippedConflicts,
-            'errors'             => $errors,
+            'errors'             => array_slice($errors, 0, 10), // أول 10 أخطاء فقط
         ]);
     }
 
