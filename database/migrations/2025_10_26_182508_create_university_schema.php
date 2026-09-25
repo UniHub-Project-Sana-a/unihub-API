@@ -572,34 +572,35 @@ return new class extends Migration
         // [25/62] lecturer_payouts
         Schema::create('lecturer_payouts', function (Blueprint $table) {
             $this->tableOptions($table);
-
+        
             $table->increments('payout_id');
-            $table->unsignedInteger('cycle_id');
-            $table->unsignedInteger('lecturer_id');
-            $table->decimal('total_hours', 8, 2)->default(0);
-            $table->decimal('hourly_rate', 10, 2)->default(0);
-            $table->decimal('base_amount', 12, 2)->default(0);
-            $table->decimal('total_bonuses', 12, 2)->default(0);
-            $table->decimal('total_deductions', 12, 2)->default(0);
-            $table->decimal('tax_amount', 12, 2)->default(0);
-            if (DB::connection()->getDriverName() === 'pgsql') {
-                // PostgreSQL Syntax (بدون backticks)
-                DB::statement('ALTER TABLE lecturer_payouts ADD COLUMN net_amount DECIMAL(12,2) GENERATED ALWAYS AS (base_amount + total_bonuses - total_deductions - tax_amount) STORED');
-            } else {
-                // MySQL Syntax (الكود الأصلي)
-                $table->decimal('net_amount', 12, 2)->storedAs('`base_amount` + `total_bonuses` - `total_deductions` - `tax_amount`');
+            $table->unsignedInteger('cycle_id');$table->unsignedInteger('lecturer_id');
+            $table->decimal('total_hours', 8, 2)->default(0);$table->decimal('hourly_rate', 10, 2)->default(0);
+            $table->decimal('base_amount', 12, 2)->default(0);$table->decimal('total_bonuses', 12, 2)->default(0);
+            $table->decimal('total_deductions', 12, 2)->default(0);$table->decimal('tax_amount', 12, 2)->default(0);
+        
+            // إذا كان المشرك MySQL أضف العمود هنا، أما إذا كان Postgres فسيتم إضافته بعد إغلاق Schema::create
+            if (DB::connection()->getDriverName() !== 'pgsql') {
+                $table->decimal('net_amount', 12, 2)
+                      ->storedAs('`base_amount` + `total_bonuses` - `total_deductions` - `tax_amount`');
             }
+        
             $table->string('status', 20)->default('pending');
-            $table->string('notes', 255)->nullable();
-            $table->timestamps();
-
-            $table->unique(['cycle_id', 'lecturer_id'], 'lecturer_payouts_cycle_id_lecturer_id_unique');
-
-            $table->index('lecturer_id', 'lecturer_payouts_lecturer_id_foreign');
-
-            $table->foreign('cycle_id', 'lecturer_payouts_cycle_id_foreign')->references('cycle_id')->on('financial_cycles')->onDelete('cascade');
-            $table->foreign('lecturer_id', 'lecturer_payouts_lecturer_id_foreign')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
-        });
+            $table->string('notes', 255)->nullable();$table->timestamps();
+        
+            $table->unique(['cycle_id', 'lecturer_id'], 'lecturer_payouts_cycle_id_lecturer_id_unique');$table->index('lecturer_id', 'lecturer_payouts_lecturer_id_foreign');
+        
+            $table->foreign('cycle_id', 'lecturer_payouts_cycle_id_foreign')->references('cycle_id')->on('financial_cycles')->onDelete('cascade');$table->foreign('lecturer_id', 'lecturer_payouts_lecturer_id_foreign')->references('lecturer_id')->on('lecturers')->onDelete('cascade');
+        }); // <-- انتبه: هنا يتم إغلاق إنشاء الجدول رسمياً في قاعدة البيانات
+        
+        // الآن فقط، بعد إغلاق Schema::create، نقوم بتعديل الجدول لـ PostgreSQL
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('
+                ALTER TABLE lecturer_payouts 
+                ADD COLUMN net_amount DECIMAL(12,2) 
+                GENERATED ALWAYS AS (base_amount + total_bonuses - total_deductions - tax_amount) STORED
+            ');
+        }
 
         // [26/62] levels
         Schema::create('levels', function (Blueprint $table) {
@@ -853,6 +854,7 @@ return new class extends Migration
         // ======================================================================
 
         // [36/62] course_assessments
+
         Schema::create('course_assessments', function (Blueprint $table) {
             $this->tableOptions($table);
 
@@ -1223,6 +1225,7 @@ return new class extends Migration
         // ======================================================================
 
         // [50/62] lecture_sessions
+
         Schema::create('lecture_sessions', function (Blueprint $table) {
             $this->tableOptions($table);
 
@@ -1451,6 +1454,7 @@ return new class extends Migration
         // ======================================================================
 
         // [60/62] lecture_attachments
+        
         Schema::create('lecture_attachments', function (Blueprint $table) {
             $this->tableOptions($table);
 
@@ -1510,15 +1514,6 @@ return new class extends Migration
             $table->foreign('session_id', 'session_topics_covered_session_id_foreign')->references('session_id')->on('lecture_sessions')->onDelete('cascade');
             $table->foreign('topic_id', 'session_topics_covered_topic_id_foreign')->references('topic_id')->on('course_topics')->onDelete('cascade');
         });
-
-        // في نهاية الـ up() function
-        if (DB::connection()->getDriverName() === 'pgsql') {
-            DB::statement('
-                ALTER TABLE lecturer_payouts 
-                ADD COLUMN net_amount DECIMAL(12,2) 
-                GENERATED ALWAYS AS (base_amount + total_bonuses - total_deductions - tax_amount) STORED
-            ');
-        }
     }
 
     /**
