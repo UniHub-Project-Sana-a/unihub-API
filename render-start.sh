@@ -84,16 +84,17 @@ EOF
 
 # Migrations
 echo "📊 Running migrations..."
-php artisan migrate:fresh --seed --force 2>&1 | head -20
+php artisan migrate --force
 
 # Seeders
 echo "🌱 Seeding database..."
-# php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
-# php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
-# php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
-# php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
-# php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
-# php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
+php artisan db:seed --class=UserTypesSeeder --force 2>&1 | head -5
+php artisan db:seed --class=PermissionsSeeder --force 2>&1 | head -5
+php artisan db:seed --class=DaysSeeder --force 2>&1 | head -5
+php artisan db:seed --class=SettingsSeeder --force 2>&1 | head -5
+php artisan db:seed --class=DatabaseSeeder --force 2>&1 | head -5
+php artisan db:seed --class=InitialCollegeSeeder --force 2>&1 | head -5
+
 # ==========================================
 # Passport Setup
 # ==========================================
@@ -109,7 +110,7 @@ fi
 if [ -f storage/oauth-private.key ]; then
     chmod 600 storage/oauth-private.key
     chmod 600 storage/oauth-public.key
-    chown www-data:www-data storage/oauth-*.key
+    chown www-data:www-data storage/oauth-*.key 2>/dev/null || true
     echo "✓ Keys permissions fixed"
 fi
 
@@ -117,25 +118,9 @@ fi
 if [ -z "$PASSPORT_CLIENT_ID" ]; then
     echo "→ Creating client..."
     
-    # Check which column exists (Laravel Passport version compatibility)
-    COLUMN_CHECK=$(php artisan tinker --execute="
-        echo Schema::hasColumn('oauth_clients', 'password_client') ? 'password_client' : 'personal_access_client';
-    " 2>/dev/null || echo "personal_access_client")
-    
-    # Delete old password/personal access clients
-    if [ "$COLUMN_CHECK" = "password_client" ]; then
-        php artisan tinker --execute="
-            DB::table('oauth_clients')->where('password_client', 1)->delete();
-        " 2>/dev/null || true
-    else
-        php artisan tinker --execute="
-            DB::table('oauth_clients')->where('personal_access_client', 1)->delete();
-        " 2>/dev/null || true
-    fi
-    
-    # Create new client with timeout
+    # Create new client with timeout safely without broken tinker table queries
     OUTPUT=$(timeout 30 php artisan passport:client --personal --name="UniHub" --no-interaction 2>&1) || {
-        echo "⚠️  Client creation timeout"
+        echo "⚠️  Client creation timeout or already exists"
         OUTPUT=""
     }
     
