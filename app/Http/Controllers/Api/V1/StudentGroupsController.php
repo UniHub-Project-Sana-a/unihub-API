@@ -617,7 +617,7 @@ private function makePlaceholderEmail(?string $academic): string
 
         $maxStudents = (int) ($data['max_students'] ?? 30);
 
-        $path = [
+        $insertData  = [
             'college_id'    => (int) $data['college_id'],
             'department_id' => (int) $data['department_id'],
             'program_id'    => $data['program_id'] ?? null,
@@ -625,14 +625,15 @@ private function makePlaceholderEmail(?string $academic): string
             'semester_id'   => $data['semester_id'] ?? null,
             'block_id'      => $data['block_id'] ?? null,
             'group_name'    => trim($data['group_name']),
+            'max_students'  => $maxStudents,
         ];
 
-        $path = array_filter($path, fn ($value) => $value !== null && $value !== '');
+        $searchPath = array_filter($insertData, fn ($value) => $value !== null && $value !== '');
     
         // 1) هل هناك مجموعة فعّالة (غير محذوفة) بهذا المسار؟
         $existing = DB::table('student_groups')
             ->whereNull('deleted_at')
-            ->where($path)
+            ->where($searchPath)
             ->first();
     
         if ($existing) {
@@ -646,7 +647,7 @@ private function makePlaceholderEmail(?string $academic): string
         // 2) هل هناك مجموعة محذوفة Soft بنفس المسار؟ إن وُجدت نعيد تفعيلها
         $soft = DB::table('student_groups')
             ->whereNotNull('deleted_at')
-            ->where($path)
+            ->where($searchPath)
             ->first();
     
         if ($soft) {
@@ -668,18 +669,22 @@ private function makePlaceholderEmail(?string $academic): string
     
         // 3) إنشاء مجموعة جديدة
         try {
-            $id = DB::table('student_groups')->insertGetId([
-                'college_id'    => $path['college_id'],
-                'department_id' => $path['department_id'],
-                'program_id'    => $path['program_id'] ?? null,
-                'level_id'      => $path['level_id'] ?? null,
-                'semester_id'   => $path['semester_id'] ?? null,
-                'block_id'      => $path['block_id'] ?? null,
-                'group_name'    => $path['group_name'],
-                'max_students'  => $maxStudents,
-                'created_at'    => now(),
-                'updated_at'    => now(),
-            ]);
+            // $id = DB::table('student_groups')->insertGetId([
+            //     'college_id'    => $path['college_id'],
+            //     'department_id' => $path['department_id'],
+            //     'program_id'    => $path['program_id'] ?? null,
+            //     'level_id'      => $path['level_id'] ?? null,
+            //     'semester_id'   => $path['semester_id'] ?? null,
+            //     'block_id'      => $path['block_id'] ?? null,
+            //     'group_name'    => $path['group_name'],
+            //     'max_students'  => $maxStudents,
+            //     'created_at'    => now(),
+            //     'updated_at'    => now(),
+            // ]);
+            $insertData['created_at'] = now();
+            $insertData['updated_at'] = now();
+    
+            $id = DB::table('student_groups')->insertGetId($insertData);
 
             $group = DB::table('student_groups')->where('group_id', $id)->first();
 
@@ -689,21 +694,21 @@ private function makePlaceholderEmail(?string $academic): string
                 'message' => 'Group created successfully',
             ], 201);
         } catch (\Illuminate\Database\QueryException $e) {
-            // في حال حصل تعارض فريد (بسبب سباق طلبات)، ارجع المجموعة الموجودة بدلاً من الخطأ
-            if ($e->getCode() === '23000' && str_contains($e->getMessage(), 'unique_group_per_path')) {
-                $dup = DB::table('student_groups')->whereNull('deleted_at')->where($path)->first()
-                    ?: DB::table('student_groups')->where($path)->first();
+            if ($e->getCode() === '23000') {
+                $dup = DB::table('student_groups')
+                    ->whereNull('deleted_at')
+                    ->where($searchPath)
+                    ->first();
     
                 return response()->json([
                     'status'  => 'exists',
                     'group'   => $dup,
-                    'message' => 'Group already exists for this path',
+                    'message' => 'Group already exists',
                 ], 200);
             }
     
-            Log::error('student_groups.upsertAndAttach DB error', [
+            Log::error('student_groups DB error', [
                 'code' => $e->getCode(),
-                'info' => $e->errorInfo,
                 'msg'  => $e->getMessage(),
             ]);
     
@@ -711,9 +716,6 @@ private function makePlaceholderEmail(?string $academic): string
                 'message'  => 'DB error',
                 'sqlstate' => $e->getCode(),
             ], 500);
-        } catch (\Throwable $e) {
-            Log::error('student_groups.upsertAndAttach error', ['msg' => $e->getMessage()]);
-            return response()->json(['message' => 'Server error'], 500);
         }
     }
 

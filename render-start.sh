@@ -83,16 +83,16 @@ BCRYPT_ROUNDS=12
 EOF
 
 # Migrations & Seeders (مُعطّل للحفاظ على البيانات)
-echo "📊 Running migrations..."
-php artisan migrate:fresh --seed --force
+# echo "📊 Running migrations..."
+# php artisan migrate:fresh --seed --force
 
 # Migrations
-# echo "📊 Running migrations..."
-# php artisan migrate --force
+echo "📊 Running migrations..."
+php artisan migrate --force
 
 # Seeders (تشغيل DatabaseSeeder الرئيسية فقط وتجنب التكرار)
-# echo "🌱 Seeding database..."
-# php artisan db:seed --force 2>&1 | head -10
+echo "🌱 Seeding database..."
+php artisan db:seed --force 2>&1 | head -10
 
 # ==========================================
 # Passport Setup
