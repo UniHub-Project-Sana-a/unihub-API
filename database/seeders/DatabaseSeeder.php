@@ -33,7 +33,7 @@ class DatabaseSeeder extends Seeder
 
         // 4. إنشاء المستخدم المشرف العام بشكل مضمون
         User::updateOrCreate(
-            ['email' => 'ala.hussein002@gmail.com'],
+            ['email' => 'Admin@unitshub.com'],
             [
                 'academic_number' => 'ADM0001',
                 'full_name'       => 'Alaa Hussein',
