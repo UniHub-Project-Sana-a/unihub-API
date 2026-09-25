@@ -931,14 +931,6 @@ private function makePlaceholderEmail(?string $academic): string
         $path = $file->getPathname();
         $ext  = strtolower($file->getClientOriginalExtension());
     
-        // تسجيل بداية العملية
-        Log::info('Starting CSV import', [
-            'group_id' => $groupId,
-            'file_name' => $file->getClientOriginalName(),
-            'file_size' => $file->getSize(),
-            'extension' => $ext,
-        ]);
-    
         $rows = [];
         if (in_array($ext, ['xlsx','xls'])) {
             try {
@@ -956,9 +948,6 @@ private function makePlaceholderEmail(?string $academic): string
                 }
     
                 $header = array_map(fn($h) => $normalizeHeader((string)$h), array_values($sheet[1]));
-                
-                Log::info('Excel headers parsed', ['headers' => $header]);
-                
                 $rowCount = count($sheet);
                 for ($i = 2; $i <= $rowCount; $i++) {
                     $line = array_values($sheet[$i] ?? []);
@@ -988,9 +977,6 @@ private function makePlaceholderEmail(?string $academic): string
             $delimiter = str_contains($first, ';') ? ';' : ',';
             $first = preg_replace('/^\xEF\xBB\xBF/', '', $first);
             $header = array_map(fn($h) => $normalizeHeader($h), str_getcsv($first, $delimiter));
-            
-            Log::info('CSV headers parsed', ['headers' => $header]);
-            
             while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
                 if (count(array_filter($data, fn($v) => $v !== null && trim((string)$v) !== '')) === 0) continue;
                 $row = [];
@@ -1001,11 +987,6 @@ private function makePlaceholderEmail(?string $academic): string
             }
             fclose($handle);
         }
-    
-        Log::info('File parsed successfully', [
-            'total_rows' => count($rows),
-            'first_row_sample' => $rows[0] ?? null,
-        ]);
     
         // 4) عدادات
         $createdUsers = 0; 
@@ -1026,25 +1007,9 @@ private function makePlaceholderEmail(?string $academic): string
             $fullName = $row['full_name'] ?? null;
             $genderV  = $row['gender'] ?? null;
     
-            // تنظيف الهاتف
             $phone = ($phoneRaw !== null && trim((string)$phoneRaw) !== '') ? trim((string)$phoneRaw) : null;
     
-            // تسجيل أول 3 صفوف للتشخيص
-            if ($rowIndex < 3) {
-                Log::info("Processing row #{$rowIndex}", [
-                    'academic_number' => $academic,
-                    'full_name' => $fullName,
-                    'email' => $email,
-                    'phone' => $phone,
-                    'gender' => $genderV,
-                ]);
-            }
-    
-            // التحقق من وجود بيانات تعريفية
             if (!$academic && !$email && !$phone) {
-                if ($rowIndex < 3) {
-                    Log::warning("Row #{$rowIndex} skipped - missing all identifiers");
-                }
                 $skippedMissing++; 
                 $errors[] = [
                     'row_number' => $rowIndex + 1,
@@ -1057,41 +1022,18 @@ private function makePlaceholderEmail(?string $academic): string
             // ابحث عن المستخدم
             $user = null;
             if ($academic) {
-                $user = \Illuminate\Support\Facades\DB::table('users')
-                    ->where('academic_number', $academic)
-                    ->first();
-                if ($user && $rowIndex < 3) {
-                    Log::info("User found by academic_number", ['user_id' => $user->user_id]);
-                }
+                $user = \Illuminate\Support\Facades\DB::table('users')->where('academic_number', $academic)->first();
             }
             if (!$user && $email) {
-                $user = \Illuminate\Support\Facades\DB::table('users')
-                    ->where('email', $email)
-                    ->first();
-                if ($user && $rowIndex < 3) {
-                    Log::info("User found by email", ['user_id' => $user->user_id]);
-                }
+                $user = \Illuminate\Support\Facades\DB::table('users')->where('email', $email)->first();
             }
             if (!$user && $phone) {
-                $user = \Illuminate\Support\Facades\DB::table('users')
-                    ->where('phone', $phone)
-                    ->first();
-                if ($user && $rowIndex < 3) {
-                    Log::info("User found by phone", ['user_id' => $user->user_id]);
-                }
+                $user = \Illuminate\Support\Facades\DB::table('users')->where('phone', $phone)->first();
             }
     
             // أنشئ User عند عدم الوجود
             if (!$user) {
-                if ($rowIndex < 3) {
-                    Log::info("User not found, attempting to create new user");
-                }
-    
-                // التحقق من البيانات المطلوبة للإنشاء
                 if (!$fullName || trim($fullName) === '') {
-                    if ($rowIndex < 3) {
-                        Log::warning("Row #{$rowIndex} skipped - missing full_name", ['data' => $row]);
-                    }
                     $skippedMissing++; 
                     $errors[] = [
                         'row_number' => $rowIndex + 1,
@@ -1102,9 +1044,6 @@ private function makePlaceholderEmail(?string $academic): string
                 }
     
                 if ($genderV === null || trim((string)$genderV) === '') {
-                    if ($rowIndex < 3) {
-                        Log::warning("Row #{$rowIndex} skipped - missing gender", ['data' => $row]);
-                    }
                     $skippedMissing++; 
                     $errors[] = [
                         'row_number' => $rowIndex + 1,
@@ -1115,15 +1054,7 @@ private function makePlaceholderEmail(?string $academic): string
                 }
     
                 $gender = $parseGender($genderV);
-                
-                if ($rowIndex < 3) {
-                    Log::info("Gender parsed", [
-                        'original' => $genderV,
-                        'parsed' => $gender,
-                    ]);
-                }
     
-                // توليد البريد الإلكتروني إذا لم يكن موجوداً
                 if (!$email || trim($email) === '') {
                     if ($academic && trim($academic) !== '') {
                         $email = strtolower(trim($academic)) . '@local.invalid';
@@ -1134,25 +1065,15 @@ private function makePlaceholderEmail(?string $academic): string
                     $email = trim($email);
                 }
     
-                // توليد الرقم الجامعي إذا لم يكن موجوداً
                 if (!$academic || trim($academic) === '') {
                     $academic = $makeAcademicNumberFromEmail($email);
                 } else {
                     $academic = trim($academic);
                 }
     
-                if ($rowIndex < 3) {
-                    Log::info("Prepared user data", [
-                        'full_name' => $fullName,
-                        'email' => $email,
-                        'academic_number' => $academic,
-                        'phone' => $phone,
-                        'gender' => $gender,
-                    ]);
-                }
-    
                 try {
-                    $userId = \Illuminate\Support\Facades\DB::table('users')->insertGetId([
+                    // ✅ الحل: استخدم insert بدلاً من insertGetId
+                    \Illuminate\Support\Facades\DB::table('users')->insert([
                         'full_name'       => trim($fullName),
                         'email'           => $email,
                         'phone'           => $phone,
@@ -1165,17 +1086,17 @@ private function makePlaceholderEmail(?string $academic): string
                         'updated_at'      => now(),
                     ]);
                     
-                    $user = \Illuminate\Support\Facades\DB::table('users')->where('user_id', $userId)->first();
-                    $createdUsers++;
+                    // ✅ ثم استعلم عن المستخدم
+                    $user = \Illuminate\Support\Facades\DB::table('users')
+                        ->where('academic_number', $academic)
+                        ->orderBy('created_at', 'desc')
+                        ->first();
                     
-                    if ($rowIndex < 3) {
-                        Log::info("User created successfully", ['user_id' => $userId]);
-                    }
+                    $createdUsers++;
                 } catch (\Illuminate\Database\QueryException $e) {
-                    Log::error("User insert failed for row #{$rowIndex}", [
+                    Log::error("User insert failed", [
                         'error' => $e->getMessage(),
-                        'code' => $e->getCode(),
-                        'data' => $row
+                        'row' => $row
                     ]);
                     $skippedConflicts++; 
                     $errors[] = [
@@ -1187,14 +1108,12 @@ private function makePlaceholderEmail(?string $academic): string
                     continue;
                 }
             } else {
-                // المستخدم موجود - تحديث الهاتف إذا كان فارغاً
                 if (is_null($user->phone) && $phone) {
                     \Illuminate\Support\Facades\DB::table('users')
                         ->where('user_id', $user->user_id)
                         ->update(['phone' => $phone]);
                 }
                 
-                // استعادة المستخدم إذا كان محذوفاً
                 if (!is_null($user->deleted_at)) {
                     \Illuminate\Support\Facades\DB::table('users')
                         ->where('user_id', $user->user_id)
@@ -1206,10 +1125,6 @@ private function makePlaceholderEmail(?string $academic): string
                         ->where('user_id', $user->user_id)
                         ->first();
                     $restoredUsers++;
-                    
-                    if ($rowIndex < 3) {
-                        Log::info("User restored from soft delete", ['user_id' => $user->user_id]);
-                    }
                 }
             }
     
@@ -1219,20 +1134,6 @@ private function makePlaceholderEmail(?string $academic): string
                 ->first();
                 
             if (!$student) {
-                if ($rowIndex < 3) {
-                    Log::info("Creating student record", [
-                        'user_id' => $user->user_id,
-                        'group_path' => [
-                            'college_id' => $group->college_id,
-                            'department_id' => $group->department_id,
-                            'program_id' => $group->program_id,
-                            'level_id' => $group->level_id,
-                            'semester_id' => $group->semester_id,
-                            'block_id' => $group->block_id,
-                        ]
-                    ]);
-                }
-    
                 try {
                     \Illuminate\Support\Facades\DB::table('students')->insert([
                         'user_id'       => $user->user_id,
@@ -1252,12 +1153,8 @@ private function makePlaceholderEmail(?string $academic): string
                         ->first();
                         
                     $createdStudents++;
-                    
-                    if ($rowIndex < 3) {
-                        Log::info("Student created successfully", ['student_id' => $student->student_id]);
-                    }
                 } catch (\Illuminate\Database\QueryException $e) {
-                    Log::error("Student insert failed for row #{$rowIndex}", [
+                    Log::error("Student insert failed", [
                         'error' => $e->getMessage(),
                         'user_id' => $user->user_id,
                     ]);
@@ -1270,7 +1167,6 @@ private function makePlaceholderEmail(?string $academic): string
                     continue;
                 }
             } else {
-                // استعادة الطالب إذا كان محذوفاً
                 if (!is_null($student->deleted_at)) {
                     \Illuminate\Support\Facades\DB::table('students')
                         ->where('student_id', $student->student_id)
@@ -1282,46 +1178,12 @@ private function makePlaceholderEmail(?string $academic): string
                         ->where('student_id', $student->student_id)
                         ->first();
                     $restoredStudents++;
-                    
-                    if ($rowIndex < 3) {
-                        Log::info("Student restored from soft delete", ['student_id' => $student->student_id]);
-                    }
                 }
             }
     
             // 6) التحقق من تطابق المسار
-            $pathMatches = $this->studentMatchesGroupPath($student, $group);
-            $alreadyInDifferentProgram = $this->studentAlreadyBelongsToDifferentProgram((int) $student->student_id, (int) $groupId);
-    
-            if ($rowIndex < 3) {
-                Log::info("Path verification for row #{$rowIndex}", [
-                    'student_id' => $student->student_id,
-                    'path_matches' => $pathMatches,
-                    'already_in_different_program' => $alreadyInDifferentProgram,
-                    'student_path' => [
-                        'college_id' => $student->college_id,
-                        'department_id' => $student->department_id,
-                        'program_id' => $student->program_id,
-                        'level_id' => $student->level_id,
-                        'semester_id' => $student->semester_id,
-                        'block_id' => $student->block_id,
-                    ],
-                    'group_path' => [
-                        'college_id' => $group->college_id,
-                        'department_id' => $group->department_id,
-                        'program_id' => $group->program_id,
-                        'level_id' => $group->level_id,
-                        'semester_id' => $group->semester_id,
-                        'block_id' => $group->block_id,
-                    ],
-                ]);
-            }
-    
-            if (!$pathMatches || $alreadyInDifferentProgram) {
-                Log::warning("Path mismatch for row #{$rowIndex}", [
-                    'student_id' => $student->student_id,
-                    'academic_number' => $academic,
-                ]);
+            if (!$this->studentMatchesGroupPath($student, $group) || 
+                $this->studentAlreadyBelongsToDifferentProgram((int) $student->student_id, (int) $groupId)) {
                 
                 $skippedConflicts++;
                 $errors[] = [
@@ -1352,54 +1214,20 @@ private function makePlaceholderEmail(?string $academic): string
     
             // 7) ربط الطالب بالمجموعة
             try {
-                $inserted = \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
+                \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
                     'student_id' => $student->student_id,
                     'group_id'   => $groupId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-                
-                if ($inserted > 0) {
-                    $attached++;
-                    if ($rowIndex < 3) {
-                        Log::info("Student attached to group", [
-                            'student_id' => $student->student_id,
-                            'group_id' => $groupId,
-                        ]);
-                    }
-                } else {
-                    if ($rowIndex < 3) {
-                        Log::info("Student already in group", [
-                            'student_id' => $student->student_id,
-                            'group_id' => $groupId,
-                        ]);
-                    }
-                }
+                $attached++;
             } catch (\Throwable $e) {
-                Log::error("Attach failed for row #{$rowIndex}", [
+                Log::error('Attach failed', [
                     'error' => $e->getMessage(),
-                    'student_id' => $student->student_id,
                 ]);
                 $skippedConflicts++;
-                $errors[] = [
-                    'row_number' => $rowIndex + 1,
-                    'reason' => 'attach_failed',
-                    'error' => $e->getMessage(),
-                ];
             }
         }
-    
-        // تسجيل النتائج النهائية
-        Log::info('CSV import completed', [
-            'created_users' => $createdUsers,
-            'restored_users' => $restoredUsers,
-            'created_students' => $createdStudents,
-            'restored_students' => $restoredStudents,
-            'attached_to_group' => $attached,
-            'skipped_missing' => $skippedMissing,
-            'skipped_conflicts' => $skippedConflicts,
-            'total_errors' => count($errors),
-        ]);
     
         // 7) النتيجة
         if ($skippedConflicts > 0 && $attached === 0 && $createdStudents === 0 && $createdUsers === 0 && $restoredStudents === 0 && $restoredUsers === 0) {
@@ -1413,7 +1241,7 @@ private function makePlaceholderEmail(?string $academic): string
                 'attached_to_group'  => 0,
                 'skipped_missing'    => $skippedMissing,
                 'skipped_conflicts'  => $skippedConflicts,
-                'errors'             => array_slice($errors, 0, 10), // أول 10 أخطاء فقط
+                'errors'             => array_slice($errors, 0, 10),
             ], 422);
         }
     
@@ -1426,7 +1254,7 @@ private function makePlaceholderEmail(?string $academic): string
             'attached_to_group'  => $attached,
             'skipped_missing'    => $skippedMissing,
             'skipped_conflicts'  => $skippedConflicts,
-            'errors'             => array_slice($errors, 0, 10), // أول 10 أخطاء فقط
+            'errors'             => array_slice($errors, 0, 10),
         ]);
     }
 
