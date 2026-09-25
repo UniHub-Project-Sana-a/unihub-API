@@ -681,12 +681,28 @@ private function makePlaceholderEmail(?string $academic): string
             //     'created_at'    => now(),
             //     'updated_at'    => now(),
             // ]);
-            $insertData['created_at'] = now();
-            $insertData['updated_at'] = now();
+            $insertData = [
+                'college_id'    => (int) $data['college_id'],
+                'department_id' => (int) $data['department_id'],
+                'program_id'    => $data['program_id'] ?? null,
+                'level_id'      => $data['level_id'] ?? null,
+                'semester_id'   => $data['semester_id'] ?? null,
+                'block_id'      => $data['block_id'] ?? null,
+                'group_name'    => trim($data['group_name']),
+                'max_students'  => $maxStudents,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ];
     
-            $id = DB::table('student_groups')->insertGetId($insertData);
+            DB::table('student_groups')->insert($insertData);
 
-            $group = DB::table('student_groups')->where('group_id', $id)->first();
+            // ✅ ثم استعلم عن السجل المُدخل
+            $searchPath = array_filter($insertData, fn($v) => $v !== null && !in_array($v, ['created_at', 'updated_at']));
+            
+            $group = DB::table('student_groups')
+                ->where($searchPath)
+                ->orderBy('created_at', 'desc')
+                ->first();
 
             return response()->json([
                 'status'  => 'created',
