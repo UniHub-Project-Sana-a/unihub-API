@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use App\Models\Course;
+use App\Models\Lecturer;
+use App\Models\StudentGroup;
+use App\Models\Classroom;
+use App\Models\Day;
+use App\Models\Period;
+use App\Models\LectureSession;
+use App\Models\Department;
+use \App\Models\QA\QaCampaign;
+class Timetable extends Model
+{
+    use HasFactory;
+
+    protected $table = 'timetable';
+    protected $primaryKey = 'timetable_id';
+    public $timestamps = true;
+
+    protected $fillable = [
+        'course_id', 'lecturer_id', 'group_id', 'classroom_id', 'day_id', 'period_id',
+        'lecture_type', 'status', 'start_date', 'end_date', 'academic_year',
+        'college_id', 'department_id', 'program_id', 'level_id', 'semester_id', 'block_id',
+        'gender_type', 'lecture_hours', 'allowance_minutes',
+    ];
+
+    // --- ✅ العلاقات (Relationships) - تأكد من وجودها كلها ---
+
+    public function course()
+    {
+        return $this->belongsTo(Course::class, 'course_id', 'course_id');
+    }
+
+    public function lecturer()
+    {
+        return $this->belongsTo(Lecturer::class, 'lecturer_id', 'lecturer_id');
+    }
+
+    public function group() // <-- على الأغلب، هذه كانت مفقودة
+    {
+        return $this->belongsTo(StudentGroup::class, 'group_id', 'group_id');
+    }
+
+    public function classroom()
+    {
+        return $this->belongsTo(Classroom::class, 'classroom_id', 'classroom_id');
+    }
+
+    public function day()
+    {
+        return $this->belongsTo(Day::class, 'day_id', 'day_id');
+    }
+
+    public function period()
+    {
+        return $this->belongsTo(Period::class, 'period_id', 'period_id');
+    }
+    
+    public function nextSession()
+    {
+        return $this->hasOne(LectureSession::class, 'timetable_id', 'timetable_id');
+    }
+    public function lectureSessions()
+    {
+        return $this->hasMany(LectureSession::class, 'timetable_id', 'timetable_id');
+    }
+    
+    public function department()
+    {
+        // جدول 'timetable' يحتوي على 'department_id'
+        // هذا يعرف علاقة "ينتمي إلى" مع موديل Department
+        return $this->belongsTo(Department::class, 'department_id');
+    }
+
+    public function studentGroup()
+    {
+        return $this->belongsTo(StudentGroup::class, 'group_id', 'group_id');
+    }
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class, 'program_id', 'program_id');
+    }
+
+    public function semester()
+    {
+        return $this->belongsTo(\App\Models\Semester::class, 'semester_id', 'semester_id');
+    }
+
+    public function block()
+    {
+        return $this->belongsTo(\App\Models\Block::class, 'block_id', 'id');
+    }
+
+    public function qaCampaigns()
+    {
+        return $this->belongsToMany(
+            QaCampaign::class, 
+            'qa_campaign_assignments', // اسم الجدول الوسيط
+            'timetable_id',            // المفتاح في الوسيط الخاص بهذا الموديل
+            'campaign_id'              // المفتاح في الوسيط الخاص بالموديل الآخر
+        );
+    }
+}

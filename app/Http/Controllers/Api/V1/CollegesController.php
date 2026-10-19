@@ -73,16 +73,82 @@ class CollegesController extends Controller {
     }
     public function destroy(College $college) 
     {
-        $logoPath = $college->getRawOriginal('college_logo');
-        // 1. حذف الصورة من التخزين إذا كانت موجودة 
-        if ($logoPath && Storage::disk('public')->exists($logoPath)) {
-            Storage::disk('public')->delete($logoPath);
-        }
-
-        // 3. حذف السجل
+        // حذف ناعم: نُبقي ملف الشعار على التخزين حتى يمكن استعادة الكلية من سلة المحذوفات.
+        // حذف الملف فعلياً يتم فقط عند "الحذف النهائي" من داخل السلة.
         $college->delete();
         
         return response()->json(['message' => 'College deleted']);
+    }
+
+    /**
+     * سلة المحذوفات (Soft Delete) للكليات.
+     * POST /api/v1/colleges/trash
+     */
+    public function trash(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:list,restore,force_delete',
+            'college_id' => 'nullable|integer|min:1',
+            'type' => 'required_if:action,restore,force_delete|in:colleges',
+            'id' => 'required_if:action,restore,force_delete|integer|min:1',
+        ]);
+
+        $collegeId = $validated['college_id'] ?? null;
+
+        $queries = [
+            'colleges' => fn () => College::onlyTrashed()
+                ->when($collegeId, fn ($q) => $q->where('college_id', (int) $collegeId)),
+        ];
+
+        if ($validated['action'] === 'list') {
+            $labels = [
+                'colleges' => 'الكليات',
+            ];
+
+            $groups = [];
+            foreach ($queries as $type => $queryFactory) {
+                $groups[] = [
+                    'type' => $type,
+                    'label' => $labels[$type],
+                    'records' => $queryFactory()->get()->map(function ($record) {
+                        $data = $record->getAttributes();
+                        $data['deleted_at'] = $record->deleted_at?->toISOString();
+
+                        return [
+                            'id' => $record->getKey(),
+                            'name' => $record->college_name ?? ('#' . $record->getKey()),
+                            'deleted_at' => $record->deleted_at?->toISOString(),
+                            'data' => $data,
+                        ];
+                    })->values(),
+                ];
+            }
+
+            return response()->json(['groups' => $groups]);
+        }
+
+        $type = $validated['type'];
+        $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+
+        DB::transaction(function () use ($record, $validated) {
+            if ($validated['action'] === 'restore') {
+                $record->restore();
+            } else {
+                // الحذف النهائي: نحذف الآن ملف الشعار من التخزين ثم نحذف السجل نهائياً.
+                $logoPath = $record->getRawOriginal('college_logo');
+                if ($logoPath && Storage::disk('public')->exists($logoPath)) {
+                    Storage::disk('public')->delete($logoPath);
+                }
+
+                $record->forceDelete();
+            }
+        });
+
+        return response()->json([
+            'message' => $validated['action'] === 'restore'
+                ? 'تمت استعادة العنصر بنجاح'
+                : 'تم حذف العنصر نهائياً',
+        ]);
     }
 
     public function dashboard($id)

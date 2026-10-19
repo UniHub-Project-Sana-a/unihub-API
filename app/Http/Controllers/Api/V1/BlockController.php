@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Block;
+use App\Models\BlockRelation;
 use App\Models\Program;
 use Illuminate\Support\Facades\Log;
 
@@ -242,10 +243,12 @@ class BlockController extends Controller
                 ], 422);
             }
 
-            // حذف العلاقات أولاً
-            $block->prerequisites()->detach();
-            $block->concurrents()->detach();
-
+            BlockRelation::query()
+                ->where(function ($query) use ($block) {
+                    $query->where('block_id', $block->id)
+                        ->orWhere('related_block_id', $block->id);
+                })
+                ->delete();
             $block->delete();
 
             return response()->json(['message' => 'تم حذف البلوك بنجاح']);

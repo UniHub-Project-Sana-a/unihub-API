@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تقرير تنفيذ تكامل API — UniHub (من المرحلة I1 إلى I6)</title>
+<style>
+  :root {
+    --brand: #0f4c81;
+    --brand-2: #0d9488;
+    --accent: #b45309;
+    --muted: #64748b;
+    --border: #dbe3ea;
+    --bg: #f6f9fc;
+    --bg-2: #eef6ff;
+    --ok: #15803d;
+    --warn: #b45309;
+    --danger: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Tahoma, "Traditional Arabic", "Dubai", sans-serif;
+    direction: rtl;
+    text-align: right;
+    line-height: 1.95;
+    color: #1f2937;
+    background: #fff;
+    font-size: 15px;
+  }
+  .page { max-width: 1040px; margin: 0 auto; padding: 40px 36px 80px; }
+
+  header.cover {
+    background: linear-gradient(135deg, #0f4c81 0%, #0d9488 100%);
+    color: #fff;
+    border-radius: 14px;
+    padding: 34px 32px;
+    margin-bottom: 28px;
+  }
+  header.cover h1 { margin: 0 0 8px; font-size: 28px; color: #fff; }
+  header.cover p { margin: 4px 0; opacity: .95; }
+  header.cover .meta { margin-top: 14px; font-size: 13.5px; opacity: .92; }
+  header.cover .meta span { display: inline-block; margin-inline-end: 18px; }
+
+  h1, h2, h3, h4 { color: var(--brand); line-height: 1.5; }
+  h2 {
+    font-size: 22px;
+    margin-top: 0;
+    border-bottom: 3px solid var(--brand-2);
+    padding-bottom: 8px;
+  }
+  h3 { font-size: 18px; color: var(--brand-2); margin-top: 26px; }
+  h4 { font-size: 16px; color: var(--accent); margin-top: 20px; }
+  p { margin: 8px 0; }
+  a { color: var(--brand); }
+
+  .section { page-break-before: always; margin-top: 44px; }
+  .no-break { page-break-inside: avoid; }
+
+  .toc {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    columns: 2;
+    column-gap: 30px;
+  }
+  .toc ol { margin: 0; padding-inline-start: 22px; }
+  .toc li { margin: 5px 0; break-inside: avoid; }
+  .toc a { text-decoration: none; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    vertical-align: top;
+  }
+  th { background: var(--bg-2); color: var(--brand); text-align: right; }
+  tbody tr:nth-child(even) { background: #fbfdff; }
+
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    direction: ltr;
+    unicode-bidi: embed;
+    background: #eef2f6;
+    color: #0b3a63;
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 13px;
+  }
+  pre {
+    font-family: Consolas, "Courier New", monospace;
+    direction: ltr;
+    text-align: left;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    overflow: auto;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--muted);
+  }
+  .badge.ok { color: var(--ok); border-color: #b6e2c4; background: #eefaef; }
+  .badge.new { color: #1d4ed8; border-color: #c3d4fb; background: #eef3ff; }
+  .badge.mod { color: var(--warn); border-color: #f2d6a8; background: #fff7ea; }
+  .badge.del { color: var(--danger); border-color: #f3c1c1; background: #fdeeee; }
+
+  .callout {
+    border-inline-start: 5px solid var(--brand-2);
+    background: var(--bg);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 14px 0;
+  }
+  .callout.warn { border-color: var(--warn); background: #fff8ee; }
+  .callout.danger { border-color: var(--danger); background: #fdeeee; }
+  .callout .title { font-weight: 700; color: var(--brand); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: #fff;
+  }
+  .card h4 { margin-top: 0; }
+  .flow { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .flow .node {
+    border: 2px solid var(--brand-2);
+    border-radius: 10px;
+    padding: 8px 14px;
+    background: #f0fdfa;
+    font-size: 14px;
+  }
+  .flow .node.deny { border-color: var(--danger); background: #fdeeee; }
+  .flow .arrow { text-align: center; color: var(--muted); font-size: 18px; line-height: 1; }
+  .ltr { direction: ltr; text-align: left; unicode-bidi: embed; }
+  .small { font-size: 13px; color: var(--muted); }
+  ul.tight li, ol.tight li { margin: 3px 0; }
+
+  footer { margin-top: 60px; border-top: 1px solid var(--border); padding-top: 16px; color: var(--muted); font-size: 13px; }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { font-size: 11.5pt; line-height: 1.85; }
+    .page { max-width: none; padding: 0 8mm; }
+    header.cover { border-radius: 0; }
+    a { color: #000; text-decoration: none; }
+    .section { page-break-before: always; }
+    h2, h3, h4 { page-break-after: avoid; }
+    table, tr, td, th, .card, .callout, pre { page-break-inside: avoid; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="cover">
+  <p>المهندس علاء حسين سعيد</p>
+  <p>المدير التنفيذي (CEO) والمطور العام لنظام UniHub لدى شركة UnitsHub</p>
+  <p><a href="mailto:unitshubcom@gmail.com">unitshubcom@gmail.com</a></p>
+  <h1>تقرير تنفيذ تكامل البيانات (API Integration)</h1>
+  <p>مشروع <strong>UniHub API</strong> &mdash; استقبال بيانات نظام الجامعة (Push / Data Ingestion)</p>
+  <p>من المرحلة <strong>I1</strong> (الأساس الأمني) حتى المرحلة <strong>I6</strong> (التقوية والتوثيق)</p>
+  <div class="meta">
+    <span>التاريخ: 2026-10-17</span>
+    <span>الوحدة: <span class="ltr">unihub-API</span></span>
+    <span>الحالة: <strong>مكتمل</strong></span>
+  </div>
+</header>
+
+<h2 id="toc">جدول المحتويات</h2>
+<nav class="toc">
+  <ol>
+    <li><a href="#summary">الملخص التنفيذي</a></li>
+    <li><a href="#flow">كيف يعمل الطلب (تدفّق الطلب)</a></li>
+    <li><a href="#security">طبقات الحماية الأمنية</a></li>
+    <li><a href="#endpoints">المسارات (Endpoints) وعقد الاستجابة</a></li>
+    <li><a href="#phases">المراحل: ماذا نُفِّذ في كل مرحلة (I1→I6)</a></li>
+    <li><a href="#files-new">فهرس الملفات الجديدة (الأهمية + السلوك)</a></li>
+    <li><a href="#files-mod">الملفات المعدّلة (قبل/بعد)</a></li>
+    <li><a href="#files-del">الملفات المحذوفة (تنظيف التوثيق)</a></li>
+    <li><a href="#db">جداول قاعدة البيانات الجديدة</a></li>
+    <li><a href="#config">متغيّرات البيئة والإعدادات</a></li>
+    <li><a href="#commands">الأوامر وطريقة التشغيل</a></li>
+    <li><a href="#tests">الاختبارات ونتائجها</a></li>
+    <li><a href="#extend">كيف تُضيف جدولاً جديداً؟</a></li>
+    <li><a href="#notes">الملاحظات والحدود</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================= -->
+<section class="section" id="summary">
+  <h2>1. الملخص التنفيذي</h2>
+
+  <p>كان المطلوب بناءُ <strong>واجهة استقبال موحّدة</strong> داخل مشروع <code>unihub-API</code> تُمكّن نظام الجامعة (Oracle) من
+  <strong>دفع (Push)</strong> البيانات إلى نظامنا: إنشاء/تحديث/حذف — على <strong>الجداول الفعلية القائمة</strong> بكل أعمدتها وصفوفها،
+  دون إنشاء جداول موازية، وبمستوى حماية <strong>مساوٍ أو أفضل</strong> من النموذج المرجعي في <code>C:\xampp\htdocs\unihub\apis</code>.</p>
+
+  <p>أُنجز العمل على ست مراحل متتابعة، والنتيجة النهائية نظام تكامل عام <strong>(config-driven)</strong>:</p>
+
+  <div class="grid">
+    <div class="card">
+      <h4>محرّك عام</h4>
+      <p class="small">وصف كل جدول في ملف إعداد واحد، وإضافة أي جدول لاحقاً = مقطع في الإعداد فقط بلا كود إضافي.</p>
+    </div>
+    <div class="card">
+      <h4>حماية بعاملين</h4>
+      <p class="small">Bearer Token (مخزَّن hash ومقارَن بزمن ثابت) + قائمة IP مسموحة (مع منع التزوير). <strong>لا يُطلب ولا يُتحقّق من هيدر <code>X-Client-MAC</code></strong> — إن أُرسل يُسجَّل في السجل فقط.</p>
+    </div>
+    <div class="card">
+      <h4>نجاح جزئي</h4>
+      <p class="small">الدفعة لا تُبطَل كاملة؛ كل صف خاطئ يُتخطّى مع سبب واضح في <code>skipped_reasons</code>.</p>
+    </div>
+    <div class="card">
+      <h4>تقوية كاملة</h4>
+      <p class="small">إعادة محاولة آمنة (Idempotency)، حدّ معدّل لكل عميل، سجلات وتقليم، وتوثيق شامل.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="title">النتيجة المُتحقَّقة:</span>
+    <ul class="tight">
+      <li><strong>102 اختباراً آلياً (PHPUnit)</strong> بنجاح كامل — 557 تأكيداً.</li>
+      <li><strong>اختبار HTTP فعلي (Smoke)</strong> من طرف إلى طرف: <strong>7/7</strong> نجاح.</li>
+      <li>قاعدة البيانات الحقيقية نُظّفت بالكامل من بيانات الاختبار.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="flow">
+  <h2>2. كيف يعمل الطلب (تدفّق الطلب)</h2>
+
+  <p>كل طلب دفع يمرّ عبر هذه السلسلة بالترتيب. أي طبقة تفشل تُعيد ردًّا موحّدًا وتوقف السلسلة:</p>
+
+  <div class="flow">
+    <div class="node">1) العميل (نظام الجامعة) → <span class="ltr">POST /api/external/v1/{resource}</span> مع <span class="ltr">Authorization: Bearer</span></div>
+    <div class="arrow">▼</div>
+    <div class="node">2) حدّ عام مبدئي بحسب IP <span class="ltr">(throttle:integration-ip)</span> — ضعف الحدّ الافتراضي</div>
+    <div class="arrow">▼</div>
+    <div class="node" id="f-auth">3) <strong>مصادقة</strong> <span class="ltr">(integration.auth)</span>: نوع الطلب → التوكن → IP المصدر (حالة العميل) + تسجيل الطلب</div>
+    <div class="arrow" style="color:var(--danger)">▼ فشل → 401 / 403 / 405</div>
+    <div class="node">4) حدّ المعدّل لكل عميل <span class="ltr">(integration.throttle)</span> → 429 عند التجاوز</div>
+    <div class="arrow">▼</div>
+    <div class="node">5) إعادة المحاولة الآمنة <span class="ltr">(integration.idempotency)</span> → إعادة رد مخزَّن أو 409</div>
+    <div class="arrow">▼</div>
+    <div class="node">6) <strong>المحرّك العام</strong>: تحقّق → حل المفاتيح → كشف التزاحم → Upsert/تعطيل (نجاح جزئي)</div>
+    <div class="arrow">▼</div>
+    <div class="node">7) رد موحّد + تحديث السجل (logs) + تخزين نتيجة Idempotency</div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="security">
+  <h2>3. طبقات الحماية الأمنية</h2>
+
+  <p>طُبِّقت الحماية على <strong>عاملين مجتمعين</strong> (لا يكفي أحدهما)، بنفس فلسفة النموذج المرجعي، مع تقويات إضافية:</p>
+
+  <table>
+    <thead>
+      <tr><th style="width:22%">الطبقة</th><th style="width:40%">الآلية</th><th>أين تُنفَّذ</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. Bearer Token</strong></td>
+        <td>هيدر <code>Authorization: Bearer &lt;TOKEN&gt;</code>. التوكن يُخزَّن كـ <strong>hash (sha256)</strong> في قاعدة البيانات، ويُقارن <strong>بزمن ثابت</strong> (<code>hash_equals</code>) لمنع هجمات التوقيت. لا يُعرض إلا مرة واحدة عند الإنشاء.</td>
+        <td><code>AuthenticateIntegrationClient</code></td>
+      </tr>
+      <tr>
+        <td><strong>2. IP Whitelist</strong></td>
+        <td>عنوان IP المصدر ضمن قائمة مسموحة تدعم صيغة <strong>CIDR</strong> (مثل <code>10.0.0.0/24</code>). <strong>لا يوجد فحص MAC</strong> (حقل <code>allowed_macs</code> خامل، وأُلغيت متطلبات <code>X-Client-MAC</code>).</td>
+        <td><code>AuthenticateIntegrationClient</code></td>
+      </tr>
+      <tr>
+        <td><strong>منع تزوير IP</strong></td>
+        <td>يُستخرج عنوان العميل من <code>REMOTE_ADDR</code> الفعلي، و<strong>لا</strong> يُقبل من ترويسات <code>X-Forwarded-For</code> إلا إذا فُعِّل الإعداد <code>INTEGRATION_TRUST_FORWARDED_IP=true</code> صراحةً (خلف وسيط موثوق).</td>
+        <td><code>App\Support\ClientIp</code></td>
+      </tr>
+      <tr>
+        <td><strong>تقييد الطرق</strong></td>
+        <td>يُسمح فقط بالطرق التي تُعدّل البيانات: <code>POST / PUT / PATCH / DELETE</code>. أي طريقة أخرى → <strong>405</strong>.</td>
+        <td><code>AuthenticateIntegrationClient</code></td>
+      </tr>
+      <tr>
+        <td><strong>حدّ المعدّل</strong></td>
+        <td>حدّ لكل عميل (افتراضي 600 طلب/دقيقة، قابل للتجاوز لكل عميل) + حماية مبدئية بحسب IP قبل المصادقة.</td>
+        <td><code>ThrottleIntegrationClient</code> + <code>AppServiceProvider</code></td>
+      </tr>
+      <tr>
+        <td><strong>إعادة المحاولة الآمنة</strong></td>
+        <td>هيدر <code>Idempotency-Key</code> اختياري: نفس المفتاح + نفس الجسم → إعادة الرد المخزَّن حرفيًا؛ جسم مختلف بنفس المفتاح → <strong>409</strong>.</td>
+        <td><code>EnsureIdempotency</code></td>
+      </tr>
+      <tr>
+        <td><strong>تسجيل كامل</strong></td>
+        <td>كل طلب يُسجَّل (IP، الحالة، مدة التنفيذ، ملخّص الرد، عيّنة من الحمولة — وترويسة <code>X-Client-MAC</code> إن وُجدت تُسجَّل ولا تُفحص) مع سياسة احتفاظ وتقليم تلقائي.</td>
+        <td><code>AuthenticateIntegrationClient</code> + <code>integration:prune</code></td>
+      </tr>
+      <tr>
+        <td><strong>حماية إضافية عامة</strong></td>
+        <td>وسيط <code>CheckIpRestrictions</code> العام يُطبَّق أيضًا على مسارات التكامل (قائمة سوداء/بيضاء من جدول <code>ip_restrictions</code>).</td>
+        <td><code>CheckIpRestrictions</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <span class="title">مقارنة بالنموذج المرجعي:</span>
+    في النموذج القديم كان التوكن ثابتًا داخل ملفات الكود وهيدر <code>X-Client-MAC</code> إلزاميًا وقابلًا للتزوير. هنا: التوكن في قاعدة البيانات كـ hash، وIP إلزامي، ومنع تزوير الترويسات، وسياسة قوائم فارغة = رفض (تشديد افتراضي) — <strong>وأُلغي فحص MAC نهائياً</strong> (لا يُطلب ولا يُتحقّق منه).
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="endpoints">
+  <h2>4. المسارات (Endpoints) وعقد الاستجابة</h2>
+
+  <table>
+    <thead>
+      <tr><th>الطريقة</th><th>المسار</th><th>الوظيفة</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>POST</td><td class="ltr">/api/external/v1/ping</td><td>فحص الاتصال والمصادقة (ليس واجهة بيانات).</td></tr>
+      <tr><td>POST / PUT / PATCH</td><td class="ltr">/api/external/v1/{resource}</td><td>إدخال/تحديث مجمّع (Upsert) — الجسم: <code>{ "data": [ ... ] }</code>.</td></tr>
+      <tr><td>DELETE</td><td class="ltr">/api/external/v1/{resource}</td><td>حذف/تعطيل حسب استراتيجية المورد.</td></tr>
+    </tbody>
+  </table>
+
+  <p class="small">لا توجد واجهات سحب (GET) — النظام يدفع البيانات فقط.</p>
+
+  <h3>عقد الاستجابة الموحّد</h3>
+<pre><code>{
+  "status": "success",
+  "message": "...",
+  "timestamp": "2026-10-17 20:00:00",
+  "inserted_records": 1,
+  "updated_records": 0,
+  "deactivated_records": 0,
+  "skipped_records": 0,
+  "skipped_reasons": [ "Row #1: ..." ]
+}</code></pre>
+
+  <h3>الموارد المتاحة (33)</h3>
+  <p><strong>الأساسية (15):</strong> <code>colleges</code>، <code>departments</code>، <code>programs</code>، <code>levels</code>، <code>semesters</code>،
+  <code>academic_titles</code>، <code>buildings</code>، <code>classrooms</code>، <code>days</code>، <code>periods</code>،
+  <code>students</code>، <code>lecturers</code>، <code>courses</code>، <code>student_groups</code>، <code>timetable</code>.</p>
+  <p><strong>توسعة البنية الأكاديمية (18):</strong> <code>blocks</code>، <code>block_relations</code>، <code>course_prerequisites</code>،
+  <code>program_learning_outcomes</code>، <code>course_learning_outcomes</code>، <code>course_descriptions</code>، <code>course_topics</code>،
+  <code>topic_questions</code>، <code>course_assignments</code>، <code>course_assessments</code>، <code>course_policies</code>، <code>course_references</code>،
+  <code>assessment_methods</code>، <code>teaching_strategies</code>، <code>outcome_assessment_method</code>، <code>outcome_teaching_strategy</code>،
+  <code>student_group_members</code>، <code>student_grades</code>.</p>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="phases">
+  <h2>5. المراحل: ماذا نُفِّذ في كل مرحلة</h2>
+
+  <h3>I1 — الأساس الأمني <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>جدولا <code>integration_clients</code> و<code>integration_logs</code>.</li>
+    <li>وسيط المصادقة الثلاثية <code>AuthenticateIntegrationClient</code>.</li>
+    <li>كونترولر <code>IntegrationController</code> بنقطة <code>ping</code> ومجموعة مسارات <span class="ltr">/api/external/v1</span>.</li>
+    <li>أمر إدارة العملاء <code>integration:client</code>.</li>
+    <li>ردود أخطاء موحّدة (401/403/405/404) لمسارات التكامل.</li>
+  </ul>
+
+  <h3>I2 — البيانات المرجعية الهيكلية <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>بناء <strong>المحرّك العام</strong> <code>IntegrationSyncService</code> وجدول الربط <code>integration_entity_refs</code>.</li>
+    <li>تفعيل 10 موارد: الكليات، الأقسام، البرامج، المستويات، الفصول، الدرجات العلمية، المباني، القاعات، الأيام، الحصص.</li>
+    <li>Upsert بالمفتاح الطبيعي + حل المفاتيح الأجنبية بالأكواد + مراجع متداخلة (semester←level←program).</li>
+    <li>نجاح جزئي صف-بصف + استرجاع المحذوف ناعمًا.</li>
+  </ul>
+
+  <h3>I3 — الأشخاص (الطلاب وهيئة التدريس) <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>ميزة <code>linked_user</code>: كتابة في جدولين (<code>users</code> + <code>students</code>/<code>lecturers</code>) وإنشاء الحساب تلقائيًا.</li>
+    <li>كلمة المرور الافتراضية <code>12345678</code> (تُطلب تغييرها عند أول دخول) — مطابقة للنظام الحالي.</li>
+    <li><strong>الإيميل إلزامي ويأتي مع البيانات فقط</strong> (لا يُولَّد تلقائيًا).</li>
+    <li>حل المرجع المركّب <code>title_code</code>+<code>college_id</code> → <code>title_id</code> للدرجة العلمية.</li>
+  </ul>
+
+  <h3>I4 — المحتوى الأكاديمي (المقررات والمجموعات) <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>موردا <code>courses</code> و<code>student_groups</code>.</li>
+    <li>دعم حقول JSON (مثل <code>course_parts</code>) + إعادة ترتيب الحل (foreign → parents → foreign_composite).</li>
+    <li>تعامل صحيح مع أعمدة NULL في المفتاح المركّب للمجموعات.</li>
+  </ul>
+
+  <h3>I5 — الجدول الدراسي مع كشف التزاحم <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>مورد <code>timetable</code> بمفتاح طبيعي: (المجموعة + اليوم + الحصة + السنة الأكاديمية) + دعم <code>external_id</code>.</li>
+    <li>كشف تزاحم عام: أبعاد (محاضر/مجموعة/قاعة) + نطاق (يوم/حصة/سنة) + تقاطع التواريخ، مع استثناء السجل نفسه عند التحديث.</li>
+    <li>عند التزاحم: تخطّي الصف بسبب واضح. الحذف = <code>status=0</code> (والمعطّل لا يمنع حجزًا جديدًا).</li>
+  </ul>
+
+  <h3>I6 — التقوية والتوثيق <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>إعادة المحاولة الآمنة (Idempotency) بصلاحية 24 ساعة.</li>
+    <li>حدّ معدّل لكل عميل (افتراضي 600/دقيقة) + حماية IP مبدئية.</li>
+    <li>التقاط الحمولة + ملخّص الرد + سياسة احتفاظ 90 يومًا + أمر تقليم وجدولة يومية.</li>
+    <li>دليل Markdown + HTML جاهز للطباعة + مجموعة Postman + سكربتات اختبار HTTP.</li>
+  </ul>
+
+  <h4>إضافات هذه الجلسة (بعد I6)</h4>
+  <ul class="tight">
+    <li><strong>تنظيف التوثيق:</strong> حذف ملفات التوثيق غير المتعلّقة بالتكامل داخل <code>docs/</code>.</li>
+    <li><strong>تصليب ضد تزوير IP:</strong> أداة <code>ClientIp</code> + إعداد <code>trust_forwarded_ip</code>.</li>
+    <li><strong>اختبارات آلية (PHPUnit):</strong> 7 مجموعات تغطّي الحماية والمزامنة والتزاحم وIdempotency والحدّ والتقليم.</li>
+    <li><strong>اختبار HTTP (Smoke):</strong> سكربت PowerShell + ملف <code>.http</code>.</li>
+  </ul>
+
+  <h3>I7 — توسعة البنية الأكاديمية (18 مورداً) <span class="badge ok">مكتمل</span></h3>
+  <ul class="tight">
+    <li>تفعيل 18 جدولاً عبر الكونفيج فقط: بلوكات وروابطها ومتطلبات المقررات؛ مخرجات التعلم (PLO/CLO)؛
+        محتوى المقرر (وصف/دروس/أسئلة)؛ التكليفات والتقويم والسياسات والمراجع؛ طرق التقويم واستراتيجيات التدريس
+        وروابط المخرجات؛ عضوية المجموعات ودرجات الطلاب.</li>
+    <li>توسعة المحرّك: نوع حذف <code>hard_delete</code> (جداول الروابط) + دعم <strong>المفتاح المركّب</strong>
+        (<code>student_group_members</code>: <code>student_id</code>+<code>group_id</code>).</li>
+    <li>دعم <code>foreign_composite</code> مع <code>nullable</code>، و<code>select</code> في <code>foreign</code>/<code>foreign_via_user</code>،
+        وتجاوز <code>null</code> في قيم enum القابلة للإفراغ.</li>
+    <li>اختبارات المراحل: <strong>102 اختباراً</strong> في <code>tests/Feature/Integration</code> بصفر فشل.</li>
+  </ul>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="files-new">
+  <h2>6. فهرس الملفات الجديدة (الأهمية + السلوك)</h2>
+  <p class="small">جميع المسارات أدناه نسبية إلى جذر وحدة <code>unihub-API</code>.</p>
+
+  <h3>6.1 الإعدادات</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>config/integration.php</code></td>
+        <td><strong>قلب النظام.</strong> يوصّف كل جدول حقيقي كمورّد وكل قواعد الكتابة عليه. إضافة أي جدول لاحقًا = مقطع هنا فقط.</td>
+        <td>يحتوي: تعريف الموارد (الجدول، المفتاح، الأعمدة القابلة للكتابة، الإلزامي، الافتراضيات، enum، التحويلات، حل المفاتيح المحلية/المركّبة/المتداخلة/عبر المستخدم، المفتاح الطبيعي، كشف التزاحم، استراتيجية الحذف)، إضافةً إلى الإعدادات العامة (كلمة المرور الافتراضية، حدّ المعدّل، صلاحية Idempotency، مدة الاحتفاظ بالسجلات، حجم الحمولة الملتقطة، وثقة ترويسة IP).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.2 المسارات والتسجيل</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge mod">معدّل</span><br><code>routes/api.php</code></td>
+        <td>تعريف نقطة الدخول لكل طلبات الدفع.</td>
+        <td>مجموعة <span class="ltr">/api/external/v1</span> بوسائط مرتّبة: <code>throttle:integration-ip</code> ثم <code>integration.auth</code> ثم <code>integration.throttle</code> ثم <code>integration.idempotency</code>. مسارات: <code>POST ping</code>، <code>POST|PUT|PATCH {resource}</code>، <code>DELETE {resource}</code>.</td>
+      </tr>
+      <tr>
+        <td><span class="badge mod">معدّل</span><br><code>bootstrap/app.php</code></td>
+        <td>تسجيل الوسائط وتوحيد أخطاء مسارات التكامل.</td>
+        <td>يعرّف الأسماء المستعارة <code>integration.auth</code> / <code>integration.throttle</code> / <code>integration.idempotency</code>، ويضيف <code>CheckIpRestrictions</code> إلى كل طلبات الـ API، ويعالج <code>NotFoundHttpException</code> و<code>MethodNotAllowedHttpException</code> لمسارات <code>api/external/*</code> بردود JSON موحّدة (404/405).</td>
+      </tr>
+      <tr>
+        <td><span class="badge mod">معدّل</span><br><code>routes/console.php</code></td>
+        <td>جدولة تقليم السجلات.</td>
+        <td>يضيف <code>Schedule::command(PruneIntegrationData::class)->daily()</code> بجانب المهام القائمة.</td>
+      </tr>
+      <tr>
+        <td><span class="badge mod">معدّل</span><br><code>app/Providers/AppServiceProvider.php</code></td>
+        <td>حماية مبدئية قبل المصادقة.</td>
+        <td>يعرّف محدّد المعدّل <code>integration-ip</code> بمفتاح <code>ClientIp::resolve</code> وبحدّ ضعف الافتراضي، لمنع إغراق نقطة الدخول قبل فحص العميل.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.3 الوسائط (Middleware)</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Http/Middleware/AuthenticateIntegrationClient.php</code></td>
+        <td>البوّابة الأمنية الأولى.</td>
+        <td>يتحقّق بالترتيب: طريقة الطلب (405) → التوكن (401، مقارنة hash بزمن ثابت) → حالة العميل (403 إن كان معطّلًا) → IP المصدر (403، يدعم CIDR). <strong>لا يفحص <code>X-Client-MAC</code></strong> (يُسجَّل فقط). يضع العميل في خصائص الطلب، ويحدّث <code>last_used_at</code>، ويسجّل الطلب في <code>integration_logs</code> (IP، الحالة، المدة، ملخّص الرد، عيّنة الحمولة).</td>
+      </tr>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Http/Middleware/ThrottleIntegrationClient.php</code></td>
+        <td>حدّ المعدّل لكل عميل.</td>
+        <td>يقرأ الحدّ من <code>rate_limit_per_minute</code> للعميل وإلا الافتراضي؛ عند التجاوز يعيد <strong>429</strong> موحّدًا مع <code>Retry-After</code> و<code>X-RateLimit-*</code>. الحدّ ≤ 0 يعني بلا حدّ. يُضاف إلى كل ردّ ناجح ترويسات الحدّ المتبقّي.</td>
+      </tr>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Http/Middleware/EnsureIdempotency.php</code></td>
+        <td>منع الازدواج عند إعادة المحاولة.</td>
+        <td>عند وجود <code>Idempotency-Key</code>: يحسب بصمة (طريقة+مسار+جسم). إن وُجد سجل غير منتهٍ بنفس البصمة → يعيد الرد المخزَّن حرفيًا مع <code>Idempotent-Replay: true</code>؛ بنفس المفتاح وبصمة مختلفة → <strong>409</strong>؛ المفتاح الأطول من 191 → <strong>400</strong>؛ السجل المنتهي يُحذف ويُعامَل كطلب جديد؛ بلا هيدر → تمرير طبيعي.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.4 الكونترولر والمحرّك</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Http/Controllers/Api/External/IntegrationController.php</code></td>
+        <td>نقطة الدخول للتطبيق (Thin Controller).</td>
+        <td><code>ping</code>: يردّ بحالة النجاح واسم العميل. <code>upsert</code>: يتحقّق من وجود المورد (404) ومن صيغة <code>data</code> (400) ثم يفوّض للمحرّك. <code>deactivate</code>: يفوّض لعملية الحذف/التعطيل. يبني كل الردود بالصيغة الموحّدة.</td>
+      </tr>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Services/Integration/IntegrationSyncService.php</code></td>
+        <td><strong>المحرّك العام (قلب المنطق).</strong></td>
+        <td>يقرأ تعريف المورد من الإعداد ثم: يتحقّق من الحقول الإلزامية و<code>enum</code> والتحويلات → يحلّ المفاتيح الأجنبية بالأكواد (<code>foreign</code>) والمراجع المركّبة (<code>foreign_composite</code>) والمتداخلة (<code>parents</code>) وعبر المستخدم (<code>foreign_via_user</code>) → يكشف التزاحم (<code>conflict</code>) → يُنشئ/يحدّث بالمفتاح الطبيعي (<code>match</code>) أو بالمعرّف الخارجي → يعالج المورد المرتبط بمستخدم (<code>linked_user</code>) بكتابة جدولين → ينفّذ الحذف/التعطيل حسب <code>deactivate</code> → يجمع نتيجة كل صف (نجاح جزئي) ويُسجّل الربط في <code>integration_entity_refs</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.5 النماذج (Models)</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge new">جديد</span><br><code>app/Models/IntegrationClient.php</code></td><td>تمثيل عميل التكامل.</td><td>يحوي <code>hashToken()</code> (sha256)، ويخفي <code>token_hash</code> عند التسلسل، ويحوّل قائمة IPs من JSON، وعلاقة <code>logs()</code>. (الحقل <code>allowed_macs</code> ما زال موجودًا في الجدول/النموذج لكنه <strong>غير مستخدم</strong> في أي فحص.)</td></tr>
+      <tr><td><span class="badge new">جديد</span><br><code>app/Models/IntegrationLog.php</code></td><td>سجل التتبّع.</td><td>جدول إلحاقي (created_at فقط)، يحوّل <code>summary</code> إلى مصفوفة، وعلاقة <code>client()</code>.</td></tr>
+      <tr><td><span class="badge new">جديد</span><br><code>app/Models/IntegrationEntityRef.php</code></td><td>ربط المعرّف الخارجي بالسجل الداخلي.</td><td>يحفظ (<code>client</code>، <code>entity</code>، <code>external_id</code>، <code>internal_id</code>، <code>internal_key</code>) لتمكين التحديث/الحذف بمعرّف النظام الخارجي.</td></tr>
+      <tr><td><span class="badge new">جديد</span><br><code>app/Models/IntegrationIdempotency.php</code></td><td>ذاكرة إعادة المحاولة الآمنة.</td><td>يحفظ لكل (عميل+مفتاح) بصمة الطلب وردّه المخزَّن وصلاحية الانتهاء.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.6 أدوات مساعدة</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Support/ClientIp.php</code></td>
+        <td>تصليب ضد تزوير عنوان IP.</td>
+        <td><code>resolve()</code> يعيد <code>REMOTE_ADDR</code> الفعلي، ولا يقرأ <code>X-Forwarded-For</code> إلا إذا فُعِّل <code>integration.trust_forwarded_ip</code> (افتراضيًا معطّل). يُستخدم في فحص IP وفي مفتاح حدّ المعدّل وفي التسجيل.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.7 الهجرات (Migrations)</h3>
+  <table>
+    <thead><tr><th style="width:34%">الملف</th><th>الوظيفة</th></tr></thead>
+    <tbody>
+      <tr><td><code>2026_10_17_000001_create_integration_clients_table.php</code></td><td>إنشاء <code>integration_clients</code> (اسم، token_hash فريد، <code>allowed_ips</code> كـ JSON، <code>allowed_macs</code> كـ JSON — حقل خامل لا يُفحص، حالة، آخر استخدام).</td></tr>
+      <tr><td><code>2026_10_17_000002_create_integration_logs_table.php</code></td><td>إنشاء <code>integration_logs</code> (طريقة، مسار، IP، MAC، حالة، ملخّص، مدة، وقت).</td></tr>
+      <tr><td><code>2026_10_17_000003_create_integration_entity_refs_table.php</code></td><td>إنشاء <code>integration_entity_refs</code> (ربط خارجي/داخلي) مع قيد فريد لكل (عميل، كيان، معرّف خارجي).</td></tr>
+      <tr><td><code>2026_10_17_000004_create_integration_idempotency_table.php</code></td><td>إنشاء <code>integration_idempotency</code> (مفتاح، بصمة طلب، رد مخزَّن، انتهاء) مع قيد فريد لكل (عميل، مفتاح).</td></tr>
+      <tr><td><code>2026_10_17_000005_add_rate_limit_to_integration_clients_table.php</code></td><td>إضافة عمود <code>rate_limit_per_minute</code> العملاء (NULL = الافتراضي).</td></tr>
+      <tr><td><code>2026_10_17_000006_add_payload_capture_to_integration_logs_table.php</code></td><td>إضافة التقاط الحمولة وأحجام الطلب/الرد إلى السجلات.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.8 أوامر Artisan</h3>
+  <table>
+    <thead><tr><th style="width:26%">الملف</th><th style="width:34%">الأهمية</th><th>السلوك</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Console/Commands/ManageIntegrationClient.php</code></td>
+        <td>إنشاء وإدارة عملاء التكامل.</td>
+        <td>الأمر <code>integration:client</code>: إنشاء عميل مع قائمة IPs (<code>--ips</code> فقط — لا يوجد خيار <code>--macs</code>، لأن فحص MAC مُلغى)، أو <code>--rotate</code> لتدوير التوكن، أو <code>--enable/--disable</code>، أو <code>--rate-limit</code>. التوكن يُولَّد ويُعرض مرة واحدة ويُخزَّن كـ hash.</td>
+      </tr>
+      <tr>
+        <td><span class="badge new">جديد</span><br><code>app/Console/Commands/PruneIntegrationData.php</code></td>
+        <td>سياسة الاحتفاظ نظيفة تلقائيًا.</td>
+        <td>الأمر <code>integration:prune</code>: يحذف السجلات الأقدم من مدة الاحتفاظ (افتراضي 90 يومًا، أو <code>--days</code>) ومفاتيح Idempotency المنتهية، مع دعم <code>--dry-run</code>. مجدول يوميًا.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.9 الاختبارات</h3>
+  <table>
+    <thead><tr><th style="width:34%">الملف</th><th>الوظيفة</th></tr></thead>
+    <tbody>
+      <tr><td><code>phpunit.xml</code></td><td>إعداد بيئة الاختبار (قاعدة منفصلة <code>unihub20_test</code>، <code>APP_URL=http://localhost</code>، كاش array).</td></tr>
+      <tr><td><code>tests/TestCase.php</code></td><td>الأساس المشترك لاختبارات الميزات.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationTestCase.php</code></td><td>صنف أساس للتكامل: مساعدات <code>makeClient()</code> و<code>integrationHeaders()</code> و<code>endpoint()</code> (بدون أي ترويسات MAC).</td></tr>
+      <tr><td><code>tests/Feature/Integration/SeedsIntegrationData.php</code></td><td>سمة تهيئة بيانات واقعية (كليات، أقسام، أيام، حصص، مبانٍ، قاعات، مقررات، محاضرون، مجموعات).</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationAuthTest.php</code></td><td>الحماية: توكن/IP، إلغاء فحص MAC، منع تزوير IP، عميل معطّل، 405/404، التسجيل، تحديث آخر استخدام.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationReferenceSyncTest.php</code></td><td>المزامنة المرجعية: إنشاء/تحديث، حل المفاتيح، النجاح الجزئي، الحذف الناعم والاسترجاع.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationPeopleSyncTest.php</code></td><td>الأشخاص: إنشاء الحساب المرتبط، كلمة المرور الافتراضية، عدم التكرار، التعطيل/التفعيل، الدرجة العلمية.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationTimetableSyncTest.php</code></td><td>الجدول: المفتاح الطبيعي، كشف التزاحم، عدم تقاطع التواريخ، الحذف بالمعرّف الخارجي.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationIdempotencyTest.php</code></td><td>إعادة المحاولة: إعادة الرد، 409، المفتاح الطويل 400، المفتاح المنتهي.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationRateLimitTest.php</code></td><td>حدّ المعدّل: 429، الترويسات، صفر = بلا حدّ.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationPruneCommandTest.php</code></td><td>التقليم: حذف القديم فقط، <code>--days</code>، <code>--dry-run</code>، حذف المفاتيح المنتهية.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationBlocksSyncTest.php</code></td><td>المرحلة 1: <code>blocks</code> / <code>block_relations</code> / <code>course_prerequisites</code> (حذف صلب).</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationOutcomesSyncTest.php</code></td><td>المرحلة 2: مخرجات البرنامج والمقرر.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationContentSyncTest.php</code></td><td>المرحلة 3: وصف المقرر، الموضوعات، الأسئلة.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationAssessmentsSyncTest.php</code></td><td>المرحلة 4: التكليفات، التقويم، السياسات، المراجع.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationOutcomeLinksSyncTest.php</code></td><td>المرحلة 5: الطرق/الاستراتيجيات وروابط المخرجات.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationEnrollmentSyncTest.php</code></td><td>المرحلة 6: عضويات المجموعات والدرجات.</td></tr>
+      <tr><td><code>tests/Feature/Integration/IntegrationEngineExtensionsTest.php</code></td><td>امتدادات المحرّك: <code>hard_delete</code>، المفتاح المركّب، المراجع غير المحلولة.</td></tr>
+      <tr><td><code>tests/Unit/ExampleTest.php</code></td><td>اختبار وحدة بسيط (لتثبيت مجلد Unit).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.10 الوثائق وأدوات الاختبار اليدوي</h3>
+  <table>
+    <thead><tr><th style="width:34%">الملف</th><th>الوظيفة</th></tr></thead>
+    <tbody>
+      <tr><td><code>docs/INTEGRATION_API_GUIDE_AR.md</code></td><td>دليل التكامل الرئيسي (14 قسمًا): المصادقة، جدول الراوتات (34 صفاً)، مرجع الموارد 33، الأمثلة، الأخطاء، وأقسام «كيف تختبر الواجهة».</td></tr>
+      <tr><td><code>docs/INTEGRATION_API_GUIDE_AR.html</code></td><td>نسخة الدليل جاهزة للطباعة/التصدير PDF.</td></tr>
+      <tr><td><code>docs/INTEGRATION_PLAN_AR.md</code></td><td>الخطة وسجل التنفيذ مرحلة بمرحلة.</td></tr>
+      <tr><td><code>docs/integration_postman_collection.json</code></td><td>مجموعة Postman جاهزة (68 طلبًا في 6 مجلدات).</td></tr>
+      <tr><td><code>docs/integration.http</code></td><td>طلبات HTTP للاختبار اليدوي من VS Code (REST Client).</td></tr>
+      <tr><td><code>docs/integration_smoke_test.ps1</code></td><td>اختبار HTTP فعلي من طرف إلى طرف (PowerShell) ضد خادم يعمل.</td></tr>
+      <tr><td><code>docs/INTEGRATION_FULL_REPORT_AR.html</code></td><td><strong>هذا الملف</strong> — تقرير التنفيذ الشامل القابل للطباعة.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="files-mod">
+  <h2>7. الملفات المعدّلة (قبل/بعد)</h2>
+  <table>
+    <thead><tr><th style="width:28%">الملف</th><th>ما الذي تغيّر ولماذا</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>routes/api.php</code></td>
+        <td>أُضيفت مجموعة مسارات التكامل <span class="ltr">/api/external/v1</span> بوسائطها الأربع، دون المساس بمسارات النظام القائمة.</td>
+      </tr>
+      <tr>
+        <td><code>bootstrap/app.php</code></td>
+        <td>تسجيل الأسماء المستعارة للوسائط الثلاثة، وإضافة معالجة موحّدة لأخطاء 404/405 على مسارات التكامل، مع الإبقاء على <code>CheckIpRestrictions</code> العام.</td>
+      </tr>
+      <tr>
+        <td><code>routes/console.php</code></td>
+        <td>جدولة أمر التقليم يوميًا.</td>
+      </tr>
+      <tr>
+        <td><code>app/Providers/AppServiceProvider.php</code></td>
+        <td>إضافة محدّد المعدّل <code>integration-ip</code> (حماية مبدئية قبل المصادقة) بمفتاح مقاوم للتزوير.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="title">ملاحظة:</span>
+    تظهر في حالة Git أيضًا ملفات نظامية أخرى عُدِّلت في مسار عمل سابق غير متعلّق بالتكامل (عدد من كونترولرات V1 والنماذج).
+    لا علاقة لهذه التغييرات بواجهة التكامل، ولم تُمسّ في هذا العمل.
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="files-del">
+  <h2>8. الملفات المحذوفة (تنظيف التوثيق)</h2>
+  <p>بُناءً على الطلب، حُذفت ملفات التوثيق <strong>غير المتعلّقة بالتكامل</strong> داخل مجلد <code>docs/</code> فقط (مع الإبقاء على ملفات الجذر مثل README):</p>
+  <table>
+    <thead><tr><th>الملف المحذوف</th><th>السبب</th></tr></thead>
+    <tbody>
+      <tr><td><code>docs/API_DOCUMENTATION.md</code></td><td>توثيق عام قديم غير متعلّق بالتكامل.</td></tr>
+      <tr><td><code>docs/API_DOCUMENTATION_FIXED.md</code></td><td>نسخة مكرّرة/قديمة.</td></tr>
+      <tr><td><code>docs/DATABASE_SCHEMA.md</code></td><td>مخطط قاعدة بيانات عام.</td></tr>
+      <tr><td><code>docs/FIX_PLAN_AR.md</code></td><td>خطة إصلاح سابقة.</td></tr>
+      <tr><td><code>docs/generate_docs.py</code></td><td>سكربت توليد توثيق قديم.</td></tr>
+      <tr><td><code>docs/parse_routes.py</code></td><td>سكربت تحليل مسارات قديم.</td></tr>
+      <tr><td><code>docs/routes_parsed.json</code></td><td>مخرجات سكربت التحليل القديم.</td></tr>
+    </tbody>
+  </table>
+  <p class="small">هذه الملفات مُتعقَّبة في Git، لذا يمكن استرجاعها عند الحاجة. الملفات المتبقّية في <code>docs/</code> كلها تخصّ التكامل.</p>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="db">
+  <h2>9. جداول قاعدة البيانات الجديدة</h2>
+  <table>
+    <thead><tr><th style="width:26%">الجدول</th><th>الغرض والحقول الأساسية</th></tr></thead>
+    <tbody>
+      <tr><td><code>integration_clients</code></td><td>عملاء التكامل. الحقول: <code>name</code> (فريد)، <code>token_hash</code> (فريد، sha256)، <code>allowed_ips</code> (JSON)، <code>allowed_macs</code> (JSON — حقل خامل لا يُستخدم في فحص)، <code>is_active</code>، <code>rate_limit_per_minute</code>، <code>last_used_at</code>.</td></tr>
+      <tr><td><code>integration_logs</code></td><td>سجل التتبّع الإلحاقي. الحقول: <code>client_id</code>، <code>method</code>، <code>path</code>، <code>ip</code>، <code>mac</code>، <code>request_payload</code>، <code>request_bytes</code>، <code>http_status</code>، <code>summary</code> (JSON)، <code>duration_ms</code>، <code>response_bytes</code>، <code>created_at</code>.</td></tr>
+      <tr><td><code>integration_entity_refs</code></td><td>ربط المعرّف الخارجي بالسجل الداخلي. الحقول: <code>client_id</code>، <code>entity</code>، <code>external_id</code>، <code>internal_id</code>، <code>internal_key</code>؛ قيد فريد لكل (عميل، كيان، معرّف خارجي).</td></tr>
+      <tr><td><code>integration_idempotency</code></td><td>ذاكرة إعادة المحاولة. الحقول: <code>client_id</code>، <code>idempotency_key</code>، <code>request_hash</code>، <code>http_status</code>، <code>response</code> (JSON)، <code>created_at</code>، <code>expires_at</code>؛ قيد فريد لكل (عميل، مفتاح).</td></tr>
+    </tbody>
+  </table>
+  <p class="small">كل هذه الجداول <strong>مساندة</strong> للتكامل فقط؛ بيانات الجامعة تُكتب في جداول المشروع الفعلية القائمة (colleges, students, timetable …) كما هي.</p>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="config">
+  <h2>10. متغيّرات البيئة والإعدادات</h2>
+  <table>
+    <thead><tr><th style="width:38%">المفتاح (في <code>config/integration.php</code>)</th><th style="width:26%">متغيّر البيئة</th><th>الافتراضي والمعنى</th></tr></thead>
+    <tbody>
+      <tr><td><code>default_user_password</code></td><td><code>DEFAULT_STUDENT_PASSWORD</code></td><td><code>12345678</code> — كلمة مرور الحسابات الجديدة (تُطلب تغييرها عند أول دخول).</td></tr>
+      <tr><td><code>default_rate_limit</code></td><td>—</td><td>600 — الحدّ الافتراضي للطلبات لكل دقيقة لكل عميل.</td></tr>
+      <tr><td><code>idempotency_ttl_hours</code></td><td>—</td><td>24 — صلاحية مفاتيح إعادة المحاولة (0 = تعطيل).</td></tr>
+      <tr><td><code>log_retention_days</code></td><td>—</td><td>90 — مدة الاحتفاظ بسجلات التكامل.</td></tr>
+      <tr><td><code>log_payload_max_bytes</code></td><td>—</td><td>الحد الأقصى لعيّنة الحمولة المحفوظة في السجل.</td></tr>
+      <tr><td><code>trust_forwarded_ip</code></td><td><code>INTEGRATION_TRUST_FORWARDED_IP</code></td><td><code>false</code> — عند التفعيل فقط يُقبل <code>X-Forwarded-For</code> (خلف وسيط موثوق).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="commands">
+  <h2>11. الأوامر وطريقة التشغيل</h2>
+
+  <h3>تشغيل الهجرات</h3>
+<pre><code>php artisan migrate</code></pre>
+
+  <h3>إنشاء عميل تكامل (توكن + IP)</h3>
+<pre><code>php artisan integration:client "university-oracle" \
+    --ips=10.0.0.0/24
+
+# تدوير التوكن / تعطيل / تفعيل / ضبط الحدّ
+php artisan integration:client "university-oracle" --rotate
+php artisan integration:client "university-oracle" --disable
+php artisan integration:client "university-oracle" --enable
+php artisan integration:client "university-oracle" --rate-limit=1200</code></pre>
+  <p class="small">التوكن يُعرض <strong>مرة واحدة فقط</strong> ويُخزَّن كـ hash؛ احفظه فورًا.</p>
+
+  <h3>تقليم السجلات</h3>
+<pre><code>php artisan integration:prune
+php artisan integration:prune --days=30
+php artisan integration:prune --dry-run</code></pre>
+
+  <h3>تشغيل الاختبارات</h3>
+<pre><code># الاختبارات الآلية (تستخدم قاعدة unihub20_test منفصلة)
+vendor\phpunit\phpunit\phpunit tests/Feature/Integration</code></pre>
+
+  <h3>الاختبار اليدوي عبر HTTP</h3>
+<pre><code># 1) شغّل الخادم
+php -S 127.0.0.1:8099 -t public public/index.php
+
+# 2) أنشئ عميلاً (لاحظ التوكن) — لا يوجد خيار --macs (فحص MAC مُلغى)
+php artisan integration:client "smoke" --ips=127.0.0.1
+
+# 3) شغّل اختبار الدخان (الأقسام [1]..[7])
+powershell -ExecutionPolicy Bypass -File docs\integration_smoke_test.ps1 `
+    -BaseUrl "http://127.0.0.1:8099" `
+    -Token   "<التوكن>"</code></pre>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="tests">
+  <h2>12. الاختبارات ونتائجها</h2>
+
+  <h3>الاختبارات الآلية (PHPUnit)</h3>
+  <table>
+    <thead><tr><th>المجموعة</th><th>التغطية</th></tr></thead>
+    <tbody>
+      <tr><td>الحماية</td><td>401 بلا توكن/بتوكن خاطئ، 403 لـ IP/عميل معطّل، <strong>إلغاء فحص MAC</strong> (لا يُطلب ولا يُمنع)، منع تزوير IP عبر <code>X-Forwarded-For</code>، 405 للطرق غير المسموحة، 404 لمورد مجهول، التسجيل وتحديث آخر استخدام.</td></tr>
+      <tr><td>المزامنة المرجعية</td><td>إنشاء/تحديث، حل المفتاح الأجنبي، النجاح الجزئي، الحذف الناعم والاسترجاع، 400 لبنية خاطئة.</td></tr>
+      <tr><td>الأشخاص</td><td>إنشاء الحساب المرتبط، كلمة المرور الافتراضية، عدم التكرار، التعطيل/التفعيل، الدرجة العلمية المركّبة، رفض الصف ناقص البريد.</td></tr>
+      <tr><td>الجدول</td><td>كشف تزاحم القاعة والمحاضر، السماح بعدم تقاطع التواريخ، التحديث بالمفتاح الطبيعي، الحذف بالمعرّف الخارجي وإعادة التفعيل.</td></tr>
+      <tr><td>إعادة المحاولة</td><td>إعادة الرد المخزَّن، 409 لجسم مختلف، 400 للمفتاح الطويل، معالجة المفتاح المنتهي.</td></tr>
+      <tr><td>حدّ المعدّل</td><td>429 عند التجاوز، ترويسات الحدّ، صفر = بلا حدّ.</td></tr>
+      <tr><td>التقليم</td><td>حذف القديم فقط، <code>--days</code>، <code>--dry-run</code>، حذف المفاتيح المنتهية.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="title">النتيجة:</span>
+    <strong>102 اختبارًا · 557 تأكيدًا · 0 فشل</strong> (ملاحظة: تظهر 5 تنبيهات deprecation مصدرها ملف إعداد قاعدة بيانات Laravel الافتراضي <code>config/database.php</code> وليست من كود التكامل).
+  </div>
+
+  <h3>اختبار HTTP الفعلي (Smoke)</h3>
+  <table>
+    <thead><tr><th>الخطوة</th><th>التحقّق</th><th>النتيجة</th></tr></thead>
+    <tbody>
+      <tr><td>Ping</td><td>200 + <code>status=success</code></td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>توكن غير صحيح</td><td>401</td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>إنشاء كلية</td><td>Upsert</td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>إنشاء قسم</td><td>حل المفتاح الأجنبي</td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>إنشاء طالب</td><td>users + students</td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>التوسعة الأكاديمية</td><td>موارد البنية الأكاديمية الجديدة</td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>إعادة المحاولة الآمنة</td><td>إعادة الرد دون تكرار</td><td><span class="badge ok">ناجح</span></td></tr>
+      <tr><td>مورد غير معروف</td><td>404</td><td><span class="badge ok">ناجح</span></td></tr>
+    </tbody>
+  </table>
+  <p class="small">النتيجة النهائية: <strong>7/7</strong> (جميع أقسام السكربت [1]..[7])، ثم نُظّفت قاعدة البيانات بالكامل من بيانات الاختبار.</p>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="extend">
+  <h2>13. كيف تُضيف جدولاً جديداً؟</h2>
+  <p>بفضل التصميم القائم على الإعداد، لا تحتاج كودًا جديدًا. أضف مقطعًا واحدًا في <code>config/integration.php</code> ضمن <code>resources</code>:</p>
+<pre><code>'resources' =&gt; [
+    // ...
+    'my_table' =&gt; [
+        'table'       =&gt; 'my_table',            // الجدول الحقيقي
+        'primary_key' =&gt; 'id',
+        'writable'    =&gt; ['code', 'name', 'college_code'],
+        'required'    =&gt; ['code', 'name'],
+        'defaults'    =&gt; ['is_active' =&gt; 1],
+        'casts'       =&gt; ['is_active' =&gt; 'bool'],
+        'foreign'     =&gt; ['college_code' =&gt; ['colleges', 'college_code', 'college_id']],
+        'match'       =&gt; ['code'],              // المفتاح الطبيعي
+        'deactivate'  =&gt; ['column' =&gt; 'is_active', 'value' =&gt; 0],
+    ],
+];</code></pre>
+  <p>يصبح المورد متاحًا فورًا عبر <span class="ltr">/api/external/v1/my_table</span> بكل ميزات المحرّك (حل المفاتيح، النجاح الجزئي، الحذف، التسجيل).</p>
+</section>
+
+<!-- ============================================================= -->
+<section class="section" id="notes">
+  <h2>14. الملاحظات والحدود</h2>
+  <ul class="tight">
+    <li><strong>لا واجهات سحب (GET):</strong> النظام يدفع فقط، حسب الاتفاق.</li>
+    <li><strong>الإيميل إلزامي:</strong> يأتي ضمن البيانات، ولا يُولَّد تلقائيًا.</li>
+    <li><strong>حذف ناعم/تعطيل:</strong> حسب أعمدة كل جدول (<code>is_active</code> أو <code>status</code> أو <code>deleted_at</code>).</li>
+    <li><strong>نجاح جزئي:</strong> لا تُبطَل الدفعة كاملة؛ الصفوف الخاطئة تُتخطّى بأسباب واضحة.</li>
+    <li><strong>إعداد Trusted Proxies:</strong> إن كان النظام خلف وسيط موثوق، فعّل <code>INTEGRATION_TRUST_FORWARDED_IP=true</code> فقط حينها.</li>
+    <li><strong>التنبيهات (deprecations):</strong> مصدرها إعداد Laravel الافتراضي لقاعدة PostgreSQL، ولا تؤثّر على التكامل.</li>
+    <li><strong>الحالة في Git:</strong> كل تغييرات التكامل غير مُودَعة (uncommitted)؛ يُنصح بمراجعتها ثم عمل commit.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>تقرير تنفيذ تكامل API — مشروع UniHub · أُعدّ تلقائيًا · 2026-10-17</p>
+  <p class="small">هذا المستند قابل للطباعة مباشرةً: افتحه في متصفح ثم اطبع (Ctrl+P) أو صدّره إلى PDF.</p>
+</footer>
+
+</div>
+</body>
+</html>

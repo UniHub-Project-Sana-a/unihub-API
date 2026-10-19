@@ -1,0 +1,2929 @@
+{
+    "info": {
+        "name": "UniHub — التكامل الخارجي v1",
+        "description": "واجهات دفع البيانات من نظام الجامعة إلى UniHub.\nالمصادقة بعاملين: Bearer Token + IP Whitelist.\nراجع docs/INTEGRATION_API_GUIDE_AR.md للتفاصيل.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://127.0.0.1:8000/api/external/v1"
+        },
+        {
+            "key": "token",
+            "value": "PUT-YOUR-TOKEN-HERE"
+        }
+    ],
+    "item": [
+        {
+            "name": "0. اختبار الاتصال",
+            "item": [
+                {
+                    "name": "اختبار الاتصال (ping)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/ping",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "ping"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "1. بيانات مرجعية",
+            "item": [
+                {
+                    "name": "إدخال/تحديث: colleges",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/colleges",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "colleges"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"college_name\": \"كلية الحاسبات وتقنية المعلومات\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: colleges",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/colleges",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "colleges"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"college_name\": \"كلية الحاسبات وتقنية المعلومات\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: departments",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/departments",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "departments"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"department_code\": \"CS-DEP\",\n            \"department_name\": \"علوم الحاسب\",\n            \"college_code\": \"fcit\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: departments",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/departments",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "departments"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"department_code\": \"CS-DEP\",\n            \"department_name\": \"علوم الحاسب\",\n            \"college_code\": \"fcit\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: programs",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/programs",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "programs"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"department_code\": \"CS-DEP\",\n            \"program_name\": \"fd\",\n            \"academic_system\": \"semester\",\n            \"block_based\": false,\n            \"total_hours\": 132\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: programs",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/programs",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "programs"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"department_code\": \"CS-DEP\",\n            \"program_name\": \"fd\",\n            \"academic_system\": \"semester\",\n            \"block_based\": false,\n            \"total_hours\": 132\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: levels",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/levels",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "levels"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level_number\": 1,\n            \"level_name\": \"المستوى الأول\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: levels",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/levels",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "levels"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level_number\": 1,\n            \"level_name\": \"المستوى الأول\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: semesters",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/semesters",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "semesters"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester_name\": \"الفصل الأول\",\n            \"academic_year\": \"2026\",\n            \"term_number\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: semesters",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/semesters",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "semesters"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester_name\": \"الفصل الأول\",\n            \"academic_year\": \"2026\",\n            \"term_number\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: academic_titles",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/academic_titles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "academic_titles"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"title_name\": \"أستاذ\",\n            \"title_code\": \"PROF\",\n            \"hourly_price\": 100\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: academic_titles",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/academic_titles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "academic_titles"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"title_name\": \"أستاذ\",\n            \"title_code\": \"PROF\",\n            \"hourly_price\": 100\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: buildings",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/buildings",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "buildings"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"building_code\": \"B1\",\n            \"building_name\": \"المبنى الرئيسي\",\n            \"floors_count\": 3,\n            \"college_code\": \"fcit\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: buildings",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/buildings",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "buildings"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"building_code\": \"B1\",\n            \"building_name\": \"المبنى الرئيسي\",\n            \"floors_count\": 3,\n            \"college_code\": \"fcit\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: classrooms",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/classrooms",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "classrooms"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"building_code\": \"B1\",\n            \"classroom_name\": \"101\",\n            \"floor\": 1,\n            \"college_code\": \"fcit\",\n            \"capacity\": 40,\n            \"display_type\": \"projector\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: classrooms",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/classrooms",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "classrooms"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"building_code\": \"B1\",\n            \"classroom_name\": \"101\",\n            \"floor\": 1,\n            \"college_code\": \"fcit\",\n            \"capacity\": 40,\n            \"display_type\": \"projector\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: days",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/days",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "days"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"day_name\": \"الأحد\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: days",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/days",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "days"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"day_name\": \"الأحد\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: periods",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/periods",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "periods"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"period_name\": \"الحصة الأولى\",\n            \"start_time\": \"08:00\",\n            \"end_time\": \"09:00\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: periods",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/periods",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "periods"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"period_name\": \"الحصة الأولى\",\n            \"start_time\": \"08:00\",\n            \"end_time\": \"09:00\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال مع Idempotency-Key (إعادة محاولة آمنة)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Idempotency-Key",
+                                "value": "{{$guid}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/colleges",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "colleges"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"college_name\": \"كلية الحاسبات وتقنية المعلومات\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "2. الأشخاص",
+            "item": [
+                {
+                    "name": "إدخال/تحديث: students",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/students",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "students"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"full_name\": \"محمد أحمد\",\n            \"academic_number\": \"2026001\",\n            \"email\": \"s2026001@univ.edu\",\n            \"phone\": \"0500000000\",\n            \"gender\": \"male\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": false\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"status\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: students",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/students",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "students"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"full_name\": \"محمد أحمد\",\n            \"academic_number\": \"2026001\",\n            \"email\": \"s2026001@univ.edu\",\n            \"phone\": \"0500000000\",\n            \"gender\": \"male\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": false\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"status\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: lecturers",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/lecturers",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "lecturers"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"full_name\": \"د. خالد سعيد\",\n            \"academic_number\": \"LEC001\",\n            \"email\": \"k.saeed@univ.edu\",\n            \"gender\": \"male\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"title_code\": \"PROF\",\n            \"hire_date\": \"2020-09-01\",\n            \"can_teach_externally\": false,\n            \"status\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: lecturers",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/lecturers",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "lecturers"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"full_name\": \"د. خالد سعيد\",\n            \"academic_number\": \"LEC001\",\n            \"email\": \"k.saeed@univ.edu\",\n            \"gender\": \"male\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"title_code\": \"PROF\",\n            \"hire_date\": \"2020-09-01\",\n            \"can_teach_externally\": false,\n            \"status\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "3. المحتوى الأكاديمي",
+            "item": [
+                {
+                    "name": "إدخال/تحديث: courses",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/courses",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "courses"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"course_name\": \"مقدمة في البرمجة\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"credit_hours\": 3,\n            \"category\": \"متطلب تخصص إجباري\",\n            \"teaching_language\": \"العربية\",\n            \"course_parts\": {\n                \"theory\": 2,\n                \"practical\": 1\n            }\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: courses",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/courses",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "courses"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"course_name\": \"مقدمة في البرمجة\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"credit_hours\": 3,\n            \"category\": \"متطلب تخصص إجباري\",\n            \"teaching_language\": \"العربية\",\n            \"course_parts\": {\n                \"theory\": 2,\n                \"practical\": 1\n            }\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: student_groups",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/student_groups",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "student_groups"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": false\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"group_name\": \"المجموعة أ\",\n            \"max_students\": 30\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: student_groups",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/student_groups",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "student_groups"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": false\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"group_name\": \"المجموعة أ\",\n            \"max_students\": 30\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "4. الجداول",
+            "item": [
+                {
+                    "name": "إدخال/تحديث: timetable",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/timetable",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "timetable"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"lecturer_academic_number\": \"LEC001\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": false\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"group_name\": \"المجموعة أ\",\n            \"building_code\": \"B1\",\n            \"floor\": 1,\n            \"classroom_name\": \"101\",\n            \"day_name\": \"الأحد\",\n            \"period_name\": \"الحصة الأولى\",\n            \"start_date\": \"2026-02-01\",\n            \"end_date\": \"2026-05-31\",\n            \"academic_year\": \"2026\",\n            \"lecture_type\": 1,\n            \"lecture_hours\": 2,\n            \"allowance_minutes\": 10\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: timetable",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/timetable",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "timetable"
+                            ]
+                        },
+                        "description": "الحذف بالتصفير/الحذف الناعم حسب المورد. يكفي إرسال حقول المفتاح الطبيعي فقط (بقية الحقول اختيارية).",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"lecturer_academic_number\": \"LEC001\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": false\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": false\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": false\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"group_name\": \"المجموعة أ\",\n            \"building_code\": \"B1\",\n            \"floor\": 1,\n            \"classroom_name\": \"101\",\n            \"day_name\": \"الأحد\",\n            \"period_name\": \"الحصة الأولى\",\n            \"start_date\": \"2026-02-01\",\n            \"end_date\": \"2026-05-31\",\n            \"academic_year\": \"2026\",\n            \"lecture_type\": 1,\n            \"lecture_hours\": 2,\n            \"allowance_minutes\": 10\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. التوسعة الأكاديمية (بلوكات/مخرجات/محتوى/تقويم/طرق/تسجيل)",
+            "item": [
+                {
+                    "name": "إدخال/تحديث: blocks",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/blocks",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "blocks"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"level_number\": 1\n            },\n            \"block_number\": 1,\n            \"block_name\": \"البلوك الأول\",\n            \"type\": \"compulsory\",\n            \"weeks\": 16,\n            \"credit_hours\": 15\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: blocks",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/blocks",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "blocks"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"level_number\": 1\n            },\n            \"block_number\": 1,\n            \"block_name\": \"البلوك الأول\",\n            \"type\": \"compulsory\",\n            \"weeks\": 16,\n            \"credit_hours\": 15\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: block_relations",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/block_relations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "block_relations"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"block\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"block_number\": 1\n            },\n            \"related_block\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"block_number\": 2\n            },\n            \"relation_type\": \"next\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: block_relations",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/block_relations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "block_relations"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"block\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"block_number\": 1\n            },\n            \"related_block\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"block_number\": 2\n            },\n            \"relation_type\": \"next\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_prerequisites",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_prerequisites",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_prerequisites"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"prerequisite_course_code\": \"CS100\",\n            \"type\": \"prerequisite\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_prerequisites",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_prerequisites",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_prerequisites"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"prerequisite_course_code\": \"CS100\",\n            \"type\": \"prerequisite\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: program_learning_outcomes",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/program_learning_outcomes",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "program_learning_outcomes"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"code\": \"PLO1\",\n            \"domain\": \"Knowledge\",\n            \"description\": \"يُظهر الطالب معرفة أساسية بعلوم الحاسب\",\n            \"weight\": 25,\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: program_learning_outcomes",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/program_learning_outcomes",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "program_learning_outcomes"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"code\": \"PLO1\",\n            \"domain\": \"Knowledge\",\n            \"description\": \"يُظهر الطالب معرفة أساسية بعلوم الحاسب\",\n            \"weight\": 25,\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_learning_outcomes",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_learning_outcomes",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_learning_outcomes"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"code\": \"a1\",\n            \"domain\": \"Knowledge\",\n            \"description\": \"يشرح المفاهيم الأساسية للبرمجة\",\n            \"plo\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"code\": \"PLO1\"\n            },\n            \"weight\": 25,\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_learning_outcomes",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_learning_outcomes",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_learning_outcomes"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"code\": \"a1\",\n            \"domain\": \"Knowledge\",\n            \"description\": \"يشرح المفاهيم الأساسية للبرمجة\",\n            \"plo\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"code\": \"PLO1\"\n            },\n            \"weight\": 25,\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_descriptions",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_descriptions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_descriptions"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"description\": \"مقدمة في البرمجة ومنهجياتها\",\n            \"goals\": [\n                \"فهم الأساسيات\",\n                \"كتابة برامج بسيطة\"\n            ],\n            \"word_count\": 120,\n            \"goals_count\": 2\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_descriptions",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_descriptions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_descriptions"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"description\": \"مقدمة في البرمجة ومنهجياتها\",\n            \"goals\": [\n                \"فهم الأساسيات\",\n                \"كتابة برامج بسيطة\"\n            ],\n            \"word_count\": 120,\n            \"goals_count\": 2\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_topics",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_topics",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_topics"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"part\": \"نظري\",\n            \"week\": 1,\n            \"unit_name\": \"مقدمة\",\n            \"subtopics\": [\n                \"المتغيرات\",\n                \"أنواع البيانات\"\n            ],\n            \"hours\": 3,\n            \"clo_ids\": [\n                1,\n                2\n            ],\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_topics",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_topics",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_topics"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"part\": \"نظري\",\n            \"week\": 1,\n            \"unit_name\": \"مقدمة\",\n            \"subtopics\": [\n                \"المتغيرات\",\n                \"أنواع البيانات\"\n            ],\n            \"hours\": 3,\n            \"clo_ids\": [\n                1,\n                2\n            ],\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: topic_questions",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/topic_questions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "topic_questions"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"part\": \"نظري\",\n            \"topic\": {\n                \"course_code\": \"CS101\",\n                \"part\": \"نظري\",\n                \"week\": 1,\n                \"unit_name\": \"مقدمة\"\n            },\n            \"question_text\": \"ما هو المتغير؟\",\n            \"question_type\": \"MCQ\",\n            \"options\": [\n                \"مخزن للبيانات\",\n                \"نوع بيانات\",\n                \"دالة\",\n                \"حلقة\"\n            ],\n            \"correct_answer\": \"مخزن للبيانات\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: topic_questions",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/topic_questions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "topic_questions"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"part\": \"نظري\",\n            \"topic\": {\n                \"course_code\": \"CS101\",\n                \"part\": \"نظري\",\n                \"week\": 1,\n                \"unit_name\": \"مقدمة\"\n            },\n            \"question_text\": \"ما هو المتغير؟\",\n            \"question_type\": \"MCQ\",\n            \"options\": [\n                \"مخزن للبيانات\",\n                \"نوع بيانات\",\n                \"دالة\",\n                \"حلقة\"\n            ],\n            \"correct_answer\": \"مخزن للبيانات\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_assignments",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_assignments",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_assignments"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"part\": \"نظري\",\n            \"title\": \"تكليف 1\",\n            \"description\": \"حل تمارين الفصل الأول\",\n            \"week\": 2,\n            \"grade\": 5,\n            \"assignment_type\": \"homework\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_assignments",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_assignments",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_assignments"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"part\": \"نظري\",\n            \"title\": \"تكليف 1\",\n            \"description\": \"حل تمارين الفصل الأول\",\n            \"week\": 2,\n            \"grade\": 5,\n            \"assignment_type\": \"homework\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_assessments",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_assessments",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_assessments"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"course_code\": \"CS101\",\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": true\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"name\": \"الاختبار النصفي\",\n            \"max_score\": 20,\n            \"assessment_type\": \"midterm_exam\",\n            \"week\": 7,\n            \"weight\": 20,\n            \"created_academic_number\": \"LEC001\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_assessments",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_assessments",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_assessments"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"college_code\": \"fcit\",\n            \"course_code\": \"CS101\",\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": true\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"name\": \"الاختبار النصفي\",\n            \"max_score\": 20,\n            \"assessment_type\": \"midterm_exam\",\n            \"week\": 7,\n            \"weight\": 20,\n            \"created_academic_number\": \"LEC001\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_policies",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_policies",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_policies"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"policy_number\": 1,\n            \"title\": \"الحضور\",\n            \"content\": \"يشترط حضور 75% من المحاضرات\",\n            \"is_fixed\": true,\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_policies",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_policies",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_policies"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"policy_number\": 1,\n            \"title\": \"الحضور\",\n            \"content\": \"يشترط حضور 75% من المحاضرات\",\n            \"is_fixed\": true,\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: course_references",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_references",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_references"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"type\": \"main\",\n            \"title\": \"مقدمة في البرمجة\",\n            \"author\": \"John Doe\",\n            \"year\": 2024,\n            \"publisher\": \"Academic Press\",\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: course_references",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/course_references",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "course_references"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"type\": \"main\",\n            \"title\": \"مقدمة في البرمجة\",\n            \"author\": \"John Doe\",\n            \"year\": 2024,\n            \"publisher\": \"Academic Press\",\n            \"order\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: assessment_methods",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/assessment_methods",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "assessment_methods"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"name\": \"الاختبار النصفي\",\n            \"description\": \"اختبار قصير\",\n            \"category\": \"exam\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: assessment_methods",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/assessment_methods",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "assessment_methods"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"name\": \"الاختبار النصفي\",\n            \"description\": \"اختبار قصير\",\n            \"category\": \"exam\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: teaching_strategies",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/teaching_strategies",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "teaching_strategies"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"name\": \"المحاضرة التفاعلية\",\n            \"category\": \"lecture\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: teaching_strategies",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/teaching_strategies",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "teaching_strategies"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"name\": \"المحاضرة التفاعلية\",\n            \"category\": \"lecture\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: outcome_assessment_method",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/outcome_assessment_method",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "outcome_assessment_method"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"code\": \"a1\",\n            \"method\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"name\": \"الاختبار النصفي\"\n            }\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: outcome_assessment_method",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/outcome_assessment_method",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "outcome_assessment_method"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"code\": \"a1\",\n            \"method\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"name\": \"الاختبار النصفي\"\n            }\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: outcome_teaching_strategy",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/outcome_teaching_strategy",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "outcome_teaching_strategy"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"code\": \"a1\",\n            \"strategy\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"name\": \"المحاضرة التفاعلية\"\n            }\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: outcome_teaching_strategy",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/outcome_teaching_strategy",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "outcome_teaching_strategy"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"course_code\": \"CS101\",\n            \"code\": \"a1\",\n            \"strategy\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"name\": \"المحاضرة التفاعلية\"\n            }\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: student_group_members",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/student_group_members",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "student_group_members"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"academic_number\": \"2026001\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": true\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"group_name\": \"المجموعة أ\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: student_group_members",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/student_group_members",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "student_group_members"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"academic_number\": \"2026001\",\n            \"college_code\": \"fcit\",\n            \"department_code\": \"CS-DEP\",\n            \"program\": {\n                \"department_code\": \"CS-DEP\",\n                \"program_name\": \"fd\",\n                \"academic_system\": \"semester\",\n                \"block_based\": true\n            },\n            \"level\": {\n                \"program\": {\n                    \"department_code\": \"CS-DEP\",\n                    \"program_name\": \"fd\",\n                    \"academic_system\": \"semester\",\n                    \"block_based\": true\n                },\n                \"level_number\": 1\n            },\n            \"semester\": {\n                \"level\": {\n                    \"program\": {\n                        \"department_code\": \"CS-DEP\",\n                        \"program_name\": \"fd\",\n                        \"academic_system\": \"semester\",\n                        \"block_based\": true\n                    },\n                    \"level_number\": 1\n                },\n                \"semester_name\": \"الفصل الأول\",\n                \"academic_year\": \"2026\",\n                \"term_number\": 1\n            },\n            \"group_name\": \"المجموعة أ\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "إدخال/تحديث: student_grades",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/student_grades",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "student_grades"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"academic_number\": \"2026001\",\n            \"assessment\": {\n                \"college_code\": \"fcit\",\n                \"course_code\": \"CS101\",\n                \"semester\": {\n                    \"level\": {\n                        \"program\": {\n                            \"department_code\": \"CS-DEP\",\n                            \"program_name\": \"fd\",\n                            \"academic_system\": \"semester\",\n                            \"block_based\": true\n                        },\n                        \"level_number\": 1\n                    },\n                    \"semester_name\": \"الفصل الأول\",\n                    \"academic_year\": \"2026\",\n                    \"term_number\": 1\n                },\n                \"name\": \"الاختبار النصفي\",\n                \"max_score\": 20\n            },\n            \"score\": 17.5,\n            \"notes\": \"أداء جيد\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "حذف/تعطيل: student_grades",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/student_grades",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "student_grades"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"data\": [\n        {\n            \"academic_number\": \"2026001\",\n            \"assessment\": {\n                \"college_code\": \"fcit\",\n                \"course_code\": \"CS101\",\n                \"semester\": {\n                    \"level\": {\n                        \"program\": {\n                            \"department_code\": \"CS-DEP\",\n                            \"program_name\": \"fd\",\n                            \"academic_system\": \"semester\",\n                            \"block_based\": true\n                        },\n                        \"level_number\": 1\n                    },\n                    \"semester_name\": \"الفصل الأول\",\n                    \"academic_year\": \"2026\",\n                    \"term_number\": 1\n                },\n                \"name\": \"الاختبار النصفي\",\n                \"max_score\": 20\n            },\n            \"score\": 17.5,\n            \"notes\": \"أداء جيد\"\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "الحذف/التعطيل حسب المورد: عمود حالة، أو حذف ناعم (deleted_at)، أو حذف فعلي (جداول الروابط). يكفي إرسال حقول المفتاح الطبيعي."
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,2079 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دليل واجهات التكامل الخارجي — UniHub</title>
+<style>
+  :root { --ink:#1f2933; --muted:#52606d; --line:#d9e2ec; --brand:#0b5563; --brand2:#0e7490; --bg:#f5f7fa; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", Arial, sans-serif; color: var(--ink);
+         background: var(--bg); margin: 0; line-height: 1.9; }
+  .page { max-width: 900px; margin: 0 auto; background: #fff; padding: 48px 56px; }
+  h1 { font-size: 30px; color: var(--brand); border-bottom: 3px solid var(--brand); padding-bottom: 14px; }
+  h2 { font-size: 23px; color: var(--brand2); margin-top: 38px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  h3 { font-size: 18px; color: var(--brand); margin-top: 26px; }
+  p, li, td, th { font-size: 15px; }
+  code { background: #eef2f6; color: #b3005e; padding: 1px 6px; border-radius: 4px;
+         font-family: "Consolas", "Courier New", monospace; direction: ltr; display: inline-block; }
+  pre.code { background: #0f172a; color: #e2e8f0; padding: 16px 18px; border-radius: 8px;
+             overflow-x: auto; direction: ltr; text-align: left; }
+  pre.code code { background: transparent; color: inherit; padding: 0; display: block; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: right; vertical-align: top; }
+  th { background: #e6f6f9; color: var(--brand); }
+  tr:nth-child(even) td { background: #fafcfd; }
+  blockquote { border-right: 4px solid var(--brand2); background: #f0f9fb; margin: 14px 0;
+               padding: 10px 16px; color: var(--muted); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+  a { color: var(--brand2); }
+  .pagebreak { page-break-after: always; }
+  @media print {
+    body { background: #fff; }
+    .page { max-width: none; padding: 0 12mm; }
+    h2 { page-break-after: avoid; }
+    table, pre.code, blockquote { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+<p>المهندس علاء حسين سعيد</p>
+<p>المدير التنفيذي (CEO) والمطور العام لنظام UniHub لدى شركة UnitsHub</p>
+<p><a href="mailto:unitshubcom@gmail.com">unitshubcom@gmail.com</a></p>
+<h1>دليل واجهات التكامل الخارجي (Data Ingestion) — UniHub</h1>
+<blockquote>
+<p>الإصدار: <strong>v1</strong> · المسار الأساسي: <code>/api/external/v1</code> · الاتجاه: <strong>دفع من نظام الجامعة إلى UniHub</strong> (POST/PUT/PATCH/DELETE).
+هذه الواجهات تكتب مباشرةً في <strong>الجداول الفعلية</strong> لنظام UniHub (لا جداول وسيطة).</p>
+</blockquote>
+<hr />
+<h2>1. نظرة عامة</h2>
+<ul>
+<li><strong>الاتجاه:</strong> نظام الجامعة (Oracle) → UniHub. كل الطلبات تُرسَل من الجامعة إلينا (Push).</li>
+<li><strong>الطريقة:</strong> لا توجد واجهات <code>GET</code> للجلب. الإدخال/التحديث عبر <code>POST</code> (و<code>PUT</code>/<code>PATCH</code> مرادفة)، والحذف عبر <code>DELETE</code>.</li>
+<li><strong>الدفعات:</strong> كل طلب يحمل مصفوفة صفوف: <code>{ &quot;data&quot;: [ { ... }, { ... } ] }</code>.</li>
+<li><strong>النجاح الجزئي:</strong> يُعالَج كل صف مستقلاً؛ الصفوف الخاطئة تُتخطّى (تُدرَج أسبابها) دون إبطال بقية الدفعة.</li>
+<li><strong>Upsert:</strong> التحديد بالاعتماد على <strong>مفتاح طبيعي</strong> (كود/اسم) أو <code>external_id</code> — فلا تتكرر السجلات عند إعادة الإرسال.</li>
+</ul>
+<h3>رابط أساسي (مثال)</h3>
+<pre class="code"><code>https://&lt;نطاق-الجامعة&gt;/api/external/v1
+</code></pre>
+<h3>الراوتات المتاحة (بعد الراوت العام الرئيسي)</h3>
+<p>كل مورد أدناه يقبل نفس المسار بالطرق الأربع. الراوت العام الرئيسي <code>/api/external/v1</code> هو المُسبق لكل المسارات التالية:</p>
+<table>
+<thead>
+<tr>
+<th>الراوت (المسار الكامل)</th>
+<th>الطرق المدعومة</th>
+<th>الجدول المُستهدف</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/external/v1/ping</code></td>
+<td><code>POST</code></td>
+<td>— (اختبار الاتصال والمصادقة)</td>
+</tr>
+<tr>
+<td><code>/api/external/v1/colleges</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>colleges</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/departments</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>departments</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/programs</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>programs</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/levels</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>levels</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/semesters</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>semesters</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/academic_titles</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>academic_titles</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/buildings</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>buildings</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/classrooms</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>classrooms</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/days</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>days</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/periods</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>periods</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/students</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>users</code> + <code>students</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/lecturers</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>users</code> + <code>lecturers</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/courses</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>courses</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/student_groups</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>student_groups</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/timetable</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>timetable</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/blocks</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>blocks</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/block_relations</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>block_relations</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_prerequisites</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_prerequisites</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/program_learning_outcomes</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>program_learning_outcomes</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_learning_outcomes</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_learning_outcomes</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_descriptions</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_descriptions</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_topics</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_topics</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/topic_questions</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>topic_questions</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_assignments</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_assignments</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_assessments</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_assessments</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_policies</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_policies</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/course_references</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>course_references</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/assessment_methods</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>assessment_methods</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/teaching_strategies</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>teaching_strategies</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/outcome_assessment_method</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>outcome_assessment_method</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/outcome_teaching_strategy</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>outcome_teaching_strategy</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/student_group_members</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>student_group_members</code></td>
+</tr>
+<tr>
+<td><code>/api/external/v1/student_grades</code></td>
+<td><code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code></td>
+<td><code>student_grades</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>أي مسار آخر يعيد <code>404 Unknown integration endpoint.</code> (مع بقاء المصادقة فعّالة).</p>
+</blockquote>
+<hr />
+<h2>2. المصادقة (عاملان مجتمعان)</h2>
+<p>يجب توفير <strong>كل</strong> العاملين التاليةين في كل طلب، وإلا رُفض الطلب:</p>
+<table>
+<thead>
+<tr>
+<th>العامل</th>
+<th>المكان</th>
+<th>الوصف</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bearer Token</td>
+<td>ترويسة <code>Authorization: Bearer &lt;TOKEN&gt;</code></td>
+<td>توكن العميل (يُخزَّن مشفَّراً على الخادم)</td>
+</tr>
+<tr>
+<td>عنوان المصدر</td>
+<td>—</td>
+<td>IP الطلب ضمن قائمة عناوين العميل (يدعم CIDR مثل <code>10.0.0.0/24</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>ملاحظة:</strong> تم إلغاء فحص توقيع الجهاز <code>X-Client-MAC</code>. الترويسة، إن أُرسلت، تُتجاهل ولا تُتحقّق منها.</p>
+</blockquote>
+<h3>ترويسات موصى بها</h3>
+<pre class="code"><code>Authorization: Bearer &lt;TOKEN&gt;
+Content-Type: application/json
+Accept: application/json
+</code></pre>
+<h3>نقطة اختبار الاتصال</h3>
+<p><code>POST /api/external/v1/ping</code> → يعيد <code>200</code> مع اسم العميل عند نجاح المصادقة.</p>
+<hr />
+<h2>3. صيغة الطلب والرد</h2>
+<h3>الطلب</h3>
+<pre class="code http"><code>POST /api/external/v1/{resource}
+Authorization: Bearer &lt;TOKEN&gt;
+Content-Type: application/json
+
+{ &quot;data&quot;: [ { ...صف... }, { ...صف... } ] }
+</code></pre>
+<h3>رد النجاح (200)</h3>
+<pre class="code json"><code>{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;colleges synchronized successfully.&quot;,
+  &quot;timestamp&quot;: &quot;2026-10-17 12:00:00&quot;,
+  &quot;inserted_records&quot;: 2,
+  &quot;updated_records&quot;: 1,
+  &quot;skipped_records&quot;: 1,
+  &quot;skipped_reasons&quot;: [&quot;Row #3: missing required field 'college_code'.&quot;]
+}
+</code></pre>
+<h3>رد الحذف (200)</h3>
+<pre class="code json"><code>{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;colleges deactivated successfully.&quot;,
+  &quot;timestamp&quot;: &quot;2026-10-17 12:00:00&quot;,
+  &quot;deactivated_records&quot;: 1,
+  &quot;skipped_records&quot;: 0,
+  &quot;skipped_reasons&quot;: []
+}
+</code></pre>
+<h3>الطرق المدعومة</h3>
+<table>
+<thead>
+<tr>
+<th>العملية</th>
+<th>الطريقة</th>
+<th>المسار</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>إدخال/تحديث (دفعة)</td>
+<td><code>POST</code> / <code>PUT</code> / <code>PATCH</code></td>
+<td><code>/api/external/v1/{resource}</code></td>
+</tr>
+<tr>
+<td>حذف/تعطيل (دفعة)</td>
+<td><code>DELETE</code></td>
+<td><code>/api/external/v1/{resource}</code></td>
+</tr>
+<tr>
+<td>اختبار الاتصال</td>
+<td><code>POST</code></td>
+<td><code>/api/external/v1/ping</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>4. المفاتيح الطبيعية وحل المراجع</h2>
+<ul>
+<li><strong>المفتاح الطبيعي</strong> يحدّد السجل الوحيد: إمّا كود (<code>college_code</code>, <code>course_code</code>, <code>day_name</code>…)، أو <strong>مفتاح مركّب</strong> (<code>(program_id, level_number)</code>…)، أو <strong>كائن أب متداخل</strong>.</li>
+<li><strong>المراجع المتداخلة (<code>parents</code>)</strong>: يُرسَل الأب ككائن كامل يُطابق مفاتيحه الطبيعية، مثال:
+<pre class="code json"><code>&quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+&quot;level&quot;:   { &quot;program&quot;: { &quot;...&quot;: &quot;...&quot; }, &quot;level_number&quot;: 1 },
+&quot;semester&quot;:{ &quot;level&quot;: { &quot;...&quot;: &quot;...&quot; }, &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1 }
+</code></pre>
+</li>
+<li><strong>المعرّف الخارجي <code>external_id</code></strong> (اختياري، مدعوم في كل الموارد): إن أرسلته الجامعة، يُستخدم أولاً لتحديد السجل، ويُخزَّن الربط داخلياً. عند إعادة الإرسال بنفس <code>external_id</code> يُحدَّث السجل نفسه.</li>
+</ul>
+<h3>دلالة الحذف حسب المورد</h3>
+<table>
+<thead>
+<tr>
+<th>الحالة</th>
+<th>السلوك</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>الجدول فيه <code>is_active</code> (programs, courses, assessment_methods, teaching_strategies)</td>
+<td><code>is_active = 0</code></td>
+</tr>
+<tr>
+<td>الجدول فيه <code>status</code> (students, lecturers, timetable)</td>
+<td><code>status = 0</code></td>
+</tr>
+<tr>
+<td>الجدول فيه <code>deleted_at</code></td>
+<td><strong>حذف ناعم</strong> — وإعادة الإرسال تستعيد السجل</td>
+</tr>
+<tr>
+<td>جدول روابط بلا <code>deleted_at</code> (block_relations, course_prerequisites, course_descriptions, outcome_*, student_group_members, student_grades)</td>
+<td><strong>حذف فعلي</strong> من الجدول</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>المفتاح المركّب:</strong> بعض الجداول بلا مفتاح تلقائي، ويُحدَّد صفّها بمفتاح مركّب من عمودين (مثل <code>student_group_members</code>: <code>(student_id, group_id)</code>). سلوك الإدراج/التحديث موحّد — إعادة الإرسال تُحدِّث الصف نفسه.</p>
+</blockquote>
+<hr />
+<h2>5. إعادة المحاولة الآمنة (Idempotency)</h2>
+<p>عند إرسال ترويسة اختيارية:</p>
+<pre class="code"><code>Idempotency-Key: &lt;مفتاح فريد لكل عملية&gt;
+</code></pre>
+<ul>
+<li><strong>نفس المفتاح + نفس الجسم</strong> → يُعاد <strong>نفس الرد</strong> المخزَّن حرفياً، بترويسة <code>Idempotent-Replay: true</code>، دون تنفيذ جديد.</li>
+<li><strong>نفس المفتاح + جسم مختلف</strong> → <code>409 Conflict</code>.</li>
+<li><strong>بلا الترويسة</strong> → تنفيذ طبيعي.</li>
+<li>مدة الصلاحية: <strong>24 ساعة</strong> (قابلة للضبط). الطلب الذي ينتج خطأ خادم <code>5xx</code> لا يُخزَّن (لإتاحة إعادة المحاولة).</li>
+</ul>
+<hr />
+<h2>6. حدّ المعدّل (Rate Limiting)</h2>
+<ul>
+<li>الحدّ الافتراضي: <strong>600 طلب/دقيقة لكل عميل</strong> (قابل للضبط لكل عميل).</li>
+<li>عند التجاوز: <code>429 Too Many Requests</code> مع ترويسات:
+<ul>
+<li><code>Retry-After: &lt;ثوانٍ&gt;</code></li>
+<li><code>X-RateLimit-Limit</code> و<code>X-RateLimit-Remaining</code></li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>7. أكواد الأخطاء</h2>
+<table>
+<thead>
+<tr>
+<th>الكود</th>
+<th>المعنى</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>200</code></td>
+<td>نجاح (مع ملخّص الأعداد)</td>
+</tr>
+<tr>
+<td><code>400</code></td>
+<td>بنية طلب غير صحيحة (مثل غياب <code>data</code>) أو <code>Idempotency-Key</code> أطول من الحد</td>
+</tr>
+<tr>
+<td><code>401</code></td>
+<td>توكن مفقود أو غير صحيح</td>
+</tr>
+<tr>
+<td><code>403</code></td>
+<td>IP غير مسموح، أو العميل معطّل</td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td>مورد تكامل غير معروف</td>
+</tr>
+<tr>
+<td><code>405</code></td>
+<td>طريقة غير مدعومة (يُسمح فقط POST/PUT/PATCH/DELETE)</td>
+</tr>
+<tr>
+<td><code>409</code></td>
+<td>تعارض <code>Idempotency-Key</code> (نفس المفتاح بجسم مختلف)</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>تجاوز حدّ المعدّل</td>
+</tr>
+<tr>
+<td><code>5xx</code></td>
+<td>خطأ داخلي</td>
+</tr>
+</tbody>
+</table>
+<p>كل الأخطاء بصيغة موحّدة:</p>
+<pre class="code json"><code>{ &quot;status&quot;: &quot;error&quot;, &quot;message&quot;: &quot;...&quot;, &quot;timestamp&quot;: &quot;...&quot; }
+</code></pre>
+<hr />
+<h2>8. مرجع الموارد (33 مورداً)</h2>
+<blockquote>
+<p><code>*</code> = حقل إلزامي. الحقول المقتبسة (مثل <code>program</code>) كائنات متداخلة.
+الموارد 8.1–8.15 هي الأساسية، والموارد 8.16–8.33 هي المضافة في توسعة البنية الأكاديمية
+(البلوكات، المتطلبات، المخرجات، المحتوى، التكليفات والتقويم، الطرق والاستراتيجيات، والتسجيل).</p>
+</blockquote>
+<h3>8.1 <code>colleges</code> — الكليات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>college_code</code> *</td>
+<td>المفتاح الطبيعي</td>
+</tr>
+<tr>
+<td><code>college_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>college_logo</code></td>
+<td>رابط الشعار</td>
+</tr>
+</tbody>
+</table>
+<h3>8.2 <code>departments</code> — الأقسام</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>department_code</code> *</td>
+<td>المفتاح الطبيعي</td>
+</tr>
+<tr>
+<td><code>department_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>college_code</code> *</td>
+<td>مرجع لكلية</td>
+</tr>
+</tbody>
+</table>
+<h3>8.3 <code>programs</code> — البرامج</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>department_code</code> *</td>
+<td>مرجع لقسم</td>
+</tr>
+<tr>
+<td><code>program_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>academic_system</code></td>
+<td><code>semester</code> (افتراضي) أو <code>credit</code></td>
+</tr>
+<tr>
+<td><code>block_based</code></td>
+<td><code>true/false</code> (افتراضي <code>false</code>)</td>
+</tr>
+<tr>
+<td><code>total_hours</code></td>
+<td>عدد الساعات</td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(department_id, program_name, academic_system, block_based)</code>. الحذف: <code>is_active=0</code>.</p>
+<h3>8.4 <code>levels</code> — المستويات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>program</code> *</td>
+<td>كائن البرنامج</td>
+</tr>
+<tr>
+<td><code>level_number</code> *</td>
+<td>رقم المستوى</td>
+</tr>
+<tr>
+<td><code>level_name</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(program_id, level_number)</code>.</p>
+<h3>8.5 <code>semesters</code> — الفصول</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>level</code> *</td>
+<td>كائن المستوى</td>
+</tr>
+<tr>
+<td><code>semester_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>academic_year</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>term_number</code> *</td>
+<td>رقم الفصل</td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(level_id, term_number)</code>.</p>
+<h3>8.6 <code>academic_titles</code> — الألقاب العلمية</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>college_code</code> *</td>
+<td>مرجع لكلية</td>
+</tr>
+<tr>
+<td><code>title_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>title_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>hourly_price</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(college_id, title_code)</code>.</p>
+<h3>8.7 <code>buildings</code> — المباني</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>building_code</code> *</td>
+<td>المفتاح الطبيعي</td>
+</tr>
+<tr>
+<td><code>building_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>floors_count</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>college_code</code></td>
+<td>مرجع اختياري لكلية</td>
+</tr>
+</tbody>
+</table>
+<h3>8.8 <code>classrooms</code> — القاعات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>building_code</code> *</td>
+<td>مرجع لمبنى</td>
+</tr>
+<tr>
+<td><code>classroom_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>floor</code> *</td>
+<td>رقم الطابق</td>
+</tr>
+<tr>
+<td><code>college_code</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>capacity</code> / <code>latitude</code> / <code>longitude</code> / <code>allowed_distance</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>classroom_type</code> / <code>windows_count</code></td>
+<td>أرقام</td>
+</tr>
+<tr>
+<td><code>has_computer</code></td>
+<td><code>true/false</code></td>
+</tr>
+<tr>
+<td><code>display_type</code></td>
+<td><code>none</code>|<code>screen</code>|<code>projector</code>|<code>smart_board</code></td>
+</tr>
+<tr>
+<td><code>notes</code> / <code>location_address</code> / <code>remote_id</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(building_id, floor, classroom_name)</code>.</p>
+<h3>8.9 <code>days</code> — الأيام</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>day_name</code> *</td>
+<td>المفتاح الطبيعي (مثل <code>الأحد</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3>8.10 <code>periods</code> — الحصص</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>college_code</code> *</td>
+<td>مرجع لكلية</td>
+</tr>
+<tr>
+<td><code>period_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>start_time</code> *</td>
+<td><code>HH:MM</code></td>
+</tr>
+<tr>
+<td><code>end_time</code> *</td>
+<td><code>HH:MM</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(college_id, period_name)</code>.</p>
+<h3>8.11 <code>students</code> — الطلاب (يكتب <code>users</code> + <code>students</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full_name</code> *</td>
+<td>في <code>users</code></td>
+</tr>
+<tr>
+<td><code>academic_number</code> *</td>
+<td>الرقم الأكاديمي (المفتاح)</td>
+</tr>
+<tr>
+<td><code>email</code> *</td>
+<td>إلزامي من البيانات (يُستخدم كما هو)</td>
+</tr>
+<tr>
+<td><code>phone</code></td>
+<td>اختياري (فريد إن وُجد)</td>
+</tr>
+<tr>
+<td><code>gender</code></td>
+<td><code>male</code>/<code>female</code> أو <code>1</code>/<code>0</code></td>
+</tr>
+<tr>
+<td><code>college_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>department_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>program</code> / <code>level</code> / <code>semester</code></td>
+<td>كائنات اختيارية</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>افتراضي <code>1</code> (الحذف = <code>0</code>)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>تُنشأ <strong>حسابات الدخول</strong> تلقائياً بكلمة مرور افتراضية (<code>12345678</code>) مع إلزام تغييرها عند أول دخول.</li>
+<li>المفتاح: <code>academic_number</code>.</li>
+</ul>
+<h3>8.12 <code>lecturers</code> — أعضاء هيئة التدريس (يكتب <code>users</code> + <code>lecturers</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full_name</code> *</td>
+<td>في <code>users</code></td>
+</tr>
+<tr>
+<td><code>academic_number</code> *</td>
+<td>المفتاح</td>
+</tr>
+<tr>
+<td><code>email</code> *</td>
+<td>إلزامي</td>
+</tr>
+<tr>
+<td><code>phone</code> / <code>gender</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>college_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>department_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>title_code</code></td>
+<td>كود اللقب العلمي (اختياري، يُربط بالكلية)</td>
+</tr>
+<tr>
+<td><code>hire_date</code> *</td>
+<td>تاريخ التعيين</td>
+</tr>
+<tr>
+<td><code>can_teach_externally</code></td>
+<td><code>true/false</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>افتراضي <code>1</code></td>
+</tr>
+</tbody>
+</table>
+<h3>8.13 <code>courses</code> — المقررات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>المفتاح الطبيعي</td>
+</tr>
+<tr>
+<td><code>course_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>college_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>department_code</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>program</code> / <code>level</code> / <code>semester</code></td>
+<td>كائنات اختيارية</td>
+</tr>
+<tr>
+<td><code>block_number</code></td>
+<td>رقم البلوك (ضمن البرنامج)</td>
+</tr>
+<tr>
+<td><code>credit_hours</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>course_parts</code></td>
+<td><strong>JSON</strong> (أجزاء المقرر)</td>
+</tr>
+<tr>
+<td><code>weight</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>category</code></td>
+<td><code>متطلب جامعة</code>|<code>متطلب كلية</code>|<code>متطلب تخصص إجباري</code>|<code>متطلب تخصص اختياري</code></td>
+</tr>
+<tr>
+<td><code>teaching_language</code></td>
+<td><code>العربية</code>|<code>الإنجليزية</code>|<code>ثنائي اللغة</code></td>
+</tr>
+<tr>
+<td><code>notes</code> / <code>is_approved</code> / <code>approval_date</code> / <code>approved_by</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>specification_status</code></td>
+<td><code>draft</code>|<code>in_progress</code>|<code>under_review</code>|<code>approved</code>|<code>published</code></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>الحذف: <code>is_active=0</code>.</p>
+<h3>8.14 <code>student_groups</code> — المجموعات الطلابية</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>college_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>department_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>group_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>program</code> / <code>level</code> / <code>semester</code></td>
+<td>كائنات اختيارية</td>
+</tr>
+<tr>
+<td><code>block_number</code></td>
+<td>اختياري</td>
+</tr>
+<tr>
+<td><code>max_students</code></td>
+<td>افتراضي <code>30</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(المسار + group_name)</code>. الحذف: حذف ناعم.</p>
+<h3>8.15 <code>timetable</code> — الجدول الدراسي</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>مرجع لمقرر</td>
+</tr>
+<tr>
+<td><code>lecturer_academic_number</code> *</td>
+<td>الرقم الأكاديمي للمحاضر</td>
+</tr>
+<tr>
+<td><code>college_code</code> * / <code>department_code</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>program</code> / <code>level</code> / <code>semester</code></td>
+<td>كائنات اختيارية</td>
+</tr>
+<tr>
+<td><code>block_number</code></td>
+<td>اختياري</td>
+</tr>
+<tr>
+<td><code>group_name</code> *</td>
+<td>المجموعة (ضمن المسار)</td>
+</tr>
+<tr>
+<td><code>building_code</code> * / <code>floor</code> * / <code>classroom_name</code> *</td>
+<td>القاعة</td>
+</tr>
+<tr>
+<td><code>day_name</code> * / <code>period_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>start_date</code> * / <code>end_date</code> *</td>
+<td><code>YYYY-MM-DD</code></td>
+</tr>
+<tr>
+<td><code>academic_year</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>lecture_hours</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>lecture_type</code> / <code>status</code> / <code>gender_type</code> / <code>allowance_minutes</code></td>
+<td>افتراضي <code>0/1/0/0</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>المفتاح الطبيعي:</strong> <code>(المجموعة + اليوم + الحصة + السنة الأكاديمية)</code>.</li>
+<li><strong>كشف التعارض:</strong> يُرفض الصف (نجاح جزئي) إذا تزاحم <strong>المحاضر</strong> أو <strong>المجموعة</strong> أو <strong>القاعة</strong> في نفس (اليوم + الحصة + السنة) مع تقاطع الفترات الزمنية.
+مثال: <code>&quot;Row #2: conflict: classroom is already booked on the same day/period (2026).&quot;</code></li>
+<li><strong>الحذف:</strong> <code>status = 0</code>.</li>
+</ul>
+<h3>8.16 <code>blocks</code> — بلوكات البرنامج</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>program</code> *</td>
+<td>كائن البرنامج</td>
+</tr>
+<tr>
+<td><code>level</code></td>
+<td>كائن المستوى (اختياري)</td>
+</tr>
+<tr>
+<td><code>block_number</code> *</td>
+<td>رقم البلوك</td>
+</tr>
+<tr>
+<td><code>block_name</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>compulsory</code> (افتراضي) | <code>elective</code></td>
+</tr>
+<tr>
+<td><code>weight</code> / <code>credit_hours</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>weeks</code></td>
+<td>افتراضي <code>1</code></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(program_id, block_number)</code>. الحذف: حذف ناعم.</p>
+<h3>8.17 <code>block_relations</code> — روابط البلوكات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>block</code> *</td>
+<td>كائن البلوك (المصدر)</td>
+</tr>
+<tr>
+<td><code>related_block</code> *</td>
+<td>كائن البلوك المرتبط</td>
+</tr>
+<tr>
+<td><code>relation_type</code> *</td>
+<td><code>prerequisite</code> | <code>concurrent</code> | <code>next</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(block_id, related_block_id, relation_type)</code>. الحذف: <strong>حذف فعلي</strong>.</p>
+<h3>8.18 <code>course_prerequisites</code> — متطلبات المقررات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>prerequisite_course_code</code> *</td>
+<td>كود المقرر المتطلب</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>prerequisite</code> (افتراضي) | <code>corequisite</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, prerequisite_course_id, type)</code>. الحذف: <strong>حذف فعلي</strong>.</p>
+<h3>8.19 <code>program_learning_outcomes</code> — مخرجات تعلم البرنامج (PLO)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>program</code> *</td>
+<td>كائن البرنامج</td>
+</tr>
+<tr>
+<td><code>code</code> *</td>
+<td>كود المخرج (مثل <code>PLO1</code>)</td>
+</tr>
+<tr>
+<td><code>domain</code> *</td>
+<td><code>Knowledge</code> | <code>Intellectual</code> | <code>Professional</code> | <code>General</code></td>
+</tr>
+<tr>
+<td><code>description</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>weight</code> / <code>order</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(program_id, code)</code>. الحذف: حذف ناعم.</p>
+<h3>8.20 <code>course_learning_outcomes</code> — مخرجات تعلم المقرر (CLO)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>code</code> *</td>
+<td>كود المخرج (مثل <code>a1</code>)</td>
+</tr>
+<tr>
+<td><code>domain</code> *</td>
+<td>كالمخرج البرامجي</td>
+</tr>
+<tr>
+<td><code>description</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>plo</code></td>
+<td>كائن PLO الأب (اختياري)</td>
+</tr>
+<tr>
+<td><code>plo_weight</code> / <code>weight</code> / <code>order</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, code)</code>. الحذف: حذف ناعم.</p>
+<h3>8.21 <code>course_descriptions</code> — وصف المقرر (صف واحد لكل مقرر)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>description</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>goals</code></td>
+<td><strong>JSON</strong> (الأهداف)</td>
+</tr>
+<tr>
+<td><code>word_count</code> / <code>goals_count</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>is_completed</code></td>
+<td>افتراضي <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>course_id</code> (صف واحد). الحذف: <strong>حذف فعلي</strong>.</p>
+<h3>8.22 <code>course_topics</code> — دروس المقرر</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>part</code> *</td>
+<td><code>نظري</code> | <code>عملي</code> | <code>تمارين</code> | <code>سريري</code></td>
+</tr>
+<tr>
+<td><code>week</code> *</td>
+<td>رقم الأسبوع</td>
+</tr>
+<tr>
+<td><code>unit_name</code> *</td>
+<td>اسم الوحدة</td>
+</tr>
+<tr>
+<td><code>subtopics</code></td>
+<td><strong>JSON</strong> (العناصر الفرعية)</td>
+</tr>
+<tr>
+<td><code>is_exam</code> / <code>exam_type</code></td>
+<td><code>exam_type</code>: <code>midterm</code>|<code>final</code> (اتركه فارغاً ولا ترسل <code>null</code>)</td>
+</tr>
+<tr>
+<td><code>hours</code> / <code>order</code> / <code>notes</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>clo_ids</code></td>
+<td><strong>JSON</strong> (معرّفات مخرجات المقرر)</td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, part, week, unit_name)</code>. الحذف: حذف ناعم.</p>
+<h3>8.23 <code>topic_questions</code> — بنك الأسئلة</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>part</code> *</td>
+<td><code>نظري</code> | <code>عملي</code> | <code>تمارين</code> | <code>سريري</code></td>
+</tr>
+<tr>
+<td><code>topic</code></td>
+<td>كائن الدرس (اختياري)</td>
+</tr>
+<tr>
+<td><code>subtopic</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>question_text</code> *</td>
+<td>نص السؤال</td>
+</tr>
+<tr>
+<td><code>question_type</code></td>
+<td><code>MCQ</code> (افتراضي) | <code>essay</code></td>
+</tr>
+<tr>
+<td><code>difficulty_level</code></td>
+<td>افتراضي <code>1</code></td>
+</tr>
+<tr>
+<td><code>clo_code</code></td>
+<td>كود مخرج المقرر</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><strong>JSON</strong> (الخيارات)</td>
+</tr>
+<tr>
+<td><code>correct_answer</code> / <code>order</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, question_text)</code>. الحذف: حذف ناعم.</p>
+<h3>8.24 <code>course_assignments</code> — التكليفات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>part</code> *</td>
+<td><code>نظري</code> | <code>عملي</code> | <code>تمارين</code> | <code>سريري</code></td>
+</tr>
+<tr>
+<td><code>title</code> *</td>
+<td>عنوان التكليف</td>
+</tr>
+<tr>
+<td><code>week</code> *</td>
+<td>رقم الأسبوع</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>grade</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>clo_ids</code></td>
+<td><strong>JSON</strong></td>
+</tr>
+<tr>
+<td><code>assignment_type</code></td>
+<td><code>homework</code> (افتراضي) | <code>project</code> | <code>presentation</code> | <code>quiz</code> | <code>other</code></td>
+</tr>
+<tr>
+<td><code>is_mandatory</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, part, week, title)</code>. الحذف: حذف ناعم.</p>
+<h3>8.25 <code>course_assessments</code> — عناصر التقويم</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>college_code</code> *</td>
+<td>مرجع لكلية</td>
+</tr>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>semester</code> *</td>
+<td>كائن الفصل</td>
+</tr>
+<tr>
+<td><code>name</code> *</td>
+<td>اسم عنصر التقويم</td>
+</tr>
+<tr>
+<td><code>max_score</code> *</td>
+<td>الدرجة العظمى</td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td>كائن المجموعة (اختياري)</td>
+</tr>
+<tr>
+<td><code>academic_year</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>week</code> / <code>weight</code> / <code>percentage</code> / <code>order</code> / <code>grade</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>clo_ids</code></td>
+<td><strong>JSON</strong></td>
+</tr>
+<tr>
+<td><code>assessment_type</code></td>
+<td><code>activities</code> (افتراضي) | <code>quizzes</code> | <code>midterm_exam</code> | <code>final_exam</code> | <code>project</code> | <code>presentation</code> | <code>practical_exam</code> | <code>other</code></td>
+</tr>
+<tr>
+<td><code>created_academic_number</code></td>
+<td>الرقم الأكاديمي للمحاضر (يُخزَّن في <code>created_by</code>)</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, semester_id, name)</code>. الحذف: حذف ناعم.</p>
+<h3>8.26 <code>course_policies</code> — سياسات المقرر</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>policy_number</code> *</td>
+<td>رقم السياسة</td>
+</tr>
+<tr>
+<td><code>title</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>content</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>is_fixed</code></td>
+<td>افتراضي <code>false</code></td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, policy_number)</code>. الحذف: حذف ناعم.</p>
+<h3>8.27 <code>course_references</code> — مراجع المقرر</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>type</code> *</td>
+<td><code>main</code> | <code>support</code> | <code>electronic</code></td>
+</tr>
+<tr>
+<td><code>title</code> *</td>
+<td></td>
+</tr>
+<tr>
+<td><code>category</code></td>
+<td><code>website</code> | <code>journal</code> | <code>other</code></td>
+</tr>
+<tr>
+<td><code>author</code> / <code>year</code> / <code>edition</code> / <code>publisher</code> / <code>country</code> / <code>url</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(course_id, title)</code>. الحذف: حذف ناعم.</p>
+<h3>8.28 <code>assessment_methods</code> — طرق التقويم (قائمة برامجية)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>program</code> *</td>
+<td>كائن البرنامج (إلزامي لضمان التفرّد)</td>
+</tr>
+<tr>
+<td><code>name</code> *</td>
+<td>اسم الطريقة</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>category</code></td>
+<td><code>exam</code> (افتراضي) | <code>assignment</code> | <code>project</code> | <code>presentation</code> | <code>participation</code> | <code>portfolio</code> | <code>other</code></td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(program_id, name)</code>. الحذف: <code>is_active = 0</code>.</p>
+<h3>8.29 <code>teaching_strategies</code> — استراتيجيات التدريس (قائمة برامجية)</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>program</code> *</td>
+<td>كائن البرنامج (إلزامي)</td>
+</tr>
+<tr>
+<td><code>name</code> *</td>
+<td>اسم الاستراتيجية</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>category</code></td>
+<td><code>lecture</code> (افتراضي) | <code>practical</code> | <code>discussion</code> | <code>collaboration</code> | <code>project_based</code> | <code>problem_solving</code> | <code>simulation</code> | <code>other</code></td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td>افتراضي <code>0</code></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>افتراضي <code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(program_id, name)</code>. الحذف: <code>is_active = 0</code>.</p>
+<h3>8.30 <code>outcome_assessment_method</code> — ربط مخرج المقرر بطريقة التقويم</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>code</code> *</td>
+<td>كود مخرج المقرر (CLO)</td>
+</tr>
+<tr>
+<td><code>method</code> *</td>
+<td>كائن طريقة التقويم (يجب أن تكون قائمة)</td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(clo_id, method_id)</code>. الحذف: <strong>حذف فعلي</strong>.</p>
+<h3>8.31 <code>outcome_teaching_strategy</code> — ربط مخرج المقرر باستراتيجية التدريس</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>course_code</code> *</td>
+<td>كود المقرر</td>
+</tr>
+<tr>
+<td><code>code</code> *</td>
+<td>كود مخرج المقرر (CLO)</td>
+</tr>
+<tr>
+<td><code>strategy</code> *</td>
+<td>كائن استراتيجية التدريس (يجب أن تكون قائمة)</td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(clo_id, strategy_id)</code>. الحذف: <strong>حذف فعلي</strong>.</p>
+<h3>8.32 <code>student_group_members</code> — عضوية الطلاب في المجموعات</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>academic_number</code> *</td>
+<td>الرقم الأكاديمي للطالب</td>
+</tr>
+<tr>
+<td><code>college_code</code> * / <code>department_code</code> *</td>
+<td>مراجع (ضمن مسار المجموعة)</td>
+</tr>
+<tr>
+<td><code>program</code> / <code>level</code> / <code>semester</code></td>
+<td>كائنات اختيارية (مسار المجموعة)</td>
+</tr>
+<tr>
+<td><code>block_number</code></td>
+<td>اختياري</td>
+</tr>
+<tr>
+<td><code>group_name</code> *</td>
+<td>اسم المجموعة (بنفس مسار <code>student_groups</code>)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>المفتاح المركّب:</strong> <code>(student_id, group_id)</code> — إضافة الطالب لمجموعة أو إزالته منها.</li>
+<li>الحذف: <strong>حذف فعلي</strong>.</li>
+</ul>
+<h3>8.33 <code>student_grades</code> — درجات الطلاب على عناصر التقويم</h3>
+<table>
+<thead>
+<tr>
+<th>الحقل</th>
+<th>ملاحظة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>academic_number</code> *</td>
+<td>الرقم الأكاديمي للطالب</td>
+</tr>
+<tr>
+<td><code>assessment</code> *</td>
+<td>كائن عنصر التقويم (<code>course_assessments</code>)</td>
+</tr>
+<tr>
+<td><code>score</code> *</td>
+<td>الدرجة</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>المفتاح: <code>(assessment_id, student_id)</code>. الحذف: <strong>حذف فعلي</strong>.</p>
+<hr />
+<h2>9. أمثلة كاملة</h2>
+<h3>9.1 كلية</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ { &quot;college_code&quot;: &quot;fcit&quot;, &quot;college_name&quot;: &quot;كلية الحاسبات وتقنية المعلومات&quot; } ] }
+</code></pre>
+<h3>9.2 قسم</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;department_name&quot;: &quot;علوم الحاسب&quot;, &quot;college_code&quot;: &quot;fcit&quot; } ] }
+</code></pre>
+<h3>9.3 برنامج</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false, &quot;total_hours&quot;: 132 } ] }
+</code></pre>
+<h3>9.4 مستوى</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+  &quot;level_number&quot;: 1, &quot;level_name&quot;: &quot;المستوى الأول&quot;
+} ] }
+</code></pre>
+<h3>9.5 فصل</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;level&quot;: {
+    &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+    &quot;level_number&quot;: 1
+  },
+  &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+} ] }
+</code></pre>
+<h3>9.6 طالب (ينشئ حساب دخول)</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;full_name&quot;: &quot;محمد أحمد&quot;, &quot;academic_number&quot;: &quot;2026001&quot;, &quot;email&quot;: &quot;s2026001@univ.edu&quot;,
+  &quot;phone&quot;: &quot;0500000000&quot;, &quot;gender&quot;: &quot;male&quot;,
+  &quot;college_code&quot;: &quot;fcit&quot;, &quot;department_code&quot;: &quot;CS-DEP&quot;,
+  &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+  &quot;level&quot;: {
+    &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+    &quot;level_number&quot;: 1
+  },
+  &quot;semester&quot;: {
+    &quot;level&quot;: {
+      &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+      &quot;level_number&quot;: 1
+    },
+    &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+  },
+  &quot;status&quot;: 1
+} ] }
+</code></pre>
+<h3>9.7 مقرر</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;course_code&quot;: &quot;CS101&quot;, &quot;course_name&quot;: &quot;مقدمة في البرمجة&quot;, &quot;college_code&quot;: &quot;fcit&quot;, &quot;department_code&quot;: &quot;CS-DEP&quot;,
+  &quot;credit_hours&quot;: 3, &quot;category&quot;: &quot;متطلب تخصص إجباري&quot;, &quot;teaching_language&quot;: &quot;العربية&quot;,
+  &quot;course_parts&quot;: { &quot;theory&quot;: 2, &quot;practical&quot;: 1 }
+} ] }
+</code></pre>
+<h3>9.8 مجموعة طلابية</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;college_code&quot;: &quot;fcit&quot;, &quot;department_code&quot;: &quot;CS-DEP&quot;,
+  &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+  &quot;level&quot;: {
+    &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+    &quot;level_number&quot;: 1
+  },
+  &quot;semester&quot;: {
+    &quot;level&quot;: {
+      &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+      &quot;level_number&quot;: 1
+    },
+    &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+  },
+  &quot;group_name&quot;: &quot;المجموعة أ&quot;, &quot;max_students&quot;: 30
+} ] }
+</code></pre>
+<h3>9.9 محاضرة جدول</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;course_code&quot;: &quot;CS101&quot;, &quot;lecturer_academic_number&quot;: &quot;LEC001&quot;,
+  &quot;college_code&quot;: &quot;fcit&quot;, &quot;department_code&quot;: &quot;CS-DEP&quot;,
+  &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+  &quot;level&quot;: {
+    &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+    &quot;level_number&quot;: 1
+  },
+  &quot;semester&quot;: {
+    &quot;level&quot;: {
+      &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: false },
+      &quot;level_number&quot;: 1
+    },
+    &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+  },
+  &quot;group_name&quot;: &quot;المجموعة أ&quot;,
+  &quot;building_code&quot;: &quot;B1&quot;, &quot;floor&quot;: 1, &quot;classroom_name&quot;: &quot;101&quot;,
+  &quot;day_name&quot;: &quot;الأحد&quot;, &quot;period_name&quot;: &quot;الحصة الأولى&quot;,
+  &quot;start_date&quot;: &quot;2026-02-01&quot;, &quot;end_date&quot;: &quot;2026-05-31&quot;, &quot;academic_year&quot;: &quot;2026&quot;,
+  &quot;lecture_type&quot;: 1, &quot;lecture_hours&quot;: 2, &quot;allowance_minutes&quot;: 10
+} ] }
+</code></pre>
+<h3>9.10 الحذف (تعطيل)</h3>
+<pre class="code http"><code>DELETE /api/external/v1/courses
+Content-Type: application/json
+
+{ &quot;data&quot;: [ { &quot;course_code&quot;: &quot;CS101&quot; } ] }
+</code></pre>
+<blockquote>
+<p>يمكن الحذف بالمفتاح الطبيعي، أو بالمعرّف الخارجي: <code>{ &quot;data&quot;: [ { &quot;external_id&quot;: &quot;oracle-123&quot; } ] }</code>.</p>
+</blockquote>
+<h3>9.11 بلوك برنامج</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true },
+  &quot;level&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;level_number&quot;: 1 },
+  &quot;block_number&quot;: 1, &quot;block_name&quot;: &quot;البلوك الأول&quot;, &quot;type&quot;: &quot;compulsory&quot;, &quot;weeks&quot;: 16, &quot;credit_hours&quot;: 15
+} ] }
+</code></pre>
+<h3>9.12 مخرج تعلم مقرر (CLO) مرتبط بـ PLO</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;course_code&quot;: &quot;CS101&quot;, &quot;code&quot;: &quot;a1&quot;, &quot;domain&quot;: &quot;Knowledge&quot;,
+  &quot;description&quot;: &quot;يشرح المفاهيم الأساسية للبرمجة&quot;,
+  &quot;plo&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;code&quot;: &quot;PLO1&quot; },
+  &quot;weight&quot;: 25, &quot;order&quot;: 1
+} ] }
+</code></pre>
+<h3>9.13 عنصر تقويم</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;college_code&quot;: &quot;fcit&quot;, &quot;course_code&quot;: &quot;CS101&quot;,
+  &quot;semester&quot;: {
+    &quot;level&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;level_number&quot;: 1 },
+    &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+  },
+  &quot;name&quot;: &quot;الاختبار النصفي&quot;, &quot;max_score&quot;: 20, &quot;assessment_type&quot;: &quot;midterm_exam&quot;,
+  &quot;week&quot;: 7, &quot;weight&quot;: 20, &quot;created_academic_number&quot;: &quot;LEC001&quot;
+} ] }
+</code></pre>
+<h3>9.14 إضافة طالب إلى مجموعة</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;academic_number&quot;: &quot;2026001&quot;, &quot;college_code&quot;: &quot;fcit&quot;, &quot;department_code&quot;: &quot;CS-DEP&quot;,
+  &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true },
+  &quot;level&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;level_number&quot;: 1 },
+  &quot;semester&quot;: {
+    &quot;level&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;level_number&quot;: 1 },
+    &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+  },
+  &quot;group_name&quot;: &quot;المجموعة أ&quot;
+} ] }
+</code></pre>
+<h3>9.15 درجة طالب على عنصر تقويم</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;academic_number&quot;: &quot;2026001&quot;,
+  &quot;assessment&quot;: {
+    &quot;college_code&quot;: &quot;fcit&quot;, &quot;course_code&quot;: &quot;CS101&quot;,
+    &quot;semester&quot;: {
+      &quot;level&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;level_number&quot;: 1 },
+      &quot;semester_name&quot;: &quot;الفصل الأول&quot;, &quot;academic_year&quot;: &quot;2026&quot;, &quot;term_number&quot;: 1
+    },
+    &quot;name&quot;: &quot;الاختبار النصفي&quot;, &quot;max_score&quot;: 20
+  },
+  &quot;score&quot;: 17.5, &quot;notes&quot;: &quot;أداء جيد&quot;
+} ] }
+</code></pre>
+<h3>9.16 ربط مخرج مقرر بطريقة تقويم</h3>
+<pre class="code json"><code>{ &quot;data&quot;: [ {
+  &quot;course_code&quot;: &quot;CS101&quot;, &quot;code&quot;: &quot;a1&quot;,
+  &quot;method&quot;: { &quot;program&quot;: { &quot;department_code&quot;: &quot;CS-DEP&quot;, &quot;program_name&quot;: &quot;fd&quot;, &quot;academic_system&quot;: &quot;semester&quot;, &quot;block_based&quot;: true }, &quot;name&quot;: &quot;الاختبار النصفي&quot; }
+} ] }
+</code></pre>
+<hr />
+<h2>10. السجلات والاحتفاظ</h2>
+<ul>
+<li>يُسجَّل كل طلب في <code>integration_logs</code>: العميل، الطريقة، المسار، IP، حمولة الطلب (مقتطعة)، أحجام الطلب/الرد، الحالة، الملخّص، والمدة.</li>
+<li><strong>مدة الاحتفاظ:</strong> 90 يوماً (افتراضية)، ويُنظَّف يومياً عبر <code>php artisan integration:prune</code>.</li>
+</ul>
+<hr />
+<h2>11. أوامر التشغيل (على خادم UniHub)</h2>
+<pre class="code bash"><code># إنشاء عميل تكامل وتوليد توكنه (يُعرض مرة واحدة)
+php artisan integration:client &quot;university-oracle&quot; --ips=10.0.0.0/24
+
+# تدوير التوكن
+php artisan integration:client &quot;university-oracle&quot; --rotate
+
+# تعطيل/تفعيل
+php artisan integration:client &quot;university-oracle&quot; --disable
+php artisan integration:client &quot;university-oracle&quot; --enable
+
+# ضبط حدّ المعدّل لهذا العميل (0 = بلا حدّ)
+php artisan integration:client &quot;university-oracle&quot; --rate-limit=300
+
+# تقليم السجلات ومفاتيح Idempotency المنتهية
+php artisan integration:prune
+php artisan integration:prune --days=30 --dry-run
+</code></pre>
+<hr />
+<h2>12. متغيّرات البيئة</h2>
+<table>
+<thead>
+<tr>
+<th>المتغيّر</th>
+<th>الافتراضي</th>
+<th>الوصف</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INTEGRATION_RATE_LIMIT</code></td>
+<td><code>600</code></td>
+<td>حدّ الطلبات/دقيقة الافتراضي لكل عميل</td>
+</tr>
+<tr>
+<td><code>INTEGRATION_IDEMPOTENCY_TTL_HOURS</code></td>
+<td><code>24</code></td>
+<td>صلاحية مفاتيح Idempotency</td>
+</tr>
+<tr>
+<td><code>INTEGRATION_LOG_RETENTION_DAYS</code></td>
+<td><code>90</code></td>
+<td>أيام الاحتفاظ بالسجلات</td>
+</tr>
+<tr>
+<td><code>INTEGRATION_LOG_PAYLOAD_MAX_BYTES</code></td>
+<td><code>65535</code></td>
+<td>الحد الأقصى لحمولة الطلب المسجَّلة</td>
+</tr>
+<tr>
+<td><code>DEFAULT_STUDENT_PASSWORD</code></td>
+<td><code>12345678</code></td>
+<td>كلمة المرور الافتراضية لحسابات الطلاب/المحاضرين</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>13. ملاحظات تشغيلية</h2>
+<ol>
+<li><strong>الترتيب مهم:</strong> أنشئ البيانات المرجعية (كليات/أقسام/برامج/مستويات/فصول/مبانٍ/قاعات/أيام/حصص/ألقاب) <strong>قبل</strong> الأشخاص والمحتوى والجدول. ثم رتّب الموارد الأكاديمية: <code>blocks</code> → <code>block_relations</code> → <code>course_prerequisites</code> → المخرجات → المحتوى → التكليفات والتقويم → الطرق والاستراتيجيات → روابط المخرجات → التسجيل (<code>student_group_members</code> / <code>student_grades</code>).</li>
+<li><strong>الحقول غير المرسَلة لا تُطمس</strong> — يُحدَّث فقط ما ترسله الجامعة (ما عدا القيم الافتراضية عند الإنشاء).</li>
+<li><strong>البيانات الفعلية:</strong> الحقول المرجعية (<code>college_code</code> …) تُحوَّل داخلياً إلى معرّفاتها.</li>
+<li><strong>المراجع المتداخلة تُطابَق ولا تُنشأ:</strong> كائن الأب (<code>program</code>, <code>semester</code>, <code>block</code>, <code>method</code>, <code>assessment</code> …) يجب أن يكون <strong>موجوداً مسبقاً</strong> ويُطابَق بمفتاحه الطبيعي، وإلا تُتخطّى الصفوف.</li>
+<li><strong>قيم <code>enum</code> القابلة للإفراغ (<code>exam_type</code>, <code>category</code>):</strong> أَهمِل الحقل عند عدم الحاجة، <strong>ولا ترسل <code>null</code></strong> صريحاً (يُرفض الصف).</li>
+<li><strong>أمان:</strong> لا تُشارك التوكن؛ يُخزَّن مشفَّراً ولا يظهر بعد التوليد الأول.</li>
+</ol>
+<hr />
+<h2>14. كيف تختبر الواجهة</h2>
+<p>ثلاث طرق متتابعة: <strong>آليّة (PHPUnit) → سريعة حيّة (سكربت) → يدويّة (Postman/.http)</strong>.</p>
+<h3>14.1 الاختبارات الآلية (شغّلها أولاً)</h3>
+<pre class="code bash"><code># من مجلد unihub-API
+php vendor\bin\phpunit tests\Feature\Integration
+</code></pre>
+<ul>
+<li>قاعدة الاختبار <code>unihub20_test</code> (مضبوطة في <code>phpunit.xml</code>) — <strong>منفصلة</strong> عن قاعدة التطبيق <code>unihub20</code>، فلا تُمسّ بياناتك الحقيقية.</li>
+<li>النتيجة المرجعية: <strong>102 اختباراً · 557 تأكيداً · 0 فشل</strong>.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>الملف</th>
+<th>ما يغطيه</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IntegrationAuthTest</code></td>
+<td>التوكن/IP (وأن <code>X-Forwarded-For</code> لا يُزوير به)، 405/404، إلغاء فحص MAC، التسجيل و<code>last_used_at</code></td>
+</tr>
+<tr>
+<td><code>IntegrationReferenceSyncTest</code></td>
+<td>الموارد المرجعية + النجاح الجزئي + الحذف الناعم</td>
+</tr>
+<tr>
+<td><code>IntegrationPeopleSyncTest</code></td>
+<td>الطلاب/المحاضرون وحسابات <code>users</code> المرتبطة</td>
+</tr>
+<tr>
+<td><code>IntegrationTimetableSyncTest</code></td>
+<td>المجموعات/الجدول وكشف التعارضات</td>
+</tr>
+<tr>
+<td><code>IntegrationBlocksSyncTest</code></td>
+<td><code>blocks</code> / <code>block_relations</code> / <code>course_prerequisites</code></td>
+</tr>
+<tr>
+<td><code>IntegrationOutcomesSyncTest</code></td>
+<td>مخرجات البرنامج/المقرر</td>
+</tr>
+<tr>
+<td><code>IntegrationContentSyncTest</code></td>
+<td>الوصف/الموضوعات/الأسئلة</td>
+</tr>
+<tr>
+<td><code>IntegrationAssessmentsSyncTest</code></td>
+<td>التكليفات/التقويم/السياسات/المراجع</td>
+</tr>
+<tr>
+<td><code>IntegrationOutcomeLinksSyncTest</code></td>
+<td>الطرق/الاستراتيجيات وروابط المخرجات</td>
+</tr>
+<tr>
+<td><code>IntegrationEnrollmentSyncTest</code></td>
+<td>التسجيل والدرجات</td>
+</tr>
+<tr>
+<td><code>IntegrationEngineExtensionsTest</code></td>
+<td>امتدادات المحرّك: <code>hard_delete</code>، المفتاح المركّب، المراجع غير المحلولة</td>
+</tr>
+<tr>
+<td><code>IntegrationIdempotencyTest</code></td>
+<td>إعادة إرسال آمنة / <code>409</code> / مفتاح منتهٍ</td>
+</tr>
+<tr>
+<td><code>IntegrationRateLimitTest</code></td>
+<td><code>429</code> وترويسات <code>X-RateLimit-*</code></td>
+</tr>
+<tr>
+<td><code>IntegrationPruneCommandTest</code></td>
+<td><code>integration:prune</code> و<code>--dry-run</code></td>
+</tr>
+</tbody>
+</table>
+<h3>14.2 تجربة حيّة على خادم يعمل</h3>
+<pre class="code powershell"><code># 1) أنشئ عميلاً وانسخ التوكن (يُعرض مرة واحدة فقط)
+php artisan integration:client &quot;local-test&quot; --ips=127.0.0.1
+
+# 2) شغّل سكربت التدخين (الأقسام [1]..[7])
+powershell -ExecutionPolicy Bypass -File docs\integration_smoke_test.ps1 `
+    -BaseUrl &quot;http://127.0.0.1:8099&quot; -Token &quot;&lt;TOKEN&gt;&quot;
+</code></pre>
+<blockquote>
+<p>يجب أن يكون عنوان جهازك ضمن <code>allowed_ips</code>، وإلا ستحصل على <code>403 Unauthorized IP address</code>.</p>
+</blockquote>
+<h3>14.3 تجربة يدوية (Postman / VS Code / curl)</h3>
+<table>
+<thead>
+<tr>
+<th>الأداة</th>
+<th>الملف</th>
+<th>الخطوة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Postman</td>
+<td><code>docs/integration_postman_collection.json</code></td>
+<td>استورد المجموعة (٦ مجلدات) وضع <code>{{token}}</code> في المتغيّرات</td>
+</tr>
+<tr>
+<td>VS Code REST Client</td>
+<td><code>docs/integration.http</code></td>
+<td>عدّل <code>@token</code> ثم <strong>Send Request</strong> فوق كل طلب <code>###</code></td>
+</tr>
+<tr>
+<td>curl</td>
+<td>—</td>
+<td><code>curl -X POST &lt;BASE&gt;/api/external/v1/ping -H &quot;Authorization: Bearer &lt;TOKEN&gt;&quot; -H &quot;Accept: application/json&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="code powershell"><code>Invoke-RestMethod -Method Post `
+    -Uri &quot;http://127.0.0.1:8099/api/external/v1/ping&quot; `
+    -Headers @{ Authorization = &quot;Bearer &lt;TOKEN&gt;&quot;; Accept = &quot;application/json&quot; }
+</code></pre>
+<h3>14.4 تشخيص سريع للأعراض</h3>
+<table>
+<thead>
+<tr>
+<th>الرسالة</th>
+<th>السبب</th>
+<th>الحل</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>401 … Invalid or missing security token</code></td>
+<td>لا توكن، أو توكن خاطئ، أو توكن مُدوَّر</td>
+<td>استخدم التوكن الحالي؛ إن نُسي فـ <code>--rotate</code></td>
+</tr>
+<tr>
+<td><code>403 … Unauthorized IP address (x.x.x.x)</code></td>
+<td>عنوانك خارج <code>allowed_ips</code></td>
+<td><code>integration:client &lt;name&gt; --ips=&lt;عنوانك&gt;</code> (أو CIDR)</td>
+</tr>
+<tr>
+<td><code>403 … Integration client is disabled</code></td>
+<td>العميل معطّل</td>
+<td><code>integration:client &lt;name&gt; --enable</code></td>
+</tr>
+<tr>
+<td><code>405 … requests are allowed</code></td>
+<td>استخدام <code>GET</code>/<code>HEAD</code></td>
+<td>استخدم POST/PUT/PATCH/DELETE فقط</td>
+</tr>
+<tr>
+<td><code>404 Unknown integration endpoint</code></td>
+<td>مسار غير مدرج</td>
+<td>راجع جدول الراوتات في القسم 1</td>
+</tr>
+<tr>
+<td><code>429 Too many requests</code></td>
+<td>تجاوز حدّ العميل</td>
+<td>انتظر <code>Retry-After</code> أو ارفع <code>--rate-limit</code></td>
+</tr>
+<tr>
+<td>رد <code>200</code> مع <code>skipped_records &gt; 0</code></td>
+<td>صفوف مرفوضة (مرجع مفقود أو <code>enum</code> بقيمة <code>null</code>)</td>
+<td>اقرأ <code>skipped_reasons</code> وراجع القسمين 4 و13</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>راجع أيضاً <strong>القسم 7 (أكواد الأخطاء)</strong> و<strong>القسم 5 (Idempotency)</strong> قبل إعادة إرسال الدفعة نفسها.</p>
+</blockquote>
+</div>
+</body>
+</html>

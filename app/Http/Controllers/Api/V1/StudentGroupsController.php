@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Program;
+use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -319,6 +320,115 @@ private function makePlaceholderEmail(?string $academic): string
             ->update(['deleted_at' => now(), 'updated_at' => now()]);
 
         return $deleted ? response()->json(['message' => 'Deleted']) : response()->json(['message' => 'Not found'], 404);
+    }
+
+    /**
+     * سلة المحذوفات (Soft Delete) للمجموعات الدراسية والطلاب.
+     * POST /api/v1/student-groups/trash
+     */
+    public function trash(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:list,restore,force_delete',
+            'college_id' => 'required|integer|min:1',
+            'type' => 'required_if:action,restore,force_delete|in:student_groups,students',
+            'id' => 'required_if:action,restore,force_delete|integer|min:1',
+        ]);
+
+        $collegeId = (int) $validated['college_id'];
+
+        if ($validated['action'] === 'list') {
+            $groupRows = DB::table('student_groups')
+                ->where('college_id', $collegeId)
+                ->whereNotNull('deleted_at')
+                ->orderByDesc('deleted_at')
+                ->get();
+
+            $studentRows = Student::onlyTrashed()
+                ->with(['user' => fn ($q) => $q->withTrashed()])
+                ->where('college_id', $collegeId)
+                ->orderByDesc('deleted_at')
+                ->get();
+
+            return response()->json([
+                'groups' => [
+                    [
+                        'type' => 'student_groups',
+                        'label' => 'المجموعات الدراسية',
+                        'records' => $groupRows->map(function ($row) {
+                            $data = (array) $row;
+
+                            return [
+                                'id' => $row->group_id,
+                                'name' => $row->group_name ?: ('#' . $row->group_id),
+                                'deleted_at' => $row->deleted_at
+                                    ? \Illuminate\Support\Carbon::parse($row->deleted_at)->toISOString()
+                                    : null,
+                                'data' => $data,
+                            ];
+                        })->values(),
+                    ],
+                    [
+                        'type' => 'students',
+                        'label' => 'الطلاب',
+                        'records' => $studentRows->map(function ($student) {
+                            $data = $student->getAttributes();
+                            $data['deleted_at'] = $student->deleted_at?->toISOString();
+
+                            return [
+                                'id' => $student->getKey(),
+                                'name' => $student->user?->full_name ?: ('طالب #' . $student->getKey()),
+                                'deleted_at' => $student->deleted_at?->toISOString(),
+                                'data' => $data,
+                            ];
+                        })->values(),
+                    ],
+                ],
+            ]);
+        }
+
+        $type = $validated['type'];
+        $id = (int) $validated['id'];
+
+        if ($type === 'student_groups') {
+            $exists = DB::table('student_groups')
+                ->where('group_id', $id)
+                ->where('college_id', $collegeId)
+                ->whereNotNull('deleted_at')
+                ->exists();
+
+            abort_unless($exists, 404);
+
+            if ($validated['action'] === 'restore') {
+                DB::table('student_groups')
+                    ->where('group_id', $id)
+                    ->update(['deleted_at' => null, 'updated_at' => now()]);
+            } else {
+                DB::transaction(function () use ($id) {
+                    DB::table('student_group_members')->where('group_id', $id)->delete();
+                    DB::table('student_groups')->where('group_id', $id)->delete();
+                });
+            }
+        } else {
+            $student = Student::onlyTrashed()
+                ->where('college_id', $collegeId)
+                ->whereKey($id)
+                ->firstOrFail();
+
+            DB::transaction(function () use ($student, $validated) {
+                if ($validated['action'] === 'restore') {
+                    $student->restore();
+                } else {
+                    $student->forceDelete();
+                }
+            });
+        }
+
+        return response()->json([
+            'message' => $validated['action'] === 'restore'
+                ? 'تمت استعادة العنصر بنجاح'
+                : 'تم حذف العنصر نهائياً',
+        ]);
     }
 
     private function validateSameProgramTransfer(array $source, array $target): bool
@@ -742,6 +852,7 @@ private function makePlaceholderEmail(?string $academic): string
             ->join('students as s', 's.student_id', '=', 'sgm.student_id')
             ->join('users as u', 'u.user_id', '=', 's.user_id')
             ->where('sgm.group_id', (int)$group)
+            ->whereNull('s.deleted_at') // استبعاد الطلاب المحذوفين حذفاً ناعماً
             ->select(
                 's.student_id',
                 'u.full_name',

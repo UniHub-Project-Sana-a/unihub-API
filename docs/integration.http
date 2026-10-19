@@ -1,0 +1,573 @@
+### =====================================================================
+### UniHub — Integration API — HTTP Tests (VS Code REST Client)
+### الاستخدام: افتح الملف في VS Code مع إضافة "REST Client"، وعدّل المتغيّرات أدناه،
+### ثم اضغط "Send Request" فوق كل طلب.
+### =====================================================================
+
+@baseUrl = http://127.0.0.1:8099
+@token = PASTE_YOUR_CLIENT_TOKEN_HERE
+@contentType = application/json
+
+### ---------------------------------------------------------------------
+### 0) فحص الاتصال والمصادقة (Ping)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/ping
+Authorization: Bearer {{token}}
+Accept: {{contentType}}
+
+### ---------------------------------------------------------------------
+### 1) كليات — إنشاء/تحديث (Upsert)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/colleges
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    { "college_code": "ENG", "college_name": "College of Engineering" }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 2) أقسام — ربط بالكلية عبر الكود
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/departments
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    { "department_code": "CE", "department_name": "Civil Engineering", "college_code": "ENG" }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 3) طلاب — يُنشئ حساب المستخدم تلقائياً (users + students)
+### البريد إلزامي — لا يُولَّد تلقائياً
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/students
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "full_name": "Ali Ahmed",
+      "academic_number": "S-2026-0001",
+      "email": "ali.ahmed@univ.edu",
+      "phone": "0910000001",
+      "gender": "male",
+      "college_code": "ENG",
+      "department_code": "CE"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 4) محاضرون — يُنشئ حساب المستخدم + العنوان الأكاديمي (title_code)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/lecturers
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "full_name": "Dr. Sara Salem",
+      "academic_number": "L-2026-0001",
+      "email": "sara.salem@univ.edu",
+      "gender": "female",
+      "college_code": "ENG",
+      "department_code": "CE",
+      "title_code": "PROF",
+      "hire_date": "2021-09-01"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 5) الجدول الدراسي — مفتاح طبيعي + كشف تزاحم
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/timetable
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "external_id": "TT-2026-0001",
+      "course_code": "CS101",
+      "lecturer_academic_number": "L-2026-0001",
+      "college_code": "ENG",
+      "department_code": "CE",
+      "group_name": "G1",
+      "building_code": "B1",
+      "floor": 1,
+      "classroom_name": "R1",
+      "day_name": "Sunday",
+      "period_name": "P1",
+      "start_date": "2026-02-01",
+      "end_date": "2026-06-01",
+      "academic_year": "2026/2027",
+      "lecture_hours": 2
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 6) إعادة المحاولة الآمنة — نفس المفتاح + نفس الجسم => يُعاد الرد المخزّن
+### عدّل قيمة Idempotency-Key يدوياً لكل عملية مختلفة.
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/colleges
+Authorization: Bearer {{token}}
+Idempotency-Key: 9f2c1e70-4b1a-4c33-9d2e-000000000001
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    { "college_code": "MED", "college_name": "College of Medicine" }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 7) حذف/تعطيل — استراتيجية الحذف حسب المورد (soft delete أو عمود الحالة)
+### ---------------------------------------------------------------------
+DELETE {{baseUrl}}/api/external/v1/timetable
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    { "external_id": "TT-2026-0001" }
+  ]
+}
+
+### =====================================================================
+### توسعة البنية الأكاديمية (بلوكات/مخرجات/محتوى/تقويم/طرق/تسجيل)
+### تتطلّب وجود البيانات المرجعية: كلية fcit، قسم CS-DEP، برنامج fd (block_based=true)،
+### مستوى 1، فصل «الفصل الأول 2026»، مقرران CS100 و CS101، محاضر LEC001، طالب 2026001.
+### =====================================================================
+
+### ---------------------------------------------------------------------
+### 8) بلوكات البرنامج (blocks) — المفتاح (program_id, block_number)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/blocks
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true },
+      "level": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "level_number": 1 },
+      "block_number": 1,
+      "block_name": "البلوك الأول",
+      "type": "compulsory",
+      "weeks": 16,
+      "credit_hours": 15
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 9) روابط البلوكات (block_relations) — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/block_relations
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "block": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "block_number": 1 },
+      "related_block": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "block_number": 2 },
+      "relation_type": "next"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 10) متطلبات المقررات (course_prerequisites) — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_prerequisites
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    { "course_code": "CS101", "prerequisite_course_code": "CS100", "type": "prerequisite" }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 11) مخرجات تعلم البرنامج (program_learning_outcomes)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/program_learning_outcomes
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true },
+      "code": "PLO1",
+      "domain": "Knowledge",
+      "description": "يُظهر الطالب معرفة أساسية بعلوم الحاسب",
+      "weight": 25,
+      "order": 1
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 12) مخرجات تعلم المقرر (course_learning_outcomes) — مرتبطة بـ PLO
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_learning_outcomes
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "code": "a1",
+      "domain": "Knowledge",
+      "description": "يشرح المفاهيم الأساسية للبرمجة",
+      "plo": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "code": "PLO1" },
+      "weight": 25,
+      "order": 1
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 13) وصف المقرر (course_descriptions) — صف واحد لكل مقرر — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_descriptions
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "description": "مقدمة في البرمجة ومنهجياتها",
+      "goals": ["فهم الأساسيات", "كتابة برامج بسيطة"],
+      "word_count": 120,
+      "goals_count": 2
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 14) دروس المقرر (course_topics)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_topics
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "part": "نظري",
+      "week": 1,
+      "unit_name": "مقدمة",
+      "subtopics": ["المتغيرات", "أنواع البيانات"],
+      "hours": 3,
+      "clo_ids": [1, 2],
+      "order": 1
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 15) بنك الأسئلة (topic_questions) — مربوط بالدرس (اختياري) — المفتاح (course_id, question_text)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/topic_questions
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "part": "نظري",
+      "topic": { "course_code": "CS101", "part": "نظري", "week": 1, "unit_name": "مقدمة" },
+      "question_text": "ما هو المتغير؟",
+      "question_type": "MCQ",
+      "options": ["مخزن للبيانات", "نوع بيانات", "دالة", "حلقة"],
+      "correct_answer": "مخزن للبيانات"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 16) التكليفات (course_assignments)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_assignments
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "part": "نظري",
+      "title": "تكليف 1",
+      "description": "حل تمارين الفصل الأول",
+      "week": 2,
+      "grade": 5,
+      "assignment_type": "homework"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 17) عناصر التقويم (course_assessments) — فصل إلزامي + مجموعة اختيارية + محاضر اختياري
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_assessments
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "college_code": "fcit",
+      "course_code": "CS101",
+      "semester": {
+        "level": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "level_number": 1 },
+        "semester_name": "الفصل الأول",
+        "academic_year": "2026",
+        "term_number": 1
+      },
+      "name": "الاختبار النصفي",
+      "max_score": 20,
+      "assessment_type": "midterm_exam",
+      "week": 7,
+      "weight": 20,
+      "created_academic_number": "LEC001"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 18) سياسات المقرر (course_policies)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_policies
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "policy_number": 1,
+      "title": "الحضور",
+      "content": "يشترط حضور 75% من المحاضرات",
+      "is_fixed": true,
+      "order": 1
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 19) مراجع المقرر (course_references)
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/course_references
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "type": "main",
+      "title": "مقدمة في البرمجة",
+      "author": "John Doe",
+      "year": 2024,
+      "publisher": "Academic Press",
+      "order": 1
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 20) طرق التقويم (assessment_methods) — قائمة برامجية — التعطيل is_active=0
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/assessment_methods
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true },
+      "name": "الاختبار النصفي",
+      "description": "اختبار قصير",
+      "category": "exam"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 21) استراتيجيات التدريس (teaching_strategies) — قائمة برامجية — التعطيل is_active=0
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/teaching_strategies
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true },
+      "name": "المحاضرة التفاعلية",
+      "category": "lecture"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 22) ربط مخرج المقرر بطريقة تقويم (outcome_assessment_method) — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/outcome_assessment_method
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "code": "a1",
+      "method": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "name": "الاختبار النصفي" }
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 23) ربط مخرج المقرر باستراتيجية تدريس (outcome_teaching_strategy) — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/outcome_teaching_strategy
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "course_code": "CS101",
+      "code": "a1",
+      "strategy": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "name": "المحاضرة التفاعلية" }
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 24) إضافة طالب إلى مجموعة (student_group_members) — مفتاح مركّب — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/student_group_members
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "academic_number": "2026001",
+      "college_code": "fcit",
+      "department_code": "CS-DEP",
+      "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true },
+      "level": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "level_number": 1 },
+      "semester": {
+        "level": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "level_number": 1 },
+        "semester_name": "الفصل الأول",
+        "academic_year": "2026",
+        "term_number": 1
+      },
+      "group_name": "المجموعة أ"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 25) درجات الطلاب (student_grades) — المفتاح (assessment_id, student_id) — حذف فعلي
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/student_grades
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "academic_number": "2026001",
+      "assessment": {
+        "college_code": "fcit",
+        "course_code": "CS101",
+        "semester": {
+          "level": { "program": { "department_code": "CS-DEP", "program_name": "fd", "academic_system": "semester", "block_based": true }, "level_number": 1 },
+          "semester_name": "الفصل الأول",
+          "academic_year": "2026",
+          "term_number": 1
+        },
+        "name": "الاختبار النصفي",
+        "max_score": 20
+      },
+      "score": 17.5,
+      "notes": "أداء جيد"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### مثال حذف فعلي: إزالة طالب من مجموعة (student_group_members)
+### ---------------------------------------------------------------------
+DELETE {{baseUrl}}/api/external/v1/student_group_members
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": [
+    {
+      "academic_number": "2026001",
+      "college_code": "fcit",
+      "department_code": "CS-DEP",
+      "group_name": "المجموعة أ"
+    }
+  ]
+}
+
+### ---------------------------------------------------------------------
+### 26) حالة خطأ متوقّعة — مورد غير معروف => 404
+### ---------------------------------------------------------------------
+POST {{baseUrl}}/api/external/v1/not_a_resource
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+Accept: {{contentType}}
+
+{
+  "data": []
+}

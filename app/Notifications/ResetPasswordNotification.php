@@ -21,11 +21,9 @@ class ResetPasswordNotification extends Notification
 
     public function toMail($notifiable)
     {
-
-        $frontendUrl = "http://192.168.0.124/react-app/#/reset-password";
-        $url = $frontendUrl . "?token=" . $this->token . "&email=" . urlencode($notifiable->email);
-        // 2. بناء الرابط الكامل
-        $resetUrl = $frontendUrl . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
+        // بناء رابط إعادة التعيين من FRONTEND_URL الموجود في .env
+        $frontendUrl = rtrim(env('FRONTEND_URL', config('app.url')), '/');
+        $url = $frontendUrl . "/#/reset-password?token=" . $this->token . "&email=" . urlencode($notifiable->email);
 
         return (new MailMessage)
                     ->subject('UniHub - إعادة تعيين كلمة المرور') // ✅ عنوان مخصص

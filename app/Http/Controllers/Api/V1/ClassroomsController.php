@@ -3,8 +3,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\Classroom\StoreClassroomRequest;
 use App\Http\Requests\V1\Classroom\UpdateClassroomRequest;
+use App\Models\Building;
 use App\Models\Classroom;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\LectureSession;
 
 class ClassroomsController extends Controller {
@@ -51,6 +53,90 @@ class ClassroomsController extends Controller {
     public function destroy(Classroom $classroom) {
         $classroom->delete();
         return response()->json(['message' => 'Classroom deleted']);
+    }
+
+    /**
+     * سلة المحذوفات (Soft Delete) للمباني والقاعات.
+     * نفس نمط DepartmentsController::trash: list / restore / force_delete
+     * POST /v1/classrooms/trash
+     */
+    public function trash(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:list,restore,force_delete',
+            'college_id' => 'required|integer|min:1',
+            'type' => 'required_if:action,restore,force_delete|in:buildings,classrooms',
+            'id' => 'required_if:action,restore,force_delete|integer|min:1',
+        ]);
+
+        $collegeId = (int) $validated['college_id'];
+
+        // القاعات التابعة للكلية: مباشرة أو عبر المبنى (حتى لو كان المبنى محذوفاً ناعماً)
+        $classroomScope = fn () => Classroom::withTrashed()
+            ->where(function ($query) use ($collegeId) {
+                $query->where('college_id', $collegeId)
+                    ->orWhereHas('building', function ($building) use ($collegeId) {
+                        $building->withTrashed()->where('college_id', $collegeId);
+                    });
+            });
+
+        $queries = [
+            'buildings' => fn () => Building::onlyTrashed()->where('college_id', $collegeId),
+            'classrooms' => fn () => $classroomScope()->onlyTrashed(),
+        ];
+
+        $nameColumns = [
+            'buildings' => 'building_name',
+            'classrooms' => 'classroom_name',
+        ];
+
+        if ($validated['action'] === 'list') {
+            $labels = [
+                'buildings' => 'المباني',
+                'classrooms' => 'القاعات',
+            ];
+
+            $groups = [];
+            foreach ($queries as $type => $queryFactory) {
+                $nameColumn = $nameColumns[$type];
+
+                $groups[] = [
+                    'type' => $type,
+                    'label' => $labels[$type],
+                    'records' => $queryFactory()->get()->map(function ($record) use ($nameColumn) {
+                        $data = $record->getAttributes();
+                        $data['deleted_at'] = $record->deleted_at?->toISOString();
+
+                        return [
+                            'id' => $record->getKey(),
+                            'name' => $record->getAttribute($nameColumn)
+                                ?: ('#' . $record->getKey()),
+                            'deleted_at' => $record->deleted_at?->toISOString(),
+                            'data' => $data,
+                        ];
+                    })->values(),
+                ];
+            }
+
+            return response()->json(['groups' => $groups]);
+        }
+
+        $type = $validated['type'];
+        $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+
+        DB::transaction(function () use ($record, $validated) {
+            if ($validated['action'] === 'restore') {
+                $record->restore();
+            } else {
+                $record->forceDelete();
+            }
+        });
+
+        return response()->json([
+            'message' => $validated['action'] === 'restore'
+                ? 'تمت استعادة العنصر بنجاح'
+                : 'تم حذف العنصر نهائياً',
+        ]);
     }
 
     public function checkAvailability(Request $request)

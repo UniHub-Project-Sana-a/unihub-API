@@ -7,6 +7,7 @@ use App\Http\Requests\V1\AcademicTitle\StoreAcademicTitleRequest;
 use App\Http\Requests\V1\AcademicTitle\UpdateAcademicTitleRequest;
 use App\Models\AcademicTitle;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AcademicTitlesController extends Controller
 {
@@ -49,5 +50,69 @@ class AcademicTitlesController extends Controller
     {
         $academic_title->delete();
         return response()->json(['message' => 'Deleted']);
+    }
+
+    /**
+     * سلة المحذوفات (Soft Delete) للرتب الأكاديمية.
+     * POST /api/v1/academic-titles/trash
+     */
+    public function trash(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:list,restore,force_delete',
+            'college_id' => 'required|integer|min:1',
+            'type' => 'required_if:action,restore,force_delete|in:academic_titles',
+            'id' => 'required_if:action,restore,force_delete|integer|min:1',
+        ]);
+
+        $collegeId = (int) $validated['college_id'];
+
+        $queries = [
+            'academic_titles' => fn () => AcademicTitle::onlyTrashed()->where('college_id', $collegeId),
+        ];
+
+        if ($validated['action'] === 'list') {
+            $labels = [
+                'academic_titles' => 'الرتب الأكاديمية',
+            ];
+
+            $groups = [];
+            foreach ($queries as $type => $queryFactory) {
+                $groups[] = [
+                    'type' => $type,
+                    'label' => $labels[$type],
+                    'records' => $queryFactory()->get()->map(function ($record) {
+                        $data = $record->getAttributes();
+                        $data['deleted_at'] = $record->deleted_at?->toISOString();
+
+                        return [
+                            'id' => $record->getKey(),
+                            'name' => $record->title_name ?? ('#' . $record->getKey()),
+                            'deleted_at' => $record->deleted_at?->toISOString(),
+                            'data' => $data,
+                        ];
+                    })->values(),
+                ];
+            }
+
+            return response()->json(['groups' => $groups]);
+        }
+
+        $type = $validated['type'];
+        $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+
+        DB::transaction(function () use ($record, $validated) {
+            if ($validated['action'] === 'restore') {
+                $record->restore();
+            } else {
+                $record->forceDelete();
+            }
+        });
+
+        return response()->json([
+            'message' => $validated['action'] === 'restore'
+                ? 'تمت استعادة العنصر بنجاح'
+                : 'تم حذف العنصر نهائياً',
+        ]);
     }
 }

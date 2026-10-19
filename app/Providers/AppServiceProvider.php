@@ -30,6 +30,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('forgot', fn(Request $r) => [Limit::perMinutes(15, 3)->by($r->ip())]);
         RateLimiter::for('reset',  fn(Request $r) => [Limit::perMinutes(30, 5)->by($r->ip())]);
 
+        // حماية أولية لعناوين IP قبل مصادقة عميل التكامل (مضاعف الافتراضي)
+        RateLimiter::for('integration-ip', function (Request $request) {
+            $perMinute = max(1, (int) config('integration.default_rate_limit', 600)) * 2;
+            return Limit::perMinute($perMinute)->by(\App\Support\ClientIp::resolve($request));
+        });
+
         // 4. تسجيل الـ Policy يدويًا
         Gate::policy(UserDevice::class, UserDevicePolicy::class);
         // Passport::routes();

@@ -4,10 +4,6 @@
 
 use Illuminate\Support\Facades\Route;
 
-use App\Models\User;
-
-
-
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AuthPasswordController;
 use App\Http\Controllers\Api\V1\UsersController;
@@ -71,36 +67,33 @@ use App\Http\Controllers\Api\V1\{
     ,ProgramOptionAuditController
 };
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\External\IntegrationController;
 
 // Health Check Routes (لا تحتاج Authentication)
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/health/detailed', [HealthController::class, 'detailed']);
 Route::get('/ping', [HealthController::class, 'ping']);
 
-Route::get('/debug/password-algo', function () {
+// ============================================================
+// واجهات التكامل الخارجي (System-to-System) — Data Ingestion
+// محمية بعاملين: Bearer Token + IP Whitelist
+// ============================================================
+Route::prefix('external/v1')
+    ->middleware(['throttle:integration-ip', 'integration.auth', 'integration.throttle', 'integration.idempotency'])
+    ->group(function () {
+        // نقطة اختبار الاتصال والمصادقة
+        Route::post('ping', [IntegrationController::class, 'ping']);
 
-    $u = User::first();
+        // موارد البيانات (على الجداول الفعلية وفق config/integration.php)
+        Route::match(['post', 'put', 'patch'], '{resource}', [IntegrationController::class, 'upsert'])
+            ->where('resource', '[a-z0-9_\-]+');
 
-    if (!$u) return 'no user';
-
-    $hash = $u->password;
-
-    if (str_starts_with($hash, '$2y$') || str_starts_with($hash, '$2b$') || str_starts_with($hash, '$2a$')) return 'bcrypt';
-
-    if (str_starts_with($hash, '$argon2id$') || str_starts_with($hash, '$argon2i$')) return 'argon2';
-
-    return 'unknown';
-
-});
-
-
+        Route::delete('{resource}', [IntegrationController::class, 'deactivate'])
+            ->where('resource', '[a-z0-9_\-]+');
+    });
 
 Route::prefix('v1')->group(function ()
 {
-
-    Route::get('admin/security/policy', [SettingsController::class, 'getPolicy']);
-
-    Route::post('sync/bulk', [SyncController::class, 'bulkSync']);
 
     Route::controller(AuthController::class)->group(function () {
 
@@ -128,6 +121,9 @@ Route::prefix('v1')->group(function ()
 
         Route::post('auth/change-password', [AuthController::class, 'changePassword']);
 
+        // مزامنة المباني/القاعات الميدانية (كانت عامة - أصبحت تتطلب مصادقة)
+        Route::post('sync/bulk', [SyncController::class, 'bulkSync']);
+
 
 
         Route::controller(LookupsController::class)->prefix('lookups')->group(function () {
@@ -146,6 +142,9 @@ Route::prefix('v1')->group(function ()
 
         Route::apiResource('users', UsersController::class);
 
+        Route::post('study-plan/trash', [DepartmentsController::class, 'trash']);
+
+        Route::post('colleges/trash', [CollegesController::class, 'trash']);
         Route::apiResource('colleges', CollegesController::class);
 
         Route::apiResource('departments', DepartmentsController::class);
@@ -162,12 +161,15 @@ Route::prefix('v1')->group(function ()
         Route::apiResource('blocks', BlockController::class);
 
         Route::get('/classrooms/availability', [ClassroomsController::class, 'checkAvailability']);
+        Route::post('classrooms/trash', [ClassroomsController::class, 'trash']);
         Route::apiResource('classrooms', ClassroomsController::class);
         
+        Route::post('periods/trash', [PeriodsController::class, 'trash']);
         Route::apiResource('periods', PeriodsController::class);
 
         Route::apiResource('days', DaysController::class);
 
+        Route::post('academic-titles/trash', [AcademicTitlesController::class, 'trash']);
         Route::apiResource('academic-titles', AcademicTitlesController::class);
 
         Route::get('colleges/{college}/dashboard', [CollegesController::class, 'dashboard']);
@@ -214,6 +216,7 @@ Route::prefix('v1')->group(function ()
 
         Route::post('lecturers/import-csv', [LecturersController::class, 'importCsv']);
         Route::get('lecturers/financial-dues', [LecturersController::class, 'getFinancialDues']);
+        Route::post('lecturers/trash', [LecturersController::class, 'trash']);
         Route::apiResource('lecturers', LecturersController::class);
         
 
@@ -237,7 +240,7 @@ Route::prefix('v1')->group(function ()
 
 
 
-        Route::apiResource('students', StudentsController::class)->only(['index']);
+        Route::apiResource('students', StudentsController::class)->only(['index', 'destroy']);
 
        
 
@@ -261,6 +264,7 @@ Route::prefix('v1')->group(function ()
 
         Route::get('groups/{studentGroup}/students', [StudentGroupsController::class, 'students']);
 
+        Route::post('student-groups/trash', [StudentGroupsController::class, 'trash']);
         Route::apiResource('student-groups', StudentGroupsController::class);
 
 

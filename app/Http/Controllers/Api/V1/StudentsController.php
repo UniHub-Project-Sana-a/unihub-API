@@ -51,4 +51,19 @@ class StudentsController extends Controller
         $students = $query->paginate($perPage);
         return response()->json($students);
     }
+
+    // DELETE /api/v1/students/{student}
+    // حذف ناعم للطالب (Soft Delete) — يدخل سلة المحذوفات ويمكن استعادته منها
+    public function destroy($student)
+    {
+        $model = Student::find((int) $student);
+
+        if (! $model) {
+            return response()->json(['message' => 'Student not found'], 404);
+        }
+
+        $model->delete(); // SoftDeletes → يضبط deleted_at
+
+        return response()->json(['message' => 'Deleted']);
+    }
 }

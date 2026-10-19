@@ -95,6 +95,75 @@ class LecturersController extends Controller
         return response()->json(['message' => 'Deleted']);
     }
 
+    /**
+     * سلة المحذوفات (Soft Delete) لأعضاء هيئة التدريس (المحاضرين).
+     * POST /api/v1/lecturers/trash
+     */
+    public function trash(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:list,restore,force_delete',
+            'college_id' => 'required|integer|min:1',
+            'type' => 'required_if:action,restore,force_delete|in:lecturers',
+            'id' => 'required_if:action,restore,force_delete|integer|min:1',
+        ]);
+
+        $collegeId = (int) $validated['college_id'];
+
+        $queries = [
+            'lecturers' => fn () => Lecturer::onlyTrashed()->where('college_id', $collegeId),
+        ];
+
+        if ($validated['action'] === 'list') {
+            $labels = [
+                'lecturers' => 'أعضاء هيئة التدريس',
+            ];
+
+            $groups = [];
+            foreach ($queries as $type => $queryFactory) {
+                $groups[] = [
+                    'type' => $type,
+                    'label' => $labels[$type],
+                    'records' => $queryFactory()
+                        ->with(['user' => fn ($q) => $q->withTrashed()])
+                        ->get()
+                        ->map(function ($record) {
+                            $data = $record->getAttributes();
+                            $data['deleted_at'] = $record->deleted_at?->toISOString();
+
+                            $name = $record->user?->full_name;
+
+                            return [
+                                'id' => $record->getKey(),
+                                'name' => $name ?: ('محاضر #' . $record->getKey()),
+                                'deleted_at' => $record->deleted_at?->toISOString(),
+                                'data' => $data,
+                            ];
+                        })->values(),
+                ];
+            }
+
+            return response()->json(['groups' => $groups]);
+        }
+
+        $type = $validated['type'];
+        $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+
+        DB::transaction(function () use ($record, $validated) {
+            if ($validated['action'] === 'restore') {
+                $record->restore();
+            } else {
+                $record->forceDelete();
+            }
+        });
+
+        return response()->json([
+            'message' => $validated['action'] === 'restore'
+                ? 'تمت استعادة العنصر بنجاح'
+                : 'تم حذف العنصر نهائياً',
+        ]);
+    }
+
     // POST /api/v1/lecturers/import-csv
     public function importCsv(Request $request)
     {

@@ -894,7 +894,6 @@ CREATE TABLE `periods` (
   `period_name` varchar(50) NOT NULL,
   `start_time` time NOT NULL,
   `end_time` time NOT NULL,
-  `session_type` varchar(10) NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL

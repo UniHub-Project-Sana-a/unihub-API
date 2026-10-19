@@ -290,7 +290,6 @@ return new class extends Migration
             $table->string('period_name', 50);
             $table->time('start_time');
             $table->time('end_time');
-            $table->string('session_type', 10);
             $table->timestamps();
             $table->softDeletes();
 

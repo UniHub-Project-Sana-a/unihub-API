@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Block extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'block_name', 'block_number', 'weight', 'credit_hours', 
         'weeks', 'type', 'program_id', 'level_id', 'description'
@@ -16,6 +19,7 @@ class Block extends Model
     {
         return $this->belongsToMany(Block::class, 'block_relations', 'block_id', 'related_block_id')
                     ->wherePivot('relation_type', 'prerequisite')
+                    ->wherePivotNull('deleted_at')
                     ->withTimestamps();
     }
 
@@ -24,6 +28,7 @@ class Block extends Model
     {
         return $this->belongsToMany(Block::class, 'block_relations', 'block_id', 'related_block_id')
                     ->wherePivot('relation_type', 'concurrent')
+                    ->wherePivotNull('deleted_at')
                     ->withTimestamps();
     }
 

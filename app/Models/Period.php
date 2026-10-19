@@ -19,7 +19,6 @@ class Period extends Model
         'period_name',
         'start_time',
         'end_time',
-        'session_type',
     ];
 
     protected $casts = [
