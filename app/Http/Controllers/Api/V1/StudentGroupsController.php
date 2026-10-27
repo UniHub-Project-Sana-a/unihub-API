@@ -86,7 +86,14 @@ private function makePlaceholderEmail(?string $academic): string
     // GET /api/v1/student-groups?college_id=&department_id=&level_id=&semester_id=&with_counts=1
     public function index(Request $request)
     {
-        $q = DB::table('student_groups as g')->whereNull('g.deleted_at');
+        $q = DB::table('student_groups as g')
+            ->leftJoin('colleges as c', 'c.college_id', '=', 'g.college_id')
+            ->leftJoin('departments as d', 'd.department_id', '=', 'g.department_id')
+            ->leftJoin('programs as p', 'p.program_id', '=', 'g.program_id')
+            ->leftJoin('levels as l', 'l.level_id', '=', 'g.level_id')
+            ->leftJoin('semesters as s', 's.semester_id', '=', 'g.semester_id')
+            ->leftJoin('blocks as b', 'b.id', '=', 'g.block_id')
+            ->whereNull('g.deleted_at');
 
         if ($request->filled('college_id'))    $q->where('g.college_id',    $request->integer('college_id'));
         if ($request->filled('department_id')) $q->where('g.department_id', $request->integer('department_id'));
@@ -103,9 +110,32 @@ private function makePlaceholderEmail(?string $academic): string
                 'sgm.group_id',
                 '=',
                 'g.group_id'
-            )->select('g.*', DB::raw('COALESCE(sgm.students_count,0) as students_count'));
+            )->select(
+                'g.*',
+                'c.college_name',
+                'd.department_name',
+                'p.program_name',
+                'l.level_number',
+                's.term_number',
+                'b.block_name',
+                'b.block_number',
+                DB::raw('COALESCE(sgm.students_count,0) as students_count')
+            );
         } else {
-            $q->select('g.*');
+            $q->select(
+                'g.*',
+                'c.college_name',
+                'd.department_name',
+                'p.program_name',
+                'l.level_number',
+                's.term_number',
+                'b.block_name',
+                'b.block_number'
+            );
+        }
+
+        if ($request->query('all') === 'true') {
+            return response()->json($q->orderBy('g.group_name')->get());
         }
 
         $perPage = (int) $request->get('per_page', 100);
@@ -587,6 +617,101 @@ private function makePlaceholderEmail(?string $academic): string
             'updated_count' => $students->count(),
             'action' => $action,
         ]);
+    }
+
+    public function assignStudentsToGroup(Request $request)
+    {
+        $data = $request->validate([
+            'group_id' => ['required', 'integer', 'exists:student_groups,group_id'],
+            'student_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'student_ids.*' => ['required', 'integer', 'distinct', 'exists:students,student_id'],
+        ]);
+
+        return DB::transaction(function () use ($data) {
+            $group = DB::table('student_groups')
+                ->where('group_id', $data['group_id'])
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$group) {
+                return response()->json(['message' => 'المجموعة غير موجودة أو محذوفة.'], 404);
+            }
+
+            $studentIds = array_map('intval', $data['student_ids']);
+            $students = DB::table('students')
+                ->whereIn('student_id', $studentIds)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->get();
+
+            if ($students->count() !== count($studentIds)) {
+                return response()->json(['message' => 'بعض الطلاب غير موجودين أو محذوفون.'], 404);
+            }
+
+            $alreadyAssigned = DB::table('student_group_members as members')
+                ->join('student_groups as groups', 'groups.group_id', '=', 'members.group_id')
+                ->whereIn('members.student_id', $studentIds)
+                ->whereNull('groups.deleted_at')
+                ->pluck('members.student_id')
+                ->unique()
+                ->values();
+
+            if ($alreadyAssigned->isNotEmpty()) {
+                return response()->json([
+                    'message' => 'لا يمكن إسناد طلاب لديهم مجموعة فعالة بالفعل. حدّث القائمة وأزل الطلاب المسندين.',
+                    'student_ids' => $alreadyAssigned,
+                ], 422);
+            }
+
+            foreach ($students as $student) {
+                if (
+                    (int) $student->college_id !== (int) $group->college_id ||
+                    (int) $student->department_id !== (int) $group->department_id ||
+                    (int) ($student->program_id ?? 0) !== (int) ($group->program_id ?? 0)
+                ) {
+                    return response()->json([
+                        'message' => 'يجب أن ينتمي الطلاب والمجموعة إلى الكلية والقسم والبرنامج نفسه.',
+                        'student_id' => $student->student_id,
+                    ], 422);
+                }
+            }
+
+            $currentCount = DB::table('student_group_members')
+                ->where('group_id', $group->group_id)
+                ->count();
+            if ($currentCount + count($studentIds) > (int) $group->max_students) {
+                return response()->json([
+                    'message' => 'عدد الطلاب المحددين يتجاوز السعة المتبقية للمجموعة.',
+                    'remaining_capacity' => max(0, (int) $group->max_students - $currentCount),
+                ], 422);
+            }
+
+            $now = now();
+            foreach ($students as $student) {
+                DB::table('students')
+                    ->where('student_id', $student->student_id)
+                    ->update([
+                        'level_id' => $group->level_id,
+                        'semester_id' => $group->semester_id,
+                        'block_id' => $group->block_id,
+                        'updated_at' => $now,
+                    ]);
+
+                DB::table('student_group_members')->insert([
+                    'student_id' => $student->student_id,
+                    'group_id' => $group->group_id,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'تم إسناد الطلاب إلى المجموعة وتحديث مسارهم الدراسي.',
+                'assigned_count' => count($studentIds),
+                'group_id' => (int) $group->group_id,
+            ]);
+        });
     }
 
     public function moveGroupPath(Request $request, $group)

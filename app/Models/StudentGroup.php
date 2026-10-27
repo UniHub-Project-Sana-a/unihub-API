@@ -50,6 +50,11 @@ class StudentGroup extends Model
         return $this->belongsTo(Department::class, 'department_id', 'department_id');
     }
 
+    public function college()
+    {
+        return $this->belongsTo(College::class, 'college_id', 'college_id');
+    }
+
     public function program()
     {
         return $this->belongsTo(Program::class, 'program_id', 'program_id');

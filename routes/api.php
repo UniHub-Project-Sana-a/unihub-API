@@ -246,6 +246,8 @@ Route::prefix('v1')->group(function ()
 
         Route::controller(StudentGroupsController::class)->prefix('student-groups')->group(function () {
 
+            Route::post('assign-students', 'assignStudentsToGroup')->middleware('permission:groups.create');
+
             Route::post('upsert-and-attach', 'upsertAndAttach');
 
             Route::post('students/bulk-move', 'bulkMoveStudents');

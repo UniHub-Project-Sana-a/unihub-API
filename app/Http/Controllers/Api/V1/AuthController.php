@@ -18,10 +18,9 @@ use Illuminate\Support\Facades\Http;
 
 use function Symfony\Component\Translation\t;
 
- // تأكد أن هذا الإشعار موجود
-
 class AuthController extends Controller
 {
+    // ====== مكان دالة login ======
     public function login(LoginRequest $request)
     {
         // 1. التحقق من المدخلات
@@ -40,13 +39,7 @@ class AuthController extends Controller
         $user->loadMissing('userType');
         $userTypeCode = $user->userType->user_type_code; // student, lecturer, admin, etc.
 
-        // if ($userTypeCode === 'student') {
-        //     return response()->json([
-        //         'message' => 'عذراً، دخول الطلاب متاح عبر تطبيق UniHub الهاتف فقط.',
-        //         'error_code' => 'STUDENT_LOGIN_FORBIDDEN'
-        //     ], 403);
-        // }
-
+        // 3. التحقق من كلمة المرور الافتراضية
         if ($request->password === '12345678') {
             $token = $user->createToken($request->device_name)->accessToken;
             
@@ -58,11 +51,18 @@ class AuthController extends Controller
             ]);
         }
     
-        // if ($userTypeCode !== 'lecturer') {
-        //     $token = $user->createToken($request->device_name)->accessToken;
-        //     return response()->json(['access_token' => $token, 'user' => new UserResource($user)]);
-        // }
+        // --- الدخول المباشر بدون OTP (تم تفعيل هذا السطر لإعطاء التوكن مباشرة) ---
+        $token = $user->createToken($request->device_name)->accessToken;
+        return response()->json([
+            'access_token' => $token, 
+            'user' => new UserResource($user)
+        ]);
 
+
+        /* =====================================================================
+         * كود الـ OTP القديم (تم تعليقه بالكامل لاستخدامه لاحقاً عند الحاجة)
+         * =====================================================================
+         
         // 4. إذا كان إداري (ليس طالب ولا محاضر) يدخل مباشرة
         if (!in_array($userTypeCode, ['lecturer', 'student'])) {
             $token = $user->createToken($request->device_name)->accessToken;
@@ -109,16 +109,18 @@ class AuthController extends Controller
             'user_id'      => $user->user_id,
             'otp_for_dev'  => (config('app.env') !== 'production') ? $otp : null,
         ]);
+        
+        ===================================================================== */
     }
     
     public function verifyOtp(Request $request)
     {
+        /*
         $data = $request->validate([
-            'verification_id' => 'required|integer|exists:otp_device_verifications,verification_id', // <-- تحقق من وجوده في العمود الصحيح
+            'verification_id' => 'required|integer|exists:otp_device_verifications,verification_id', 
             'otp_code'        => 'required|string|digits:6',
         ]);
     
-        // **التصحيح هنا**
         $otpRecord = OtpDeviceVerification::find($data['verification_id']);
     
         if (!$otpRecord || $otpRecord->is_verified || $otpRecord->expires_at->isPast()) {
@@ -145,6 +147,9 @@ class AuthController extends Controller
             'access_token' => $token,
             'user' => new UserResource($user)
         ]);
+        */
+
+        return response()->json(['message' => 'خاصية التحقق برمز OTP معطلة حالياً.'], 410);
     }
 
     public function me(Request $request)
@@ -170,13 +175,11 @@ class AuthController extends Controller
             'refresh_token' => 'required|string',
         ]);
 
-        // إرسال طلب داخلي إلى مسار التوكن الخاص بـ Passport
-        // هذا يحاكي طلب العميل للحصول على توكن جديد باستخدام الـ refresh_token
         $response = Http::asForm()->post(config('app.url') . '/oauth/token', [
             'grant_type' => 'refresh_token',
             'refresh_token' => $request->refresh_token,
-            'client_id' => config('passport.personal_access_client.id'), // أو client_id الخاص بالتطبيق
-            'client_secret' => config('passport.personal_access_client.secret'), // Secret الخاص بالعميل
+            'client_id' => config('passport.personal_access_client.id'),
+            'client_secret' => config('passport.personal_access_client.secret'),
             'scope' => '',
         ]);
 
@@ -190,7 +193,7 @@ class AuthController extends Controller
     public function changePassword(Request $request)
     {
         $request->validate([
-            'password' => 'required|confirmed|min:8', // يمكنك إضافة شروط السياسة هنا
+            'password' => 'required|confirmed|min:8',
         ]);
 
         $user = $request->user();

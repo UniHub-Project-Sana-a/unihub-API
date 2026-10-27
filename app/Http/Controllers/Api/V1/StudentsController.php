@@ -24,6 +24,12 @@ class StudentsController extends Controller
 
         $query = Student::query()
             ->with(['user:user_id,full_name,email,phone,academic_number,gender'])
+            ->with(['college:college_id,college_name', 'department:department_id,department_name', 'program:program_id,program_name', 'level:level_id,level_number', 'semester:semester_id,term_number', 'block:id,block_name,block_number'])
+            ->with(['groups' => function ($groupQuery) {
+                $groupQuery
+                    ->whereNull('student_groups.deleted_at')
+                    ->with(['college:college_id,college_name', 'department:department_id,department_name', 'program:program_id,program_name', 'level:level_id,level_number', 'semester:semester_id,term_number', 'block:id,block_name,block_number']);
+            }])
             ->when($collegeId, fn($qq) => $qq->where('college_id', (int)$collegeId))
             ->when($deptId, fn($qq) => $qq->where('department_id', (int)$deptId))
             ->when($programId, fn($qq) => $qq->where('program_id', (int)$programId))

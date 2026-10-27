@@ -15,13 +15,19 @@ class ClassroomsController extends Controller {
     {
         $query = Classroom::query()->with(['building', 'college']);
     
-        // الفلترة حسب الكلية: مباشرة على القاعة أو عبر علاقة المبنى (للقاعات المشتركة قديماً)
+        // اعرض قاعات الكلية، القاعات داخل مبانيها، والقاعات العامة داخل مبانٍ عامة مشتركة.
         if ($request->filled('college_id')) {
             $collegeId = (int)$request->college_id;
             $query->where(function ($q) use ($collegeId) {
-                $q->where('college_id', $collegeId)
+                $q->where('classrooms.college_id', $collegeId)
                   ->orWhereHas('building', function ($b) use ($collegeId) {
                       $b->where('college_id', $collegeId);
+                  })
+                  ->orWhere(function ($shared) {
+                      $shared->whereNull('classrooms.college_id')
+                          ->whereHas('building', function ($building) {
+                              $building->whereNull('college_id');
+                          });
                   });
             });
         }
@@ -48,7 +54,7 @@ class ClassroomsController extends Controller {
     }
     public function update(UpdateClassroomRequest $request, Classroom $classroom) {
         $classroom->update($request->validated());
-        return response()->json($classroom->load(['building', 'college']));
+        return response()->json($classroom->refresh()->load(['building', 'college']));
     }
     public function destroy(Classroom $classroom) {
         $classroom->delete();
