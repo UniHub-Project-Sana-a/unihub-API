@@ -134,7 +134,7 @@ private function makePlaceholderEmail(?string $academic): string
             );
         }
 
-        if ($request->query('all') === 'true') {
+        if ($request->boolean('all')) {
             return response()->json($q->orderBy('g.group_name')->get());
         }
 
@@ -649,38 +649,18 @@ private function makePlaceholderEmail(?string $academic): string
                 return response()->json(['message' => 'بعض الطلاب غير موجودين أو محذوفون.'], 404);
             }
 
-            $alreadyAssigned = DB::table('student_group_members as members')
-                ->join('student_groups as groups', 'groups.group_id', '=', 'members.group_id')
-                ->whereIn('members.student_id', $studentIds)
-                ->whereNull('groups.deleted_at')
-                ->pluck('members.student_id')
-                ->unique()
-                ->values();
-
-            if ($alreadyAssigned->isNotEmpty()) {
-                return response()->json([
-                    'message' => 'لا يمكن إسناد طلاب لديهم مجموعة فعالة بالفعل. حدّث القائمة وأزل الطلاب المسندين.',
-                    'student_ids' => $alreadyAssigned,
-                ], 422);
-            }
-
-            foreach ($students as $student) {
-                if (
-                    (int) $student->college_id !== (int) $group->college_id ||
-                    (int) $student->department_id !== (int) $group->department_id ||
-                    (int) ($student->program_id ?? 0) !== (int) ($group->program_id ?? 0)
-                ) {
-                    return response()->json([
-                        'message' => 'يجب أن ينتمي الطلاب والمجموعة إلى الكلية والقسم والبرنامج نفسه.',
-                        'student_id' => $student->student_id,
-                    ], 422);
-                }
-            }
+            $alreadyInGroup = DB::table('student_group_members')
+                ->where('group_id', $group->group_id)
+                ->whereIn('student_id', $studentIds)
+                ->pluck('student_id')
+                ->map(fn ($studentId) => (int) $studentId)
+                ->all();
+            $newStudentIds = array_values(array_diff($studentIds, $alreadyInGroup));
 
             $currentCount = DB::table('student_group_members')
                 ->where('group_id', $group->group_id)
                 ->count();
-            if ($currentCount + count($studentIds) > (int) $group->max_students) {
+            if ($currentCount + count($newStudentIds) > (int) $group->max_students) {
                 return response()->json([
                     'message' => 'عدد الطلاب المحددين يتجاوز السعة المتبقية للمجموعة.',
                     'remaining_capacity' => max(0, (int) $group->max_students - $currentCount),
@@ -688,18 +668,9 @@ private function makePlaceholderEmail(?string $academic): string
             }
 
             $now = now();
-            foreach ($students as $student) {
-                DB::table('students')
-                    ->where('student_id', $student->student_id)
-                    ->update([
-                        'level_id' => $group->level_id,
-                        'semester_id' => $group->semester_id,
-                        'block_id' => $group->block_id,
-                        'updated_at' => $now,
-                    ]);
-
-                DB::table('student_group_members')->insert([
-                    'student_id' => $student->student_id,
+            foreach ($newStudentIds as $studentId) {
+                DB::table('student_group_members')->insertOrIgnore([
+                    'student_id' => $studentId,
                     'group_id' => $group->group_id,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -707,8 +678,9 @@ private function makePlaceholderEmail(?string $academic): string
             }
 
             return response()->json([
-                'message' => 'تم إسناد الطلاب إلى المجموعة وتحديث مسارهم الدراسي.',
-                'assigned_count' => count($studentIds),
+                'message' => 'تم إسناد الطلاب إلى المجموعة.',
+                'assigned_count' => count($newStudentIds),
+                'already_in_group' => count($alreadyInGroup),
                 'group_id' => (int) $group->group_id,
             ]);
         });
@@ -783,19 +755,6 @@ private function makePlaceholderEmail(?string $academic): string
         ];
 
         DB::table('student_groups')->where('group_id', (int) $group)->update($updateData);
-
-        $memberIds = DB::table('student_group_members')->where('group_id', (int) $group)->pluck('student_id');
-        if ($memberIds->isNotEmpty()) {
-            DB::table('students')->whereIn('student_id', $memberIds)->update([
-                'college_id' => $target['college_id'],
-                'department_id' => $target['department_id'],
-                'program_id' => $target['program_id'] ?? null,
-                'level_id' => $target['level_id'] ?? null,
-                'semester_id' => $target['semester_id'] ?? null,
-                'block_id' => $target['block_id'] ?? null,
-                'updated_at' => now(),
-            ]);
-        }
 
         $updatedGroup = DB::table('student_groups')->where('group_id', (int) $group)->first();
 
@@ -1017,77 +976,6 @@ private function makePlaceholderEmail(?string $academic): string
         return response()->json(['deleted' => (bool)$deleted]);
     }
 
-    private function studentMatchesGroupPath(object $student, object $group): bool
-    {
-        if ((int) ($student->college_id ?? 0) !== (int) ($group->college_id ?? 0)) {
-            return false;
-        }
-
-        if ((int) ($student->department_id ?? 0) !== (int) ($group->department_id ?? 0)) {
-            return false;
-        }
-
-        if (!is_null($group->program_id) && !is_null($student->program_id) && (int) $student->program_id !== (int) $group->program_id) {
-            return false;
-        }
-
-        if (!is_null($group->program_id) && is_null($student->program_id)) {
-            return false;
-        }
-
-        if (!is_null($group->level_id) && !is_null($student->level_id) && (int) $student->level_id !== (int) $group->level_id) {
-            return false;
-        }
-
-        if (!is_null($group->level_id) && is_null($student->level_id)) {
-            return false;
-        }
-
-        if (!is_null($group->semester_id) && !is_null($student->semester_id) && (int) $student->semester_id !== (int) $group->semester_id) {
-            return false;
-        }
-
-        if (!is_null($group->semester_id) && is_null($student->semester_id)) {
-            return false;
-        }
-
-        if (!is_null($group->block_id) && !is_null($student->block_id) && (int) $student->block_id !== (int) $group->block_id) {
-            return false;
-        }
-
-        if (!is_null($group->block_id) && is_null($student->block_id)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function studentAlreadyBelongsToDifferentProgram(int $studentId, int $groupId): bool
-    {
-        $conflict = DB::table('student_group_members as sgm')
-            ->join('student_groups as sg', 'sg.group_id', '=', 'sgm.group_id')
-            ->where('sgm.student_id', $studentId)
-            ->where('sg.group_id', '!=', $groupId)
-            ->select('sg.program_id', 'sg.level_id', 'sg.semester_id', 'sg.block_id', 'sg.college_id', 'sg.department_id')
-            ->first();
-
-        if (!$conflict) {
-            return false;
-        }
-
-        $group = DB::table('student_groups')->where('group_id', $groupId)->first();
-        if (!$group) {
-            return false;
-        }
-
-        return (int) ($conflict->program_id ?? 0) !== (int) ($group->program_id ?? 0)
-            || (int) ($conflict->college_id ?? 0) !== (int) ($group->college_id ?? 0)
-            || (int) ($conflict->department_id ?? 0) !== (int) ($group->department_id ?? 0)
-            || (int) ($conflict->level_id ?? 0) !== (int) ($group->level_id ?? 0)
-            || (int) ($conflict->semester_id ?? 0) !== (int) ($group->semester_id ?? 0)
-            || (int) ($conflict->block_id ?? 0) !== (int) ($group->block_id ?? 0);
-    }
-
     // POST /api/v1/student-groups/import-csv (form-data: file, group_id)
     public function importCsv(\Illuminate\Http\Request $request)
     {
@@ -1229,7 +1117,8 @@ private function makePlaceholderEmail(?string $academic): string
         $restoredUsers = 0; 
         $createdStudents = 0; 
         $restoredStudents = 0; 
-        $attached = 0; 
+        $attached = 0;
+        $alreadyInGroup = 0;
         $skippedMissing = 0; 
         $skippedConflicts = 0; 
         $errors = [];
@@ -1417,46 +1306,19 @@ private function makePlaceholderEmail(?string $academic): string
                 }
             }
     
-            // 6) التحقق من تطابق المسار
-            if (!$this->studentMatchesGroupPath($student, $group) || 
-                $this->studentAlreadyBelongsToDifferentProgram((int) $student->student_id, (int) $groupId)) {
-                
-                $skippedConflicts++;
-                $errors[] = [
-                    'row_number' => $rowIndex + 1,
-                    'reason' => 'student_path_mismatch',
-                    'student_id' => $student->student_id,
-                    'academic_number' => $academic,
-                    'full_name' => $fullName,
-                    'student_path' => [
-                        'college_id' => $student->college_id ?? null,
-                        'department_id' => $student->department_id ?? null,
-                        'program_id' => $student->program_id ?? null,
-                        'level_id' => $student->level_id ?? null,
-                        'semester_id' => $student->semester_id ?? null,
-                        'block_id' => $student->block_id ?? null,
-                    ],
-                    'group_path' => [
-                        'college_id' => $group->college_id ?? null,
-                        'department_id' => $group->department_id ?? null,
-                        'program_id' => $group->program_id ?? null,
-                        'level_id' => $group->level_id ?? null,
-                        'semester_id' => $group->semester_id ?? null,
-                        'block_id' => $group->block_id ?? null,
-                    ],
-                ];
-                continue;
-            }
-    
-            // 7) ربط الطالب بالمجموعة
+            // 6) ربط الطالب بالمجموعة دون تغيير مساره الأكاديمي الأساسي
             try {
-                \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
+                $inserted = \Illuminate\Support\Facades\DB::table('student_group_members')->insertOrIgnore([
                     'student_id' => $student->student_id,
                     'group_id'   => $groupId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-                $attached++;
+                if ($inserted > 0) {
+                    $attached++;
+                } else {
+                    $alreadyInGroup++;
+                }
             } catch (\Throwable $e) {
                 Log::error('Attach failed', [
                     'error' => $e->getMessage(),
@@ -1466,15 +1328,16 @@ private function makePlaceholderEmail(?string $academic): string
         }
     
         // 7) النتيجة
-        if ($skippedConflicts > 0 && $attached === 0 && $createdStudents === 0 && $createdUsers === 0 && $restoredStudents === 0 && $restoredUsers === 0) {
+        if ($skippedConflicts > 0 && $attached === 0 && $alreadyInGroup === 0 && $createdStudents === 0 && $createdUsers === 0 && $restoredStudents === 0 && $restoredUsers === 0) {
             return response()->json([
                 'status'             => 'error',
-                'message'            => 'تعذر إضافة أي طالب إلى هذه المجموعة. السبب الشائع هو أن الطالب مسجل في برنامج/مسار مختلف، أو أن البيانات ناقصة.',
+                'message'            => 'تعذر إضافة أي طالب إلى هذه المجموعة. تحقق من بيانات الملف وسجلات الطلاب.',
                 'created_users'      => 0,
                 'restored_users'     => 0,
                 'created_students'   => 0,
                 'restored_students'  => 0,
                 'attached_to_group'  => 0,
+                'already_in_group'   => 0,
                 'skipped_missing'    => $skippedMissing,
                 'skipped_conflicts'  => $skippedConflicts,
                 'errors'             => array_slice($errors, 0, 10),
@@ -1488,6 +1351,7 @@ private function makePlaceholderEmail(?string $academic): string
             'created_students'   => $createdStudents,
             'restored_students'  => $restoredStudents,
             'attached_to_group'  => $attached,
+            'already_in_group'   => $alreadyInGroup,
             'skipped_missing'    => $skippedMissing,
             'skipped_conflicts'  => $skippedConflicts,
             'errors'             => array_slice($errors, 0, 10),
