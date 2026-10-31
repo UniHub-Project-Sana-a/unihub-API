@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Http\Controllers\Api\V1;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\Course\StoreCourseRequest;
 use App\Http\Requests\V1\Course\UpdateCourseRequest;
@@ -9,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class CoursesController extends Controller
 {
@@ -128,7 +131,7 @@ class CoursesController extends Controller
             $prerequisites = DB::table('course_prerequisites as cp')
                 ->join('courses as c', 'cp.prerequisite_course_id', '=', 'c.course_id')
                 ->where('cp.course_id', $course->course_id)
-                ->where('cp.type', '!=', 'corequisite') // ✅ احصل على كل شيء ما عدا corequisite
+                ->where('cp.type', '!=', 'corequisite') 
                 ->select('c.course_id as id', 'c.course_code', 'c.course_name')
                 ->distinct()
                 ->get();
@@ -141,6 +144,14 @@ class CoursesController extends Controller
                 ->distinct()
                 ->get();
     
+            // معالجة وتنسيق تاريخ الاعتماد بأمان تام
+            $approvalDate = null;
+            if ($course->approval_date) {
+                $approvalDate = is_string($course->approval_date) 
+                    ? Carbon::parse($course->approval_date)->format('Y-m-d') 
+                    : $course->approval_date->format('Y-m-d');
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -154,7 +165,7 @@ class CoursesController extends Controller
                     'notes' => $course->notes,
                     'is_active' => $course->is_active,
                     'is_approved' => $course->is_approved,
-                    'approval_date' => $course->approval_date?->format('Y-m-d'),
+                    'approval_date' => $approvalDate,
                     'approved_by' => $course->approved_by,
                     'specification_status' => $course->specification_status ?? 'draft',
                     
@@ -216,6 +227,13 @@ class CoursesController extends Controller
      */
     private function formatCourseForSpecification($course): array
     {
+        $approvalDate = null;
+        if ($course->approval_date) {
+            $approvalDate = is_string($course->approval_date) 
+                ? Carbon::parse($course->approval_date)->format('Y-m-d') 
+                : $course->approval_date->format('Y-m-d');
+        }
+
         return [
             // ==================== البيانات الأساسية ====================
             'id' => $course->course_id,
@@ -230,7 +248,7 @@ class CoursesController extends Controller
             
             // ==================== بيانات الاعتماد ====================
             'is_approved' => $course->is_approved,
-            'approval_date' => $course->approval_date?->format('Y-m-d'),
+            'approval_date' => $approvalDate,
             'approved_by' => $course->approved_by,
 
             // ==================== المؤسسات التعليمية ====================
@@ -266,7 +284,7 @@ class CoursesController extends Controller
             ] : null,
 
             // ==================== أجزاء المقرر ====================
-            'course_parts' => $course->courseParts->map(function($part) {
+            'course_parts' => relation_loaded($course, 'courseParts') && $course->courseParts ? $course->courseParts->map(function($part) {
                 return [
                     'id' => $part->part_id,
                     'name' => $part->name,
@@ -277,7 +295,7 @@ class CoursesController extends Controller
                     'clinical_hours' => (int)$part->clinical_hours,
                     'total_hours' => (int)($part->theoretical_hours + $part->practical_hours + $part->exercise_hours + $part->seminar_hours + $part->clinical_hours)
                 ];
-            })->toArray(),
+            })->toArray() : [],
 
             // ==================== المتطلبات ====================
             'prerequisites' => $course->prerequisites ? $course->prerequisites->map(function($prereq) {
@@ -304,7 +322,7 @@ class CoursesController extends Controller
             ] : null,
 
             // ==================== مخرجات التعلم ====================
-            'learning_outcomes' => $course->learningOutcomes->map(function($outcome) {
+            'learning_outcomes' => relation_loaded($course, 'learningOutcomes') && $course->learningOutcomes ? $course->learningOutcomes->map(function($outcome) {
                 return [
                     'id' => $outcome->clo_id,
                     'code' => $outcome->code,
@@ -312,7 +330,7 @@ class CoursesController extends Controller
                     'description' => $outcome->description,
                     'weight' => (float)$outcome->weight
                 ];
-            })->toArray()
+            })->toArray() : []
         ];
     }
 
@@ -329,8 +347,8 @@ class CoursesController extends Controller
         // ✅ تحديث المتطلبات السابقة
         if (isset($data['prerequisites'])) {
             CoursePrerequisite::where('course_id', $course->course_id)
-                              ->where('type', 'prerequisite')
-                              ->delete();
+                                        ->where('type', 'prerequisite')
+                                        ->delete();
             
             foreach ($data['prerequisites'] as $prereqId) {
                 CoursePrerequisite::create([
@@ -344,8 +362,8 @@ class CoursesController extends Controller
         // ✅ تحديث المتطلبات المصاحبة
         if (isset($data['corequisites'])) {
             CoursePrerequisite::where('course_id', $course->course_id)
-                              ->where('type', 'corequisite')
-                              ->delete();
+                                        ->where('type', 'corequisite')
+                                        ->delete();
 
             // إضافة المتطلبات الجديدة
             foreach ($data['corequisites'] as $coreqId) {

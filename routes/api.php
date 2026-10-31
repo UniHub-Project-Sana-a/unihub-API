@@ -271,6 +271,7 @@ Route::prefix('v1')->group(function ()
 
 
 
+        Route::post('timetable/trash', [TimetableController::class, 'trash']);
         Route::apiResource('timetable', TimetableController::class);
 
 
