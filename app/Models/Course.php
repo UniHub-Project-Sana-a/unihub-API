@@ -42,6 +42,7 @@ class Course extends Model
         'weight' => 'decimal:2',
         'credit_hours' => 'integer',
         'is_approved' => 'boolean',
+        'approval_date' => 'date',
     ];
 
     protected $hidden = [

@@ -28,6 +28,15 @@ class CoursesController extends Controller
             'corequisites'
         ]);
 
+        // ✅ البحث بالاسم أو كود المقرر
+        if ($request->filled('q')) {
+            $q = $request->query('q');
+            $query->where(function ($sub) use ($q) {
+                $sub->where('course_name', 'like', "%{$q}%")
+                    ->orWhere('course_code', 'like', "%{$q}%");
+            });
+        }
+
         // ✅ فلترة حسب الكلية
         if ($request->has('college_id')) {
             $query->where('college_id', $request->college_id);
@@ -154,7 +163,7 @@ class CoursesController extends Controller
                     'notes' => $course->notes,
                     'is_active' => $course->is_active,
                     'is_approved' => $course->is_approved,
-                    'approval_date' => $course->approval_date?->format('Y-m-d'),
+                    'approval_date' => $course->approval_date ? substr((string)$course->approval_date, 0, 10) : null,
                     'approved_by' => $course->approved_by,
                     'specification_status' => $course->specification_status ?? 'draft',
                     
@@ -230,7 +239,7 @@ class CoursesController extends Controller
             
             // ==================== بيانات الاعتماد ====================
             'is_approved' => $course->is_approved,
-            'approval_date' => $course->approval_date?->format('Y-m-d'),
+            'approval_date' => $course->approval_date ? substr((string)$course->approval_date, 0, 10) : null,
             'approved_by' => $course->approved_by,
 
             // ==================== المؤسسات التعليمية ====================
@@ -384,5 +393,128 @@ class CoursesController extends Controller
         return response()->json([
             'message' => 'تم حذف المقرر بنجاح'
         ]);
+    }
+
+    /**
+     * بنك المتطلبات الجامعية (المقررات العامة المشتركة)
+     */
+    public function universityRequirements(Request $request): JsonResponse
+    {
+        // قائمة المتطلبات الجامعية الافتراضية المعتمدة
+        $defaultRequirements = [
+            [
+                'course_id' => 'def_1',
+                'course_code' => 'ARAB101',
+                'course_name' => 'اللغة العربية (1)',
+                'credit_hours' => 2,
+                'course_parts' => [
+                    ['name' => 'نظري', 'actual_hours' => 2, 'rate' => 1.0]
+                ],
+                'weight' => 0,
+                'category' => 'متطلب جامعة',
+                'teaching_language' => 'العربية',
+                'notes' => 'متطلب جامعي عام لجميع الأقسام'
+            ],
+            [
+                'course_id' => 'def_2',
+                'course_code' => 'ENG101',
+                'course_name' => 'اللغة الإنجليزية (1)',
+                'credit_hours' => 2,
+                'course_parts' => [
+                    ['name' => 'نظري', 'actual_hours' => 2, 'rate' => 1.0]
+                ],
+                'weight' => 0,
+                'category' => 'متطلب جامعة',
+                'teaching_language' => 'الإنجليزية',
+                'notes' => 'متطلب جامعي عام لجميع الأقسام'
+            ],
+            [
+                'course_id' => 'def_3',
+                'course_code' => 'ISLM101',
+                'course_name' => 'الثقافة الإسلامية',
+                'credit_hours' => 2,
+                'course_parts' => [
+                    ['name' => 'نظري', 'actual_hours' => 2, 'rate' => 1.0]
+                ],
+                'weight' => 0,
+                'category' => 'متطلب جامعة',
+                'teaching_language' => 'العربية',
+                'notes' => 'متطلب جامعي عام لجميع الأقسام'
+            ],
+            [
+                'course_id' => 'def_4',
+                'course_code' => 'COMP101',
+                'course_name' => 'مهارات الحاسوب وتقنية المعلومات',
+                'credit_hours' => 3,
+                'course_parts' => [
+                    ['name' => 'نظري', 'actual_hours' => 2, 'rate' => 1.0],
+                    ['name' => 'عملي', 'actual_hours' => 2, 'rate' => 0.5]
+                ],
+                'weight' => 0,
+                'category' => 'متطلب جامعة',
+                'teaching_language' => 'العربية',
+                'notes' => 'متطلب جامعي عام لجميع الأقسام'
+            ],
+            [
+                'course_id' => 'def_5',
+                'course_code' => 'PAL101',
+                'course_name' => 'القضية الفلسطينية والصراع العربي الصهيوني',
+                'credit_hours' => 2,
+                'course_parts' => [
+                    ['name' => 'نظري', 'actual_hours' => 2, 'rate' => 1.0]
+                ],
+                'weight' => 0,
+                'category' => 'متطلب جامعة',
+                'teaching_language' => 'العربية',
+                'notes' => 'متطلب جامعي عام لجميع الأقسام'
+            ],
+            [
+                'course_id' => 'def_6',
+                'course_code' => 'COMM101',
+                'course_name' => 'مهارات الاتصال والقيادة',
+                'credit_hours' => 2,
+                'course_parts' => [
+                    ['name' => 'نظري', 'actual_hours' => 2, 'rate' => 1.0]
+                ],
+                'weight' => 0,
+                'category' => 'متطلب جامعة',
+                'teaching_language' => 'العربية',
+                'notes' => 'متطلب جامعي عام لجميع الأقسام'
+            ]
+        ];
+
+        // جلب المقررات المخزنة في قاعدة البيانات المصنفة كـ "متطلب جامعة"
+        $dbRequirements = Course::where('category', 'متطلب جامعة')
+            ->select('course_id', 'course_name', 'course_code', 'credit_hours', 'course_parts', 'weight', 'teaching_language', 'category', 'notes')
+            ->orderBy('course_name')
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'course_id' => $c->course_id,
+                    'course_code' => $c->course_code,
+                    'course_name' => $c->course_name,
+                    'credit_hours' => $c->credit_hours,
+                    'course_parts' => is_array($c->course_parts) ? $c->course_parts : json_decode($c->course_parts ?? '[]', true),
+                    'weight' => (float)$c->weight,
+                    'category' => 'متطلب جامعة',
+                    'teaching_language' => $c->teaching_language ?? 'العربية',
+                    'notes' => $c->notes ?? ''
+                ];
+            })
+            ->toArray();
+
+        // دمج المتطلبات بحيث لا تتكرر الأكواد
+        $all = [];
+        $seenCodes = [];
+
+        foreach (array_merge($dbRequirements, $defaultRequirements) as $item) {
+            $code = strtoupper(trim($item['course_code']));
+            if (!isset($seenCodes[$code])) {
+                $seenCodes[$code] = true;
+                $all[] = $item;
+            }
+        }
+
+        return response()->json($all);
     }
 }

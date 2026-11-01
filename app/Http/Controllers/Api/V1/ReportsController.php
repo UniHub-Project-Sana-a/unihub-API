@@ -112,14 +112,15 @@ class ReportsController extends Controller
                         ->pluck('timetable_id');
 
                     // 2. حساب إحصائيات الجلسات (مع تطبيق فلتر الشهر)
+                    $nowStr = Carbon::now()->toDateTimeString();
                     $stats = DB::table('lecture_sessions')
                         ->whereIn('timetable_id', $timetableIds)
                         ->tap($applyMonthFilter)
                         ->selectRaw('
                             COUNT(*) as approved,
                             SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as delivered,
-                            SUM(CASE WHEN status = 0 AND session_date < NOW() THEN 1 ELSE 0 END) as absences
-                        ')
+                            SUM(CASE WHEN status = 0 AND session_date < ? THEN 1 ELSE 0 END) as absences
+                        ', [$nowStr])
                         ->first();
 
                     // 3. حساب الساعات الفعلية (Total Hours) بدقة

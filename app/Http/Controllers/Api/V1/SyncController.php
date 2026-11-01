@@ -35,12 +35,17 @@ class SyncController extends Controller
     private const GENERAL_KEYWORDS = ['عام', 'shared', 'general', 'مشترك'];
 
     /**
-     * يحاول مطابقة/إنشاء الكلية من اسمها النصي، مع رفض القيم الرقمية (خطأ ربط بيانات) والتعامل مع الكلمات العامة كأصل مشترك بلا كلية.
+     * يحاول مطابقة الكلية من اسمها النصي أو المعرف أو نطاق الكلية الحالي، دون إنشاء أي كلية جديدة تلقائياً.
      *
      * @return array{ok: bool, college_id: int|null}
      */
-    private function resolveCollegeId($collegeNameRaw, $legacyCollegeId, string $roomLabel, array &$summary): array
+    private function resolveCollegeId($collegeNameRaw, $legacyCollegeId, string $roomLabel, array &$summary, ?int $scopeCollegeId = null): array
     {
+        // إذا كان هناك نطاق كلية محدد ومصرح به من الواجهة
+        if ($scopeCollegeId && College::where('college_id', $scopeCollegeId)->exists()) {
+            return ['ok' => true, 'college_id' => $scopeCollegeId];
+        }
+
         // الحقل غير موجود إطلاقاً: نعتمد على معرف الكلية القديم إن كان صالحاً
         if ($collegeNameRaw === null) {
             if (!empty($legacyCollegeId) && College::where('college_id', $legacyCollegeId)->exists()) {
@@ -58,18 +63,33 @@ class SyncController extends Controller
         }
 
         if (is_numeric($raw)) {
-            $summary['skipped_invalid_college_mapping']++;
-            $summary['errors'][] = [
-                'room_code' => $roomLabel,
-                'error_type' => 'Invalid Data Mapping',
-                'message' => "اسم الكلية غير صالح (يظهر كرقم: {$raw}). يرجى إبلاغ مطور التطبيق بتعديل حقل collegeName ليرسل اسم الكلية الفعلي بدلاً من رقمها.",
-                'dev_note' => 'Field collegeName is numeric. Expected string. Check Mobile JSON Export Mapping.',
-            ];
-            return ['ok' => false, 'college_id' => null];
+            if (College::where('college_id', (int)$raw)->exists()) {
+                return ['ok' => true, 'college_id' => (int)$raw];
+            }
+            // إذا كان الرقم غير موجود، نتحقق من الكلية القديمة أو الأولى
+            if (!empty($legacyCollegeId) && College::where('college_id', $legacyCollegeId)->exists()) {
+                return ['ok' => true, 'college_id' => $legacyCollegeId];
+            }
+            return ['ok' => true, 'college_id' => College::value('college_id')];
         }
 
-        $college = College::firstOrCreate(['college_name' => $raw]);
-        return ['ok' => true, 'college_id' => $college->college_id];
+        // البحث في الكليات الموجودة (دون إنشاء كلية جديدة نهائياً)
+        $college = College::where('college_name', $raw)
+            ->orWhere('college_name', 'like', "%{$raw}%")
+            ->orWhere('college_code', $raw)
+            ->first();
+
+        if ($college) {
+            return ['ok' => true, 'college_id' => $college->college_id];
+        }
+
+        if (!empty($legacyCollegeId) && College::where('college_id', $legacyCollegeId)->exists()) {
+            return ['ok' => true, 'college_id' => $legacyCollegeId];
+        }
+
+        // في حال عدم التطابق، نربط بالكلية الأساسية الحالية لمنع تشتت القاعات
+        $fallbackCollegeId = College::value('college_id');
+        return ['ok' => true, 'college_id' => $fallbackCollegeId];
     }
 
     /**
@@ -118,7 +138,7 @@ class SyncController extends Controller
                 }
 
                 $collegeNameRaw = $item['collegeName'] ?? $item['college_name'] ?? null;
-                $resolved = $this->resolveCollegeId($collegeNameRaw, $item['college_id'] ?? null, $label, $summary);
+                $resolved = $this->resolveCollegeId($collegeNameRaw, $item['college_id'] ?? null, $label, $summary, $scopeCollegeId ? (int)$scopeCollegeId : null);
                 if (!$resolved['ok']) {
                     continue;
                 }
@@ -131,7 +151,7 @@ class SyncController extends Controller
                         ['building_code' => $buildingCode],
                         [
                             'building_name' => $name !== '' ? $name : $code,
-                            'college_id' => $resolved['college_id'],
+                            'college_id' => $resolved['college_id'] ?? ($scopeCollegeId ? (int)$scopeCollegeId : null),
                             'floors_count' => $item['floors_count'] ?? 1,
                         ]
                     );
@@ -162,18 +182,20 @@ class SyncController extends Controller
                 $localBuildingKey = $item['building_id'] ?? null;
                 $buildingId = $buildingMap[$localBuildingKey] ?? $localBuildingKey;
 
-                if (!$buildingId || !Building::where('building_id', $buildingId)->exists()) {
+                $currentBuilding = Building::find($buildingId);
+                if (!$currentBuilding) {
                     $summary['skipped_unapproved_buildings']++;
                     continue;
                 }
 
-                // مرحلة التحقق ومطابقة/إنشاء الكلية بالاسم الفعلي، مع دعم الأصول العامة/المشتركة
+                // مرحلة التحقق ومطابقة الكلية بالاسم الفعلي أو وراثة كلية المبنى/النطاق
+                $fallbackScope = $scopeCollegeId ? (int)$scopeCollegeId : ($currentBuilding->college_id ?? null);
                 $collegeNameRaw = $item['collegeName'] ?? $item['college_name'] ?? null;
-                $resolved = $this->resolveCollegeId($collegeNameRaw, $item['college_id'] ?? null, $roomLabel, $summary);
+                $resolved = $this->resolveCollegeId($collegeNameRaw, $item['college_id'] ?? null, $roomLabel, $summary, $fallbackScope);
                 if (!$resolved['ok']) {
                     continue;
                 }
-                $collegeId = $resolved['college_id'];
+                $collegeId = $resolved['college_id'] ?? $currentBuilding->college_id;
 
                 // استبعاد القاعات خارج نطاق الكلية الحالية عند وجود سياق مزامنة محدد
                 if ($scopeCollegeId && !empty($collegeId) && (int)$collegeId !== (int)$scopeCollegeId) {

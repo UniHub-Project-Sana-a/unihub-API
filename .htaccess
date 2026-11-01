@@ -1,0 +1,28 @@
+# Protect root directory if web server root points to unihub-API instead of public/
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Deny access to sensitive files and directories
+    RewriteRule ^\.env - [F,L,NC]
+    RewriteRule ^database/.*\.sqlite$ - [F,L,NC]
+    RewriteRule ^storage/logs/.* - [F,L,NC]
+    RewriteRule ^composer\.(json|lock)$ - [F,L,NC]
+    RewriteRule ^package(-lock)?\.json$ - [F,L,NC]
+
+    # Route requests to public/ if not already in public/
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Block access to hidden files (.env, .git, etc.)
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block direct access to sqlite databases
+<FilesMatch "\.sqlite$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+

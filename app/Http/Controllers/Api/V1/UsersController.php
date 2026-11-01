@@ -49,8 +49,14 @@ class UsersController extends Controller
                         ->orWhere('academic_number', 'like', "%$q%"); 
                 });
             })
-            ->when($collegeId, function ($query_college) use ($collegeId) {
-                $query_college->where('college_id', (int)$collegeId);
+            ->when($collegeId, function ($query_college) use ($collegeId, $request) {
+                if ($request->boolean('include_unassigned')) {
+                    $query_college->where(function ($q) use ($collegeId) {
+                        $q->where('college_id', (int)$collegeId)->orWhereNull('college_id');
+                    });
+                } else {
+                    $query_college->where('college_id', (int)$collegeId);
+                }
             })
             ->when($userTypeCode, function ($query_type) use ($userTypeCode) {
                 $query_type->whereHas('userType', function ($sub_query_type) use ($userTypeCode) {
@@ -88,15 +94,25 @@ class UsersController extends Controller
         return new \App\Http\Resources\V1\UserResource($u);
     }
     
-    public function destroy(int $user)
+    public function destroy(Request $request, int $user)
     {
-        $u = \App\Models\User::findOrFail($user);
-        $u->delete(); // Soft delete
+        $u = \App\Models\User::withTrashed()->findOrFail($user);
+
         // إلغاء كل التوكنات
         if (method_exists($u, 'tokens')) {
             $u->tokens()->delete();
         }
-        return response()->json(['message'=>'User deleted']);
+        \Illuminate\Support\Facades\DB::table('oauth_access_tokens')->where('user_id', $u->user_id)->delete();
+
+        if ($request->boolean('soft')) {
+            $u->delete();
+            return response()->json(['message' => 'User soft deleted']);
+        }
+
+        // الحذف النهائي الفعلي من قاعدة البيانات
+        $u->forceDelete();
+
+        return response()->json(['message' => 'User permanently deleted from database']);
     }
     
     public function restore(int $user)

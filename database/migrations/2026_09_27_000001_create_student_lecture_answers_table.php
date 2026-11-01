@@ -9,11 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('student_lecture_answers', function (Blueprint $table) {
-            $table->engine = 'InnoDB';
-            $table->charset = 'utf8mb4';
-            $table->collation = 'utf8mb4_unicode_ci';
-
-            $table->integer('id', true);
+            $table->id();
             $table->integer('session_id');
             $table->integer('student_id');
             $table->integer('question_id');
@@ -21,7 +17,6 @@ return new class extends Migration
             $table->boolean('is_correct')->nullable()->default(false);
             $table->timestamp('created_at')->nullable()->useCurrent();
 
-            $table->primary('id');
             $table->index(['session_id', 'student_id'], 'idx_session_student');
         });
     }

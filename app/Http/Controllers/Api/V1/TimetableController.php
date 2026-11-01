@@ -197,10 +197,14 @@ class TimetableController extends Controller
         $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $validatedData);
         
         if (!empty($conflicts)) {
+            $hasTrashConflict = collect($conflicts)->contains('in_trash', true);
             return response()->json([
                 'status' => false,
-                'message' => 'يوجد تعارض في الجدول.',
-                'conflicts' => $conflicts // سيرسل التفاصيل الكاملة التي برمجناها
+                'has_trash_conflict' => $hasTrashConflict,
+                'message' => $hasTrashConflict
+                    ? 'يوجد تعارض مع محاضرة في سلة المحذوفات. يرجى الذهاب إلى سلة المحذوفات وتأكيد الحذف النهائي أولاً لإتاحة القاعة.'
+                    : 'يوجد تعارض في الجدول.',
+                'conflicts' => $conflicts
             ], 409);
         }
         
@@ -297,9 +301,13 @@ class TimetableController extends Controller
         
         $conflicts = $this->checkForConflicts($day_id, $period_id, $validatedData, $timetable->timetable_id);
         if (!empty($conflicts)) {
+            $hasTrashConflict = collect($conflicts)->contains('in_trash', true);
             return response()->json([
                 'status' => false,
-                'message' => 'تم اكتشاف تعارض عند التحديث.',
+                'has_trash_conflict' => $hasTrashConflict,
+                'message' => $hasTrashConflict
+                    ? 'يوجد تعارض مع محاضرة في سلة المحذوفات عند التحديث. يرجى مراجعة سلة المحذوفات أولاً.'
+                    : 'تم اكتشاف تعارض عند التحديث.',
                 'conflicts' => $conflicts
             ], 409);
         }
@@ -307,10 +315,31 @@ class TimetableController extends Controller
         // 3. تحديث السجل
         $timetable->update($validatedData);
 
+        // ✅ مزامنة الجلسات المرتبطة بهذا الجدول لتحديث القاعة أو المحاضر أو التوقيت
+        $sessionUpdates = [];
+        if (isset($validatedData['classroom_id'])) {
+            $sessionUpdates['actual_classroom_id'] = $validatedData['classroom_id'];
+        }
+        if (isset($validatedData['lecturer_id'])) {
+            $sessionUpdates['lecturer_id'] = $validatedData['lecturer_id'];
+        }
+        if (isset($validatedData['period_id'])) {
+            $period = Period::find($validatedData['period_id']);
+            if ($period) {
+                $sessionUpdates['start_time'] = $period->start_time;
+                $sessionUpdates['end_time'] = $period->end_time;
+            }
+        }
+        if (!empty($sessionUpdates)) {
+            LectureSession::where('timetable_id', $timetable->timetable_id)
+                ->where('status', 0)
+                ->update($sessionUpdates);
+        }
+
         return response()->json([
             'status' => true,
             'message' => 'تم تحديث بند الجدول بنجاح.',
-            'data' => $timetable->fresh() // إرجاع النسخة المحدثة
+            'data' => $timetable->fresh(['course', 'lecturer.user', 'group', 'classroom', 'day', 'period'])
         ]);
     }
 
@@ -320,8 +349,12 @@ class TimetableController extends Controller
     public function destroy(Timetable $timetable)
     {
         try {
-            $timetable->delete();
-            return response()->json(['status' => true, 'message' => 'تم حذف بند الجدول بنجاح.'], 200);
+            DB::transaction(function () use ($timetable) {
+                // نقل الجلسات المرتبطة بهذا البند أيضاً إلى سلة المحذوفات
+                LectureSession::where('timetable_id', $timetable->timetable_id)->delete();
+                $timetable->delete();
+            });
+            return response()->json(['status' => true, 'message' => 'تم نقل المحاضرة وجلساتها إلى سلة المحذوفات بنجاح.'], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -339,7 +372,7 @@ class TimetableController extends Controller
      * @param int|null $ignoreId - معرف السجل الذي يجب تجاهله (يستخدم في التحديث).
      * @return array
      */
-    private function checkForConflicts(int $day_id, int $period_id, array $data, int $ignoreId = null): array
+    private function checkForConflicts(int $day_id, int $period_id, array $data, ?int $ignoreId = null): array
     {
         $conflicts = [];
     
@@ -361,11 +394,13 @@ class TimetableController extends Controller
         };
     
         // 2. تجهيز العلاقات لجلب أسماء المواد والمحاضرين لعرض تفاصيل الخطأ
-        $relations = ['course', 'lecturer', 'studentGroup', 'classroom'];
+        $relations = ['course', 'lecturer.user', 'studentGroup', 'classroom'];
     
         // --- أ) التحقق من تعارض القاعة (Classroom Conflict) ---
+        // يشمل السجلات في سلة المحذوفات للتنبيه بضرورة تأكيد الحذف النهائي أو استرجاعها
         if (isset($data['classroom_id'])) {
-            $clashes = Timetable::with($relations)
+            $clashes = Timetable::withTrashed()
+                ->with($relations)
                 ->where('day_id', $day_id)
                 ->where('period_id', $period_id)
                 ->where('classroom_id', $data['classroom_id'])
@@ -376,19 +411,36 @@ class TimetableController extends Controller
                 ->get();
     
             foreach ($clashes as $clash) {
-                $conflicts[] = [
-                    'type' => 'classroom',
-                    'entity' => $clash->classroom->classroom_name ?? 'غير معروف',
-                    'message' => "القاعة محجوزة لمادة ({$clash->course->course_name}) من تاريخ {$clash->start_date} إلى {$clash->end_date}",
-                    'conflict_with_id' => $clash->timetable_id,
-                    'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
-                ];
+                $isTrashed = $clash->trashed();
+                $classroomName = $clash->classroom->classroom_name ?? 'غير معروف';
+                $courseName = $clash->course->course_name ?? 'مقرر';
+
+                if ($isTrashed) {
+                    $conflicts[] = [
+                        'type' => 'classroom_trash',
+                        'in_trash' => true,
+                        'entity' => $classroomName,
+                        'message' => "يوجد تعارض مع محاضرة في سلة المحذوفات لنفس القاعة ({$classroomName}) في نفس الوقت لمقرر ({$courseName}). يرجى الذهاب إلى سلة المحذوفات وتأكيد الحذف النهائي أولاً لإتاحة القاعة.",
+                        'conflict_with_id' => $clash->timetable_id,
+                        'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                    ];
+                } else {
+                    $conflicts[] = [
+                        'type' => 'classroom',
+                        'in_trash' => false,
+                        'entity' => $classroomName,
+                        'message' => "القاعة محجوزة لمادة ({$courseName}) من تاريخ {$clash->start_date} إلى {$clash->end_date}",
+                        'conflict_with_id' => $clash->timetable_id,
+                        'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                    ];
+                }
             }
         }
     
         // --- ب) التحقق من تعارض المحاضر (Lecturer Conflict) ---
         if (isset($data['lecturer_id'])) {
-            $clashes = Timetable::with($relations)
+            $clashes = Timetable::withTrashed()
+                ->with($relations)
                 ->where('day_id', $day_id)
                 ->where('period_id', $period_id)
                 ->where('lecturer_id', $data['lecturer_id'])
@@ -399,20 +451,37 @@ class TimetableController extends Controller
                 ->get();
     
             foreach ($clashes as $clash) {
+                $isTrashed = $clash->trashed();
                 $lecturerName = $clash->lecturer->user->full_name ?? 'المحاضر';
-                $conflicts[] = [
-                    'type' => 'lecturer',
-                    'entity' => $lecturerName,
-                    'message' => "المحاضر ({$lecturerName}) لديه محاضرة أخرى ({$clash->course->course_name}) في القاعة ({$clash->classroom->classroom_name})",
-                    'conflict_with_id' => $clash->timetable_id,
-                    'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
-                ];
+                $courseName = $clash->course->course_name ?? 'مقرر';
+                $classroomName = $clash->classroom->classroom_name ?? 'القاعة';
+
+                if ($isTrashed) {
+                    $conflicts[] = [
+                        'type' => 'lecturer_trash',
+                        'in_trash' => true,
+                        'entity' => $lecturerName,
+                        'message' => "المحاضر ({$lecturerName}) لديه محاضرة في سلة المحذوفات لمقرر ({$courseName}) في نفس الوقت. يرجى تأكيد الحذف النهائي من سلة المحذوفات أولاً.",
+                        'conflict_with_id' => $clash->timetable_id,
+                        'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                    ];
+                } else {
+                    $conflicts[] = [
+                        'type' => 'lecturer',
+                        'in_trash' => false,
+                        'entity' => $lecturerName,
+                        'message' => "المحاضر ({$lecturerName}) لديه محاضرة أخرى ({$courseName}) في القاعة ({$classroomName})",
+                        'conflict_with_id' => $clash->timetable_id,
+                        'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                    ];
+                }
             }
         }
     
         // --- ج) التحقق من تعارض المجموعة الطلابية (Student Group Conflict) ---
         if (isset($data['group_id'])) {
-            $clashes = Timetable::with($relations)
+            $clashes = Timetable::withTrashed()
+                ->with($relations)
                 ->where('day_id', $day_id)
                 ->where('period_id', $period_id)
                 ->where('group_id', $data['group_id'])
@@ -423,14 +492,29 @@ class TimetableController extends Controller
                 ->get();
     
             foreach ($clashes as $clash) {
+                $isTrashed = $clash->trashed();
                 $groupName = $clash->studentGroup->group_name ?? 'المجموعة';
-                $conflicts[] = [
-                    'type' => 'group',
-                    'entity' => $groupName,
-                    'message' => "المجموعة ({$groupName}) لديها محاضرة أخرى ({$clash->course->course_name}) في نفس الوقت.",
-                    'conflict_with_id' => $clash->timetable_id,
-                    'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
-                ];
+                $courseName = $clash->course->course_name ?? 'مقرر';
+
+                if ($isTrashed) {
+                    $conflicts[] = [
+                        'type' => 'group_trash',
+                        'in_trash' => true,
+                        'entity' => $groupName,
+                        'message' => "المجموعة ({$groupName}) لديها محاضرة في سلة المحذوفات لمقرر ({$courseName}) في نفس الوقت. يرجى تأكيد الحذف النهائي من سلة المحذوفات أولاً.",
+                        'conflict_with_id' => $clash->timetable_id,
+                        'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                    ];
+                } else {
+                    $conflicts[] = [
+                        'type' => 'group',
+                        'in_trash' => false,
+                        'entity' => $groupName,
+                        'message' => "المجموعة ({$groupName}) لديها محاضرة أخرى ({$courseName}) في نفس الوقت.",
+                        'conflict_with_id' => $clash->timetable_id,
+                        'dates' => ['start' => $clash->start_date, 'end' => $clash->end_date]
+                    ];
+                }
             }
         }
     
@@ -527,4 +611,117 @@ class TimetableController extends Controller
             'course_id' => $courseId,
         ]);
     }
+
+    /**
+     * سلة المحذوفات (Soft Delete) للمحاضرات والجداول.
+     * POST /api/v1/timetable/trash
+     */
+    public function trash(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:list,restore,force_delete',
+            'college_id' => 'nullable|integer|min:1',
+            'type' => 'required_if:action,restore,force_delete|in:timetable,lecture_sessions',
+            'id' => 'required_if:action,restore,force_delete|integer|min:1',
+        ]);
+
+        $collegeId = $request->filled('college_id') ? (int) $request->college_id : null;
+
+        $queries = [
+            'timetable' => function () use ($collegeId) {
+                $q = Timetable::onlyTrashed()
+                    ->with([
+                        'course:course_id,course_name,course_code',
+                        'lecturer.user:user_id,full_name',
+                        'group:group_id,group_name',
+                        'classroom:classroom_id,classroom_name',
+                        'day:day_id,day_name',
+                        'period:period_id,start_time,end_time'
+                    ]);
+                if ($collegeId) {
+                    $q->where('college_id', $collegeId);
+                }
+                return $q;
+            },
+            'lecture_sessions' => function () use ($collegeId) {
+                $q = LectureSession::onlyTrashed()
+                    ->with([
+                        'timetable.course:course_id,course_name,course_code',
+                        'timetable.group:group_id,group_name',
+                        'timetable.lecturer.user:user_id,full_name',
+                        'actualClassroom:classroom_id,classroom_name',
+                        'actualLecturer.user:user_id,full_name'
+                    ]);
+                if ($collegeId) {
+                    $q->whereHas('timetable', fn($t) => $t->where('college_id', $collegeId));
+                }
+                return $q;
+            },
+        ];
+
+        if ($validated['action'] === 'list') {
+            $labels = [
+                'timetable' => 'محاضرات الجدول الرئيسي',
+                'lecture_sessions' => 'جلسات المحاضرات المحذوفة',
+            ];
+
+            $groups = [];
+            foreach ($queries as $type => $queryFactory) {
+                $groups[] = [
+                    'type' => $type,
+                    'label' => $labels[$type],
+                    'records' => $queryFactory()->get()->map(function ($record) use ($type) {
+                        $data = $record->getAttributes();
+                        $data['deleted_at'] = $record->deleted_at?->toISOString();
+
+                        $name = '';
+                        if ($type === 'timetable') {
+                            $courseName = $record->course->course_name ?? 'مقرر';
+                            $dayName = $record->day->day_name ?? '';
+                            $groupName = $record->group->group_name ?? '';
+                            $name = "{$courseName} - {$groupName} ({$dayName})";
+                        } else {
+                            $courseName = $record->timetable->course->course_name ?? 'جلسة محاضرة';
+                            $sessionDate = substr((string)$record->session_date, 0, 10);
+                            $startTime = substr((string)$record->start_time, 0, 5);
+                            $name = "{$courseName} (تاريخ: {$sessionDate} - {$startTime})";
+                        }
+
+                        return [
+                            'id' => $record->getKey(),
+                            'name' => $name,
+                            'deleted_at' => $record->deleted_at?->toISOString(),
+                            'data' => $data,
+                        ];
+                    })->values(),
+                ];
+            }
+
+            return response()->json(['groups' => $groups]);
+        }
+
+        $type = $validated['type'];
+        $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+
+        DB::transaction(function () use ($record, $validated, $type) {
+            if ($validated['action'] === 'restore') {
+                $record->restore();
+                if ($type === 'timetable') {
+                    LectureSession::onlyTrashed()->where('timetable_id', $record->getKey())->restore();
+                }
+            } else {
+                if ($type === 'timetable') {
+                    LectureSession::withTrashed()->where('timetable_id', $record->getKey())->forceDelete();
+                }
+                $record->forceDelete();
+            }
+        });
+
+        return response()->json([
+            'message' => $validated['action'] === 'restore'
+                ? 'تمت استعادة المحاضرة بنجاح'
+                : 'تم تأكيد الحذف النهائي بنجاح',
+        ]);
+    }
+
 }

@@ -37,11 +37,12 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+            'busy_timeout' => 5000,          // 5s بدل null — تجنّب locked DB errors
+            'journal_mode' => 'WAL',          // WAL يُحسّن الأداء بشكل كبير (reads لا تحجب writes)
+            'synchronous' => 'NORMAL',        // أسرع من FULL مع أمان كافٍ
+            'transaction_mode' => 'IMMEDIATE', // يمنع الـ lock conflicts
         ],
+
 
         'mysql' => [
             'driver' => 'mysql',
@@ -86,11 +87,11 @@ return [
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', parse_url(env('DATABASE_URL'), PHP_URL_HOST) ?: '127.0.0.1'),
-            'port' => env('DB_PORT', parse_url(env('DATABASE_URL'), PHP_URL_PORT) ?: '5432'),
-            'database' => env('DB_DATABASE', ltrim(parse_url(env('DATABASE_URL'), PHP_URL_PATH) ?: '', '/')),
-            'username' => env('DB_USERNAME', parse_url(env('DATABASE_URL'), PHP_URL_USER) ?: 'forge'),
-            'password' => env('DB_PASSWORD', parse_url(env('DATABASE_URL'), PHP_URL_PASS) ?: ''),
+            'host' => env('DB_HOST', parse_url(env('DATABASE_URL') ?? '', PHP_URL_HOST) ?: '127.0.0.1'),
+            'port' => env('DB_PORT', parse_url(env('DATABASE_URL') ?? '', PHP_URL_PORT) ?: '5432'),
+            'database' => env('DB_DATABASE', ltrim(parse_url(env('DATABASE_URL') ?? '', PHP_URL_PATH) ?: '', '/')),
+            'username' => env('DB_USERNAME', parse_url(env('DATABASE_URL') ?? '', PHP_URL_USER) ?: 'forge'),
+            'password' => env('DB_PASSWORD', parse_url(env('DATABASE_URL') ?? '', PHP_URL_PASS) ?: ''),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,

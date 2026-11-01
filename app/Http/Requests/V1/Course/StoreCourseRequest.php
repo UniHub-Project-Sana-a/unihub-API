@@ -13,6 +13,13 @@ class StoreCourseRequest extends FormRequest
         return true; 
     }
 
+    protected function prepareForValidation()
+    {
+        if ($this->has('category') && $this->category === 'بنك المتطلبات الجامعية') {
+            $this->merge(['category' => 'متطلب جامعة']);
+        }
+    }
+
     public function rules(): array
     {
         // ✅ الحصول على البرنامج
@@ -26,14 +33,22 @@ class StoreCourseRequest extends FormRequest
                 'required',
                 'string',
                 'max:50',
-                'unique:courses,course_code'
+                Rule::unique('courses', 'course_code')->where(function ($query) {
+                    if ($this->filled('program_id')) {
+                        return $query->where('program_id', $this->program_id);
+                    }
+                    if ($this->filled('college_id')) {
+                        return $query->where('college_id', $this->college_id);
+                    }
+                    return $query;
+                }),
             ],
             'course_name' => ['required', 'string', 'max:150'],
             'credit_hours' => ['required', 'integer', 'min:1'],
             
             'college_id' => ['required', 'integer', 'exists:colleges,college_id'],
-            'department_id' => ['required', 'integer', 'exists:departments,department_id'],
-            'program_id' => ['required', 'integer', 'exists:programs,program_id'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,department_id'],
+            'program_id' => ['nullable', 'integer', 'exists:programs,program_id'],
             
             'course_parts' => ['sometimes', 'array'],
             'course_parts.*.name' => ['required_with:course_parts', 'string', Rule::in(['نظري', 'عملي', 'تمارين', 'سريري'])],
@@ -45,6 +60,7 @@ class StoreCourseRequest extends FormRequest
                 'required',
                 Rule::in([
                     'متطلب جامعة',
+                    'بنك المتطلبات الجامعية',
                     'متطلب كلية',
                     'متطلب تخصص إجباري',
                     'متطلب تخصص اختياري'

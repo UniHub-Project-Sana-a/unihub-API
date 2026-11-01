@@ -15,7 +15,7 @@ class StudentExcuseSubmission extends Model
 
     protected $fillable = [
         'student_user_id','request_date','reason','course_id','lecturer_user_id',
-        'is_lecturer_notified','response_status','lecturer_comment',
+        'is_lecturer_notified','response_status','lecturer_comment','excuse_image',
     ];
 
     protected $casts = [

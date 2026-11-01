@@ -36,7 +36,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'Admin@unitshub.com'],
             [
                 'academic_number' => 'ADM0001',
-                'full_name'       => 'Alaa Hussein',
+                'full_name'       => 'Saad Mouad',
                 'phone'           => '734637112',
                 'password'        => Hash::make('Admin@12345'),
                 'gender'          => 0,
