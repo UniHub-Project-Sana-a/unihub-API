@@ -53,5 +53,8 @@ class DatabaseSeeder extends Seeder
 
         // 5. إنشاء الكلية الأولى وربط كل الصلاحيات
         $this->call(InitialCollegeSeeder::class);
+
+        // 6. زرع البيانات التجريبية الشاملة (كليات، أقسام، طلاب، مجموعات، وجداول)
+        $this->call(ComprehensiveDemoSeeder::class);
     }
 }

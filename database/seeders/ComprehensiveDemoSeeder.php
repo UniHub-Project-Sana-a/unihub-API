@@ -32,7 +32,7 @@ class ComprehensiveDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->command->info('🚀 Starting Comprehensive Demo Data Seeding for Sana\'a University...');
+        $this->command?->info('🚀 Starting Comprehensive Demo Data Seeding for Sana\'a University...');
 
         // 1. Fetch User Types
         $userTypes = UserType::all()->keyBy('user_type_code');
@@ -72,7 +72,7 @@ class ComprehensiveDemoSeeder extends Seeder
             ]
         );
 
-        $this->command->info("✅ Colleges seeded: {$medCollege->college_name}, {$dentCollege->college_name}, {$csCollege->college_name}");
+        $this->command?->info("✅ Colleges seeded: {$medCollege->college_name}, {$dentCollege->college_name}, {$csCollege->college_name}");
 
         // 3. Academic Titles for Medical College
         $titles = [
@@ -823,7 +823,7 @@ class ComprehensiveDemoSeeder extends Seeder
         }
 
         $totalSeededStudents = count($groupAStudentIds) + count($groupBStudentIds);
-        $this->command->info("✅ Seeded {$totalSeededStudents} students and assigned them to Groups A & B!");
+        $this->command?->info("✅ Seeded {$totalSeededStudents} students and assigned them to Groups A & B!");
 
         // 15. Conflict-Free Timetable Slots
         $days = Day::all()->keyBy('day_name');
@@ -1078,7 +1078,7 @@ class ComprehensiveDemoSeeder extends Seeder
             $createdTimetables[] = $tt;
         }
 
-        $this->command->info('✅ Seeded conflict-free weekly timetable slots for MBBS Level 1 & Level 2!');
+        $this->command?->info('✅ Seeded conflict-free weekly timetable slots for MBBS Level 1 & Level 2!');
 
         // 16. Generate Completed & Active Lecture Sessions
         $today = Carbon::today();
@@ -1123,7 +1123,7 @@ class ComprehensiveDemoSeeder extends Seeder
             }
         }
 
-        $this->command->info('✅ Seeded active and completed lecture sessions!');
+        $this->command?->info('✅ Seeded active and completed lecture sessions!');
 
         // 17. Seed Permissions for All Colleges
         $this->call(PermissionsSeeder::class);
@@ -1148,9 +1148,9 @@ class ComprehensiveDemoSeeder extends Seeder
                     ['updated_at']
                 );
             }
-            $this->command->info('✅ Admin user granted complete permissions across all colleges!');
+            $this->command?->info('✅ Admin user granted complete permissions across all colleges!');
         }
 
-        $this->command->info('🎉 Comprehensive Demo Seeding Finished Successfully!');
+        $this->command?->info('🎉 Comprehensive Demo Seeding Finished Successfully!');
     }
 }
