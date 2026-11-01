@@ -65,8 +65,8 @@ $envOverrides = [
     'LOG_CHANNEL' => 'stderr',
 ];
 
-if (getenv('DATABASE_URL') || getenv('POSTGRES_URL')) {
-    $dbUrl = getenv('DATABASE_URL') ?: getenv('POSTGRES_URL');
+$dbUrl = getenv('DATABASE_URL') ?: (getenv('POSTGRES_URL') ?: getenv('STORAGE_URL'));
+if ($dbUrl) {
     $envOverrides['DB_CONNECTION'] = 'pgsql';
     $envOverrides['DATABASE_URL'] = $dbUrl;
 } else {
