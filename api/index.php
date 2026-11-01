@@ -67,7 +67,33 @@ $envOverrides = [
 
 $dbUrl = getenv('DATABASE_URL') ?: (getenv('POSTGRES_URL') ?: getenv('STORAGE_URL'));
 if ($dbUrl) {
+    $parsed = parse_url($dbUrl);
+    $host = $parsed['host'] ?? '';
+    $user = $parsed['user'] ?? '';
+    $pass = $parsed['pass'] ?? '';
+    $dbName = ltrim($parsed['path'] ?? '', '/');
+    $port = $parsed['port'] ?? 5432;
+
+    // Neon SNI compatibility
+    $hostParts = explode('.', $host);
+    $endpointId = $hostParts[0] ?? '';
+    if ($endpointId && strpos($host, 'neon.tech') !== false) {
+        if (strpos($pass, 'endpoint=') === false) {
+            $pass = "endpoint={$endpointId};{$pass}";
+        }
+        if (strpos($dbUrl, 'options=endpoint') === false) {
+            $sep = (strpos($dbUrl, '?') !== false) ? '&' : '?';
+            $dbUrl .= "{$sep}options=endpoint%3D{$endpointId}";
+        }
+    }
+
     $envOverrides['DB_CONNECTION'] = 'pgsql';
+    $envOverrides['DB_HOST'] = $host;
+    $envOverrides['DB_PORT'] = (string)$port;
+    $envOverrides['DB_DATABASE'] = $dbName;
+    $envOverrides['DB_USERNAME'] = $user;
+    $envOverrides['DB_PASSWORD'] = $pass;
+    $envOverrides['DB_SSLMODE'] = 'require';
     $envOverrides['DATABASE_URL'] = $dbUrl;
 } else {
     $envOverrides['DB_CONNECTION'] = 'sqlite';

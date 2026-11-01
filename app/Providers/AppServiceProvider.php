@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate; // <-- 1. إضافة الاستيراد
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use App\Models\UserDevice; // <-- 2. إضافة الاستيراد
 use App\Policies\UserDevicePolicy; // <-- 3. إضافة الاستيراد
 use Laravel\Passport\Passport;
@@ -39,5 +42,17 @@ class AppServiceProvider extends ServiceProvider
         // 4. تسجيل الـ Policy يدويًا
         Gate::policy(UserDevice::class, UserDevicePolicy::class);
         // Passport::routes();
+
+        // 5. تهيئة جداول Neon Postgres تلقائياً عند أول تشغيل
+        if (config('database.default') === 'pgsql') {
+            try {
+                if (!Schema::hasTable('users')) {
+                    Artisan::call('migrate', ['--force' => true]);
+                    Artisan::call('db:seed', ['--force' => true]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Neon auto-migration error: ' . $e->getMessage());
+            }
+        }
     }
 }
