@@ -104,11 +104,11 @@ EOF
 
 # Migrations
 echo "📊 Running migrations..."
-php artisan migrate --force
+php artisan migrate --force || true
 
 # Seeders (تشغيل DatabaseSeeder الرئيسية فقط وتجنب التكرار)
 echo "🌱 Seeding database..."
-php artisan db:seed --force 2>&1 | head -10
+php artisan db:seed --force || true
 
 # ==========================================
 # Passport Setup
