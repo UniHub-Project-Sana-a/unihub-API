@@ -59,8 +59,10 @@ class UsersController extends Controller
                 }
             })
             ->when($userTypeCode, function ($query_type) use ($userTypeCode) {
-                $query_type->whereHas('userType', function ($sub_query_type) use ($userTypeCode) {
-                    $sub_query_type->where('user_type_code', $userTypeCode);
+                $codes = is_array($userTypeCode) ? $userTypeCode : explode(',', (string)$userTypeCode);
+                $codes = array_values(array_filter(array_map('trim', $codes)));
+                $query_type->whereHas('userType', function ($sub_query_type) use ($codes) {
+                    $sub_query_type->whereIn('user_type_code', $codes);
                 });
             })
             ->orderBy('user_id', 'desc');

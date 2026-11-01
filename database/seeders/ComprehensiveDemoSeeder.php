@@ -598,12 +598,13 @@ class ComprehensiveDemoSeeder extends Seeder
         // 12. Medical Lecturers & Professors
         $lecturersList = [
             [
-                'name' => 'أ.د. عبدالكريم الشيباني',
-                'email' => 'lec.shaibani@unihub.edu',
-                'academic_number' => 'LEC-MED-001',
-                'phone' => '771110001',
+                'name' => 'أ.د. عبدالكريم أحمد الشيباني',
+                'email' => 'dean.medicine@unihub.edu',
+                'academic_number' => 'MED-DEAN-01',
+                'phone' => '771234001',
                 'gender' => 0,
                 'title' => 'PROF',
+                'user_type_id' => $deanType ? ($deanType->user_type_id ?? $deanType->id) : 3,
             ],
             [
                 'name' => 'أ.د. هدى صالح الصلوي',
@@ -658,7 +659,7 @@ class ComprehensiveDemoSeeder extends Seeder
                     'password' => $passwordHash,
                     'gender' => $item['gender'],
                     'college_id' => $medCollege->college_id,
-                    'user_type_id' => $lecturerType ? ($lecturerType->user_type_id ?? $lecturerType->id) : 8,
+                    'user_type_id' => $item['user_type_id'] ?? ($lecturerType ? ($lecturerType->user_type_id ?? $lecturerType->id) : 8),
                 ]
             );
 
@@ -844,7 +845,7 @@ class ComprehensiveDemoSeeder extends Seeder
         $roomSina = $classroomMap[5]->classroom_id;// مدرج ابن سينا
 
         $lecs = [
-            'shaibani'   => $lecturerModelMap['lec.shaibani@unihub.edu']->lecturer_id,
+            'shaibani'   => ($lecturerModelMap['dean.medicine@unihub.edu'] ?? $lecturerModelMap['lec.shaibani@unihub.edu'])->lecturer_id,
             'salwi'      => $lecturerModelMap['lec.salwi@unihub.edu']->lecturer_id,
             'mutawakkil' => $lecturerModelMap['lec.mutawakkil@unihub.edu']->lecturer_id,
             'wadaei'     => $lecturerModelMap['lec.wadaei@unihub.edu']->lecturer_id,
