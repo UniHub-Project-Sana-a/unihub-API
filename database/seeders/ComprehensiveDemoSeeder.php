@@ -273,17 +273,17 @@ class ComprehensiveDemoSeeder extends Seeder
         // 8. Levels & Semesters for MBBS
         $lvl1 = Level::updateOrCreate(
             ['program_id' => $progMbbs->program_id, 'level_number' => 1],
-            ['level_name' => 'المستوى الأول (السنة الأولى - علوم طبية أساسية)']
+            ['level_name' => 'المستوى الأول (علوم أساسية)']
         );
 
         $lvl2 = Level::updateOrCreate(
             ['program_id' => $progMbbs->program_id, 'level_number' => 2],
-            ['level_name' => 'المستوى الثاني (السنة الثانية - الأجهزة العضوية)']
+            ['level_name' => 'المستوى الثاني (أجهزة عضوية)']
         );
 
         $lvl3 = Level::updateOrCreate(
             ['program_id' => $progMbbs->program_id, 'level_number' => 3],
-            ['level_name' => 'المستوى الثالث (السنة الثالثة - مقدمة العلوم السريرية)']
+            ['level_name' => 'المستوى الثالث (علوم سريرية)']
         );
 
         $sem1_1 = Semester::updateOrCreate(
