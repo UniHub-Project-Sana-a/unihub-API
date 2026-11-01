@@ -15,77 +15,86 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use App\Models\LecturerPayout;
 use App\Models\FinancialCycle;
+use Illuminate\Support\Facades\Log;
 
 class LecturersController extends Controller
 {
     // GET /api/v1/lecturers?college_id=...&q=...
     public function index(Request $request)
     {
-        $query = Lecturer::query()->with([
-            'user:user_id,full_name,email,phone,academic_number',
-            'academicTitle:title_id,title_name,title_code,hourly_price',
-            'department:department_id,department_name,department_code',
-            'college:college_id,college_name',
-        ]);
+        try {
+            $query = Lecturer::query()->with([
+                'user:user_id,full_name,email,phone,academic_number',
+                'academicTitle:title_id,title_name,title_code,hourly_price',
+                'department:department_id,department_name,department_code',
+                'college:college_id,college_name',
+            ]);
 
-        // ✅ محرك البحث الشامل بالاسم والرقم الوظيفي والبريد والهاتف
-        if ($request->filled('q')) {
-            $q = $request->query('q');
-            $query->where(function ($sub) use ($q) {
-                $sub->whereHas('user', function ($uq) use ($q) {
-                    $uq->where('full_name', 'like', "%{$q}%")
-                       ->orWhere('academic_number', 'like', "%{$q}%")
-                       ->orWhere('email', 'like', "%{$q}%")
-                       ->orWhere('phone', 'like', "%{$q}%");
-                })->orWhereHas('department', function ($dq) use ($q) {
-                    $dq->where('department_name', 'like', "%{$q}%");
-                })->orWhereHas('academicTitle', function ($tq) use ($q) {
-                    $tq->where('title_name', 'like', "%{$q}%");
+            // ✅ محرك البحث الشامل بالاسم والرقم الوظيفي والبريد والهاتف
+            if ($request->filled('q')) {
+                $q = $request->query('q');
+                $query->where(function ($sub) use ($q) {
+                    $sub->whereHas('user', function ($uq) use ($q) {
+                        $uq->where('full_name', 'like', "%{$q}%")
+                           ->orWhere('academic_number', 'like', "%{$q}%")
+                           ->orWhere('email', 'like', "%{$q}%")
+                           ->orWhere('phone', 'like', "%{$q}%");
+                    })->orWhereHas('department', function ($dq) use ($q) {
+                        $dq->where('department_name', 'like', "%{$q}%");
+                    })->orWhereHas('academicTitle', function ($tq) use ($q) {
+                        $tq->where('title_name', 'like', "%{$q}%");
+                    });
                 });
-            });
-        }
+            }
 
-        if ($request->filled('user_id')) {
-            $query->where('user_id', (int)$request->user_id);
-        }
+            if ($request->filled('user_id')) {
+                $query->where('user_id', (int)$request->user_id);
+            }
 
-        // ✅ فلتر حسب can_teach_externally
-        if ($request->filled('can_teach_externally')) {
-            $canTeach = filter_var($request->query('can_teach_externally'), FILTER_VALIDATE_BOOLEAN);
-            $query->where('can_teach_externally', $canTeach);
-        }
+            // ✅ فلتر حسب can_teach_externally
+            if ($request->filled('can_teach_externally')) {
+                $canTeach = filter_var($request->query('can_teach_externally'), FILTER_VALIDATE_BOOLEAN);
+                $query->where('can_teach_externally', $canTeach);
+            }
 
-        // ✅ فلتر حسب college_id
-        if ($request->filled('college_id')) {
-            $query->where('college_id', (int)$request->college_id);
-        }
+            // ✅ فلتر حسب college_id
+            if ($request->filled('college_id')) {
+                $query->where('college_id', (int)$request->college_id);
+            }
 
-        // ✅ فلتر حسب department_id
-        if ($request->filled('department_id')) {
-            $query->where('department_id', (int)$request->department_id);
-        }
+            // ✅ فلتر حسب department_id
+            if ($request->filled('department_id')) {
+                $query->where('department_id', (int)$request->department_id);
+            }
 
-        // ✅ فلتر حسب title_id (الدرجة العلمية)
-        if ($request->filled('title_id')) {
-            $query->where('title_id', (int)$request->title_id);
-        }
+            // ✅ فلتر حسب title_id (الدرجة العلمية)
+            if ($request->filled('title_id')) {
+                $query->where('title_id', (int)$request->title_id);
+            }
 
-        // ✅ فلتر حسب الحالة الوظيفية
-        if ($request->has('status') && $request->query('status') !== '') {
-            $query->where('status', filter_var($request->query('status'), FILTER_VALIDATE_BOOLEAN));
-        }
-        
-        // ✅ فلتر لاستثناء كلية معينة
-        if ($request->filled('exclude_college_id')) {
-            $query->where('college_id', '!=', (int)$request->query('exclude_college_id'));
-        }
+            // ✅ فلتر حسب الحالة الوظيفية
+            if ($request->has('status') && $request->query('status') !== '') {
+                $query->where('status', filter_var($request->query('status'), FILTER_VALIDATE_BOOLEAN));
+            }
+            
+            // ✅ فلتر لاستثناء كلية معينة
+            if ($request->filled('exclude_college_id')) {
+                $query->where('college_id', '!=', (int)$request->query('exclude_college_id'));
+            }
 
-        $perPage = (int) $request->query('per_page', 0);
-        if ($perPage > 0 && !$request->boolean('all')) {
-            return response()->json($query->paginate($perPage));
-        }
+            $perPage = (int) $request->query('per_page', 0);
+            if ($perPage > 0 && !$request->boolean('all')) {
+                return response()->json($query->paginate($perPage));
+            }
 
-        return response()->json($query->get());
+            return response()->json($query->get());
+        } catch (\Throwable $e) {
+            Log::error('LecturersController index error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'تعذر جلب المحاضرين: ' . $e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
     }
 
     // POST /api/v1/lecturers

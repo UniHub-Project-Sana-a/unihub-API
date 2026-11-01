@@ -15,6 +15,9 @@ use App\Models\Period;
 use App\Models\StudentGroup;
 use Illuminate\Support\Str;
 use App\Models\CourseTopic;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 // --- ⬆️ نهاية الإضافة ⬆️ ---
 
 class TimetableController extends Controller
@@ -662,110 +665,159 @@ class TimetableController extends Controller
      */
     public function trash(Request $request)
     {
-        $validated = $request->validate([
-            'action' => 'required|in:list,restore,force_delete',
-            'college_id' => 'nullable|integer|min:1',
-            'type' => 'required_if:action,restore,force_delete|in:timetable,lecture_sessions',
-            'id' => 'required_if:action,restore,force_delete|integer|min:1',
-        ]);
-
-        $collegeId = $request->filled('college_id') ? (int) $request->college_id : null;
-
-        $queries = [
-            'timetable' => function () use ($collegeId) {
-                $q = Timetable::onlyTrashed()
-                    ->with([
-                        'course:course_id,course_name,course_code',
-                        'lecturer.user:user_id,full_name',
-                        'group:group_id,group_name',
-                        'classroom:classroom_id,classroom_name',
-                        'day:day_id,day_name',
-                        'period:period_id,start_time,end_time'
-                    ]);
-                if ($collegeId) {
-                    $q->where('college_id', $collegeId);
-                }
-                return $q;
-            },
-            'lecture_sessions' => function () use ($collegeId) {
-                $q = LectureSession::onlyTrashed()
-                    ->with([
-                        'timetable.course:course_id,course_name,course_code',
-                        'timetable.group:group_id,group_name',
-                        'timetable.lecturer.user:user_id,full_name',
-                        'actualClassroom:classroom_id,classroom_name',
-                        'actualLecturer.user:user_id,full_name'
-                    ]);
-                if ($collegeId) {
-                    $q->whereHas('timetable', fn($t) => $t->where('college_id', $collegeId));
-                }
-                return $q;
-            },
-        ];
-
-        if ($validated['action'] === 'list') {
-            $labels = [
-                'timetable' => 'محاضرات الجدول الرئيسي',
-                'lecture_sessions' => 'جلسات المحاضرات المحذوفة',
-            ];
-
-            $groups = [];
-            foreach ($queries as $type => $queryFactory) {
-                $groups[] = [
-                    'type' => $type,
-                    'label' => $labels[$type],
-                    'records' => $queryFactory()->get()->map(function ($record) use ($type) {
-                        $data = $record->getAttributes();
-                        $data['deleted_at'] = $record->deleted_at?->toISOString();
-
-                        $name = '';
-                        if ($type === 'timetable') {
-                            $courseName = $record->course->course_name ?? 'مقرر';
-                            $dayName = $record->day->day_name ?? '';
-                            $groupName = $record->group->group_name ?? '';
-                            $name = "{$courseName} - {$groupName} ({$dayName})";
-                        } else {
-                            $courseName = $record->timetable->course->course_name ?? 'جلسة محاضرة';
-                            $sessionDate = substr((string)$record->session_date, 0, 10);
-                            $startTime = substr((string)$record->start_time, 0, 5);
-                            $name = "{$courseName} (تاريخ: {$sessionDate} - {$startTime})";
-                        }
-
-                        return [
-                            'id' => $record->getKey(),
-                            'name' => $name,
-                            'deleted_at' => $record->deleted_at?->toISOString(),
-                            'data' => $data,
-                        ];
-                    })->values(),
-                ];
+        // ضمان وجود أعمدة الحذف الناعم في قاعدة البيانات بشكل فوري وآمن
+        try {
+            if (Schema::hasTable('timetable') && !Schema::hasColumn('timetable', 'deleted_at')) {
+                Schema::table('timetable', function ($table) {
+                    $table->softDeletes();
+                });
             }
-
-            return response()->json(['groups' => $groups]);
+            if (Schema::hasTable('lecture_sessions') && !Schema::hasColumn('lecture_sessions', 'deleted_at')) {
+                Schema::table('lecture_sessions', function ($table) {
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Ensure timetable softDeletes columns error: ' . $e->getMessage());
         }
 
-        $type = $validated['type'];
-        $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+        try {
+            $validated = $request->validate([
+                'action' => 'required|in:list,restore,force_delete',
+                'college_id' => 'nullable|integer|min:1',
+                'type' => 'required_if:action,restore,force_delete|in:timetable,lecture_sessions',
+                'id' => 'required_if:action,restore,force_delete|integer|min:1',
+            ]);
 
-        DB::transaction(function () use ($record, $validated, $type) {
-            if ($validated['action'] === 'restore') {
-                $record->restore();
-                if ($type === 'timetable') {
-                    LectureSession::onlyTrashed()->where('timetable_id', $record->getKey())->restore();
+            $collegeId = $request->filled('college_id') ? (int) $request->college_id : null;
+
+            $queries = [
+                'timetable' => function () use ($collegeId) {
+                    $q = Timetable::onlyTrashed()
+                        ->with([
+                            'course:course_id,course_name,course_code',
+                            'lecturer.user:user_id,full_name',
+                            'group:group_id,group_name',
+                            'classroom:classroom_id,classroom_name',
+                            'day:day_id,day_name',
+                            'period:period_id,start_time,end_time'
+                        ]);
+                    if ($collegeId) {
+                        $q->where('college_id', $collegeId);
+                    }
+                    return $q;
+                },
+                'lecture_sessions' => function () use ($collegeId) {
+                    $q = LectureSession::onlyTrashed()
+                        ->with([
+                            'timetable' => fn($t) => $t->withTrashed()->with([
+                                'course:course_id,course_name,course_code',
+                                'group:group_id,group_name',
+                                'lecturer.user:user_id,full_name'
+                            ]),
+                            'actualClassroom:classroom_id,classroom_name',
+                            'actualLecturer.user:user_id,full_name'
+                        ]);
+                    if ($collegeId) {
+                        $q->whereHas('timetable', fn($t) => $t->withTrashed()->where('college_id', $collegeId));
+                    }
+                    return $q;
+                },
+            ];
+
+            if ($validated['action'] === 'list') {
+                $labels = [
+                    'timetable' => 'محاضرات الجدول الرئيسي',
+                    'lecture_sessions' => 'جلسات المحاضرات المحذوفة',
+                ];
+
+                $groups = [];
+                foreach ($queries as $type => $queryFactory) {
+                    $records = [];
+                    try {
+                        $records = $queryFactory()->get()->map(function ($record) use ($type) {
+                            $data = $record->getAttributes();
+                            $deletedAt = null;
+                            if ($record->deleted_at) {
+                                try {
+                                    $deletedAt = Carbon::parse($record->deleted_at)->toIso8601String();
+                                } catch (\Throwable) {
+                                    $deletedAt = (string) $record->deleted_at;
+                                }
+                            }
+                            $data['deleted_at'] = $deletedAt;
+
+                            $name = '';
+                            if ($type === 'timetable') {
+                                $courseName = $record->course?->course_name ?? 'مقرر';
+                                $dayName = $record->day?->day_name ?? '';
+                                $groupName = $record->group?->group_name ?? '';
+                                $name = "{$courseName} - {$groupName}" . ($dayName ? " ({$dayName})" : "");
+                            } else {
+                                $courseName = $record->timetable?->course?->course_name ?? 'جلسة محاضرة';
+                                $sessionDate = substr((string) ($record->session_date ?? ''), 0, 10);
+                                $startTime = substr((string) ($record->start_time ?? ''), 0, 5);
+                                $name = "{$courseName}" . ($sessionDate ? " (تاريخ: {$sessionDate} - {$startTime})" : "");
+                            }
+
+                            return [
+                                'id' => $record->getKey(),
+                                'name' => $name ?: ('#' . $record->getKey()),
+                                'deleted_at' => $deletedAt,
+                                'data' => $data,
+                            ];
+                        })->values();
+                    } catch (\Throwable $qe) {
+                        Log::warning("Error fetching trashed {$type}: " . $qe->getMessage());
+                    }
+
+                    $groups[] = [
+                        'type' => $type,
+                        'label' => $labels[$type],
+                        'records' => $records,
+                    ];
                 }
-            } else {
-                if ($type === 'timetable') {
-                    LectureSession::withTrashed()->where('timetable_id', $record->getKey())->forceDelete();
-                }
-                $record->forceDelete();
+
+                return response()->json(['groups' => $groups]);
             }
-        });
 
-        return response()->json([
-            'message' => $validated['action'] === 'restore'
-                ? 'تمت استعادة المحاضرة بنجاح'
-                : 'تم تأكيد الحذف النهائي بنجاح',
-        ]);
+            $type = $validated['type'];
+            $record = $queries[$type]()->whereKey((int) $validated['id'])->firstOrFail();
+
+            DB::transaction(function () use ($record, $validated, $type) {
+                if ($validated['action'] === 'restore') {
+                    $record->restore();
+                    if ($type === 'timetable') {
+                        LectureSession::onlyTrashed()->where('timetable_id', $record->getKey())->restore();
+                    }
+                } else {
+                    if ($type === 'timetable') {
+                        LectureSession::withTrashed()->where('timetable_id', $record->getKey())->forceDelete();
+                    }
+                    $record->forceDelete();
+                }
+            });
+
+            return response()->json([
+                'message' => $validated['action'] === 'restore'
+                    ? 'تمت استعادة المحاضرة بنجاح'
+                    : 'تم تأكيد الحذف النهائي بنجاح',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Timetable trash error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            if ($request->input('action') === 'list') {
+                return response()->json([
+                    'groups' => [
+                        ['type' => 'timetable', 'label' => 'محاضرات الجدول الرئيسي', 'records' => []],
+                        ['type' => 'lecture_sessions', 'label' => 'جلسات المحاضرات المحذوفة', 'records' => []],
+                    ],
+                    'warning' => $e->getMessage(),
+                ]);
+            }
+            return response()->json([
+                'message' => 'تعذر تنفيذ العملية: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
 }
