@@ -86,10 +86,12 @@ Route::get('/setup-db', function () {
             'output' => $output,
         ]);
     } catch (\Throwable $e) {
+        $prev = $e->getPrevious();
         return response()->json([
             'status' => 'error',
             'message' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
+            'previous' => $prev ? $prev->getMessage() : null,
+            'output' => \Illuminate\Support\Facades\Artisan::output(),
         ], 500);
     }
 });
