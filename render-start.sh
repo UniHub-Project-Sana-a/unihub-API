@@ -12,37 +12,41 @@ rm -rf storage/framework/cache/data/* 2>/dev/null || true
 # Check environment
 echo "🔍 Checking environment..."
 
-if [ -z "$DATABASE_URL" ]; then
-    echo "❌ DATABASE_URL missing!"
-    exit 1
+APP_KEY=${APP_KEY:-base64:J33kuE8MbjWUQdNDDK5rq36Ac5xBS7rPHpOj+yd44xU=}
+
+if [ -n "$DATABASE_URL" ]; then
+    echo "✓ PostgreSQL configured"
+    DB_CONN="pgsql"
+    
+    # Parse DATABASE_URL
+    DB_HOST=$(echo $DATABASE_URL | sed -n 's|.*@\([^:/]*\).*|\1|p')
+    DB_PORT=$(echo $DATABASE_URL | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+    DB_NAME=$(echo $DATABASE_URL | sed -n 's|.*/\([^?]*\).*|\1|p')
+    DB_USER=$(echo $DATABASE_URL | sed -n 's|.*://\([^:]*\):.*|\1|p')
+    DB_PASS=$(echo $DATABASE_URL | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
+    
+    DB_PORT=${DB_PORT:-5432}
+    
+    echo "✓ Database: $DB_NAME @ $DB_HOST"
+    
+    # Wait for database
+    echo "⏳ Waiting for PostgreSQL..."
+    for i in {1..30}; do
+        if PGPASSWORD=$DB_PASS psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; then
+            echo "✅ Database connected"
+            break
+        fi
+        [ $i -eq 30 ] && echo "❌ Database timeout" && exit 1
+        sleep 2
+    done
+else
+    echo "ℹ️  DATABASE_URL not set, using pre-configured SQLite database..."
+    DB_CONN="sqlite"
+    mkdir -p database
+    touch database/database.sqlite
+    chmod 666 database/database.sqlite 2>/dev/null || true
+    chown www-data:www-data database/database.sqlite 2>/dev/null || true
 fi
-
-if [ -z "$APP_KEY" ]; then
-    echo "❌ APP_KEY missing!"
-    exit 1
-fi
-
-# Parse DATABASE_URL
-DB_HOST=$(echo $DATABASE_URL | sed -n 's|.*@\([^:/]*\).*|\1|p')
-DB_PORT=$(echo $DATABASE_URL | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-DB_NAME=$(echo $DATABASE_URL | sed -n 's|.*/\([^?]*\).*|\1|p')
-DB_USER=$(echo $DATABASE_URL | sed -n 's|.*://\([^:]*\):.*|\1|p')
-DB_PASS=$(echo $DATABASE_URL | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
-
-DB_PORT=${DB_PORT:-5432}
-
-echo "✓ Database: $DB_NAME @ $DB_HOST"
-
-# Wait for database
-echo "⏳ Waiting for PostgreSQL..."
-for i in {1..30}; do
-    if PGPASSWORD=$DB_PASS psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c '\q' 2>/dev/null; then
-        echo "✅ Database connected"
-        break
-    fi
-    [ $i -eq 30 ] && echo "❌ Database timeout" && exit 1
-    sleep 2
-done
 
 # Create .env
 echo "📝 Creating .env..."
@@ -57,9 +61,21 @@ FRONTEND_URL=$FRONTEND_URL
 
 LOG_CHANNEL=errorlog
 LOG_LEVEL=error
+EOF
 
+if [ "$DB_CONN" = "pgsql" ]; then
+cat >> .env << EOF
 DB_CONNECTION=pgsql
 DATABASE_URL=$DATABASE_URL
+EOF
+else
+cat >> .env << EOF
+DB_CONNECTION=sqlite
+DB_DATABASE=/var/www/html/database/database.sqlite
+EOF
+fi
+
+cat >> .env << EOF
 
 CACHE_STORE=file
 SESSION_DRIVER=file
