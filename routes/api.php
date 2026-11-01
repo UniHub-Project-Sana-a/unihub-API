@@ -494,8 +494,12 @@ Route::prefix('v1')->group(function ()
             Route::get('excuses', 'excuses');
             Route::post('excuses', 'submitExcuse');
             Route::get('announcements', 'announcements');
-            Route::post('scan-qr', 'scanQr');
+            Route::post('announcements/mark-read', 'markAnnouncementRead');
+            Route::get('study-plan', 'studyPlan');
+            Route::get('understanding-analytics', 'understandingAnalytics');
+            Route::get('assignments', 'assignments');
             Route::post('assignments/submit', 'submitAssignment');
+            Route::post('scan-qr', 'scanQr');
             Route::post('submit-lecture-answers', 'submitLectureAnswers');
         });
 
