@@ -65,26 +65,40 @@ $envOverrides = [
     'LOG_CHANNEL' => 'stderr',
 ];
 
-$dbUrl = getenv('DATABASE_URL') ?: (getenv('POSTGRES_URL') ?: getenv('STORAGE_URL'));
+$dbUrl = getenv('DATABASE_URL_UNPOOLED')
+    ?: getenv('STORAGE_DATABASE_URL_UNPOOLED')
+    ?: getenv('DATABASE_URL')
+    ?: getenv('STORAGE_DATABASE_URL')
+    ?: getenv('POSTGRES_URL')
+    ?: getenv('STORAGE_URL')
+    ?: getenv('STORAGE_POSTGRES_URL');
+
+if (!$dbUrl) {
+    foreach (array_merge($_ENV, $_SERVER) as $k => $v) {
+        if (is_string($v) && (str_starts_with($v, 'postgres://') || str_starts_with($v, 'postgresql://'))) {
+            $dbUrl = $v;
+            break;
+        }
+    }
+}
+
 if ($dbUrl) {
     $parsed = parse_url($dbUrl);
     $host = $parsed['host'] ?? '';
-    $user = $parsed['user'] ?? '';
-    $pass = $parsed['pass'] ?? '';
+    $user = isset($parsed['user']) ? urldecode($parsed['user']) : '';
+    $pass = isset($parsed['pass']) ? urldecode($parsed['pass']) : '';
     $dbName = ltrim($parsed['path'] ?? '', '/');
     $port = $parsed['port'] ?? 5432;
 
-    // Neon SNI compatibility via password prefix (recommended for Laravel PDO)
+    // Neon SNI compatibility via password prefix
     $hostParts = explode('.', $host);
     $endpointId = $hostParts[0] ?? '';
-    if ($endpointId && strpos($host, 'neon.tech') !== false) {
+    $cleanEndpointId = preg_replace('/-pooler$/', '', $endpointId);
+    if ($cleanEndpointId && strpos($host, 'neon.tech') !== false) {
         if (strpos($pass, 'endpoint=') === false) {
-            $pass = "endpoint={$endpointId};{$pass}";
+            $pass = "endpoint={$cleanEndpointId}\${$pass}";
         }
     }
-
-    // Reconstruct clean database URL without query string 'options' to avoid PDO option array conflicts
-    $cleanDbUrl = "postgresql://{$user}:" . urlencode($pass) . "@{$host}:{$port}/{$dbName}?sslmode=require";
 
     $envOverrides['DB_CONNECTION'] = 'pgsql';
     $envOverrides['DB_HOST'] = $host;
@@ -93,7 +107,7 @@ if ($dbUrl) {
     $envOverrides['DB_USERNAME'] = $user;
     $envOverrides['DB_PASSWORD'] = $pass;
     $envOverrides['DB_SSLMODE'] = 'require';
-    $envOverrides['DATABASE_URL'] = $cleanDbUrl;
+    $envOverrides['DATABASE_URL'] = '';
 } else {
     $envOverrides['DB_CONNECTION'] = 'sqlite';
     $envOverrides['DB_DATABASE'] = $tmpDatabase;

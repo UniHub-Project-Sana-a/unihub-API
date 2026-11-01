@@ -39,9 +39,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute($perMinute)->by(\App\Support\ClientIp::resolve($request));
         });
 
-        // 4. تسجيل الـ Policy يدويًا
+        // 4. تسجيل الـ Policy يدويًا وتحديد مسار مفاتيح Passport
         Gate::policy(UserDevice::class, UserDevicePolicy::class);
-        // Passport::routes();
+        if (file_exists('/tmp/oauth-private.key')) {
+            Passport::loadKeysFrom('/tmp');
+        }
 
         // 5. تهيئة جداول Neon Postgres تلقائياً عند أول تشغيل
         if (env('DB_CONNECTION') === 'pgsql' || config('database.default') === 'pgsql') {
