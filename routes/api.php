@@ -76,6 +76,27 @@ Route::get('/health', [HealthController::class, 'index']);
 Route::get('/health/detailed', [HealthController::class, 'detailed']);
 Route::get('/ping', [HealthController::class, 'ping']);
 
+// نقطة تهيئة قاعدة البيانات السحابية (Migration & Seed)
+Route::get('/setup-db', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $migrateOutput = \Illuminate\Support\Facades\Artisan::output();
+        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+        $seedOutput = \Illuminate\Support\Facades\Artisan::output();
+        return response()->json([
+            'status' => 'success',
+            'migrate' => $migrateOutput,
+            'seed' => $seedOutput,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ], 500);
+    }
+});
+
 // ============================================================
 // واجهات التكامل الخارجي (System-to-System) — Data Ingestion
 // محمية بعاملين: Bearer Token + IP Whitelist

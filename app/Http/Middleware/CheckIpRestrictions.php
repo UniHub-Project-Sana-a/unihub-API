@@ -17,23 +17,26 @@ class CheckIpRestrictions
 
         $clientIp = $request->ip();
 
-        // 1. جلب القواعد النشطة من الكاش أو القاعدة
-        // يفضل استخدام الكاش هنا للأداء العالي
-        $restrictions = IpRestriction::where('is_active', true)->get();
+        try {
+            // 1. جلب القواعد النشطة من الكاش أو القاعدة
+            $restrictions = IpRestriction::where('is_active', true)->get();
 
-        $blacklist = $restrictions->where('type', 'blacklist')->pluck('ip_address')->toArray();
-        $whitelist = $restrictions->where('type', 'whitelist')->pluck('ip_address')->toArray();
+            $blacklist = $restrictions->where('type', 'blacklist')->pluck('ip_address')->toArray();
+            $whitelist = $restrictions->where('type', 'whitelist')->pluck('ip_address')->toArray();
 
-        // 2. فحص القائمة السوداء (ممنوع فوراً)
-        if (IpUtils::checkIp($clientIp, $blacklist)) {
-            return response()->json(['message' => 'Access Denied: Your IP is blacklisted.'], 403);
-        }
-
-        // 3. فحص القائمة البيضاء (إذا وجدت، يُمنع أي شخص ليس فيها)
-        if (count($whitelist) > 0) {
-            if (!IpUtils::checkIp($clientIp, $whitelist)) {
-                return response()->json(['message' => 'Access Denied: Restricted Network.'], 403);
+            // 2. فحص القائمة السوداء (ممنوع فوراً)
+            if (IpUtils::checkIp($clientIp, $blacklist)) {
+                return response()->json(['message' => 'Access Denied: Your IP is blacklisted.'], 403);
             }
+
+            // 3. فحص القائمة البيضاء (إذا وجدت، يُمنع أي شخص ليس فيها)
+            if (count($whitelist) > 0) {
+                if (!IpUtils::checkIp($clientIp, $whitelist)) {
+                    return response()->json(['message' => 'Access Denied: Restricted Network.'], 403);
+                }
+            }
+        } catch (\Throwable $e) {
+            // تجاهل الخطأ في حال لم تكن الجداول مهيأة بعد
         }
 
         return $next($request);

@@ -44,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
         // Passport::routes();
 
         // 5. تهيئة جداول Neon Postgres تلقائياً عند أول تشغيل
-        if (config('database.default') === 'pgsql') {
+        if (env('DB_CONNECTION') === 'pgsql' || config('database.default') === 'pgsql') {
             try {
                 if (!Schema::hasTable('users')) {
                     Artisan::call('migrate', ['--force' => true]);
