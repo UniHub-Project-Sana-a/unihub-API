@@ -80,6 +80,14 @@ foreach ($envOverrides as $k => $v) {
     $_SERVER[$k] = $v;
 }
 
+// Suppress deprecation warnings on PHP 8.5
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
+// Fix SCRIPT_NAME and SCRIPT_FILENAME so Laravel correctly resolves /api routes
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/../public/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+
 // 5. Delegate request to Laravel's public/index.php
 require __DIR__ . '/../public/index.php';
 
