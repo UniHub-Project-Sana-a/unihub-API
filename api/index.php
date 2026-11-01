@@ -52,7 +52,7 @@ if (!file_exists($tmpOauthPublic)) {
 // 4. Override runtime environment variables
 $envOverrides = [
     'APP_ENV' => 'production',
-    'APP_DEBUG' => 'false',
+    'APP_DEBUG' => 'true',
     'APP_KEY' => getenv('APP_KEY') ?: 'base64:J33kuE8MbjWUQdNDDK5rq36Ac5xBS7rPHpOj+yd44xU=',
     'APP_CONFIG_CACHE' => '/tmp/bootstrap/cache/config.php',
     'APP_EVENTS_CACHE' => '/tmp/bootstrap/cache/events.php',
