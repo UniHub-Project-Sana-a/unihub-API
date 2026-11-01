@@ -74,18 +74,17 @@ if ($dbUrl) {
     $dbName = ltrim($parsed['path'] ?? '', '/');
     $port = $parsed['port'] ?? 5432;
 
-    // Neon SNI compatibility
+    // Neon SNI compatibility via password prefix (recommended for Laravel PDO)
     $hostParts = explode('.', $host);
     $endpointId = $hostParts[0] ?? '';
     if ($endpointId && strpos($host, 'neon.tech') !== false) {
         if (strpos($pass, 'endpoint=') === false) {
             $pass = "endpoint={$endpointId};{$pass}";
         }
-        if (strpos($dbUrl, 'options=endpoint') === false) {
-            $sep = (strpos($dbUrl, '?') !== false) ? '&' : '?';
-            $dbUrl .= "{$sep}options=endpoint%3D{$endpointId}";
-        }
     }
+
+    // Reconstruct clean database URL without query string 'options' to avoid PDO option array conflicts
+    $cleanDbUrl = "postgresql://{$user}:" . urlencode($pass) . "@{$host}:{$port}/{$dbName}?sslmode=require";
 
     $envOverrides['DB_CONNECTION'] = 'pgsql';
     $envOverrides['DB_HOST'] = $host;
@@ -94,7 +93,7 @@ if ($dbUrl) {
     $envOverrides['DB_USERNAME'] = $user;
     $envOverrides['DB_PASSWORD'] = $pass;
     $envOverrides['DB_SSLMODE'] = 'require';
-    $envOverrides['DATABASE_URL'] = $dbUrl;
+    $envOverrides['DATABASE_URL'] = $cleanDbUrl;
 } else {
     $envOverrides['DB_CONNECTION'] = 'sqlite';
     $envOverrides['DB_DATABASE'] = $tmpDatabase;
