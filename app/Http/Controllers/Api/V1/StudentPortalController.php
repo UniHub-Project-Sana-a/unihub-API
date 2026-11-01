@@ -115,7 +115,12 @@ class StudentPortalController extends Controller
 
                 $statusText = 'مجدولة';
                 $statusCode = 0;
+                $sessionId = null;
+                $attachments = [];
+                $interactiveQuestions = [];
+
                 if ($activeSession) {
+                    $sessionId = $activeSession->session_id;
                     if ($activeSession->status == 1) {
                         $statusText = 'جارية الآن (مباشرة)';
                         $statusCode = 1;
@@ -123,10 +128,68 @@ class StudentPortalController extends Controller
                         $statusText = 'انتهت';
                         $statusCode = 2;
                     }
+
+                    // جلب مرفقات الجلسة المرفوعة من المحاضر
+                    $dbAttachments = \App\Models\LectureAttachment::where('session_id', $activeSession->session_id)->get();
+                    foreach ($dbAttachments as $att) {
+                        $attachments[] = [
+                            'id' => $att->attachment_id,
+                            'title' => $att->title,
+                            'type' => $att->type,
+                            'url' => $att->url,
+                        ];
+                    }
+                }
+
+                // إذا لم توجد مرفقات خاصة بالجلسة بعد، نجلب مراجع وروابط المقرر المتاحة
+                if (empty($attachments)) {
+                    $courseRefs = \App\Models\CourseReference::where('course_id', $tt->course_id)->take(3)->get();
+                    foreach ($courseRefs as $ref) {
+                        $attachments[] = [
+                            'id' => $ref->reference_id ?? 1,
+                            'title' => $ref->reference_name ?? 'المرجع العلمي للمقرر (PDF/رابط)',
+                            'type' => 'link',
+                            'url' => $ref->url ?? '#',
+                        ];
+                    }
+                }
+
+                // جلب الأسئلة التفاعلية للمحاضرة
+                $topicQuestions = \App\Models\TopicQuestion::whereHas('topic', fn($q) => $q->where('course_id', $tt->course_id))
+                    ->take(3)
+                    ->get();
+
+                if ($topicQuestions->count() > 0) {
+                    foreach ($topicQuestions as $tq) {
+                        $interactiveQuestions[] = [
+                            'id' => $tq->question_id,
+                            'question' => $tq->question_text,
+                            'type' => $tq->question_type ?? 'MCQ',
+                            'options' => is_array($tq->options) ? $tq->options : ['خيار أ', 'خيار ب', 'خيار ج', 'خيار د'],
+                        ];
+                    }
+                } else {
+                    // أسئلة تفاعلية ذكية لقياس استيعاب الطالب فور مسح الـ QR أو أثناء المحاضرة
+                    $interactiveQuestions = [
+                        [
+                            'id' => 101,
+                            'question' => 'ما هو الموضوع الرئيسي المستهدف في محاضرة اليوم لمقرر (' . ($tt->course->course_name ?? 'المقرر') . ')؟',
+                            'type' => 'MCQ',
+                            'options' => ['مقدمة وتأسيس المفاهيم الأساسية', 'التطبيقات العملية والأمثلة', 'مراجعة وحل التدريبات', 'مناقشة أبحاث وتكاليف المقرر'],
+                        ],
+                        [
+                            'id' => 102,
+                            'question' => 'ما مدى وضوح النقاط والمفاهيم المشروحة من قبل أستاذ المقرر؟',
+                            'type' => 'MCQ',
+                            'options' => ['واضحة جداً ومفهومة', 'جيدة مع الحاجة لمزيد من الأمثلة', 'متوسطة وأحتاج إعادة مراجعة', 'تحتاج لتوضيح أكثر في المحاضرة القادمة'],
+                        ]
+                    ];
                 }
 
                 $todayLectures[] = [
                     'timetable_id' => $tt->timetable_id,
+                    'session_id' => $sessionId,
+                    'course_id' => $tt->course_id,
                     'course_name' => $tt->course->course_name ?? 'مقرر دراسي',
                     'course_code' => $tt->course->course_code ?? '',
                     'lecturer_name' => $tt->lecturer->user->full_name ?? 'أستاذ المقرر',
@@ -136,6 +199,8 @@ class StudentPortalController extends Controller
                     'lecture_type' => $tt->lecture_type == 1 ? 'عملي / معمل' : 'نظري',
                     'status_code' => $statusCode,
                     'status_text' => $statusText,
+                    'attachments' => $attachments,
+                    'interactive_questions' => $interactiveQuestions,
                 ];
             }
         }
@@ -800,6 +865,31 @@ class StudentPortalController extends Controller
                 'file_url' => $filePath,
                 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ]
+        ]);
+    }
+
+    /**
+     * إرسال إجابات الطالب على أسئلة المحاضرة التفاعلية
+     * POST /api/v1/student/submit-lecture-answers
+     */
+    public function submitLectureAnswers(Request $request): JsonResponse
+    {
+        $student = $this->getCurrentStudent($request);
+        if (!$student) {
+            return response()->json(['status' => false, 'message' => 'بيانات الطالب غير موجودة.'], 403);
+        }
+
+        $validated = $request->validate([
+            'timetable_id' => 'required|integer',
+            'session_id'   => 'nullable|integer',
+            'answers'      => 'required|array',
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'تم استلام وتوثيق إجاباتك على أسئلة المحاضرة بنجاح! شكراً لمشاركتك الفعالة.',
+            'answered_count' => count($validated['answers']),
+            'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
     }
 }

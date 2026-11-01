@@ -496,6 +496,7 @@ Route::prefix('v1')->group(function ()
             Route::get('announcements', 'announcements');
             Route::post('scan-qr', 'scanQr');
             Route::post('assignments/submit', 'submitAssignment');
+            Route::post('submit-lecture-answers', 'submitLectureAnswers');
         });
 
         // ============================================================

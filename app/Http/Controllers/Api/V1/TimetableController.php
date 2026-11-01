@@ -166,7 +166,9 @@ class TimetableController extends Controller
         $rules = [
             'course_id'     => 'required|integer|exists:courses,course_id',
             'lecturer_id'   => 'required|integer|exists:lecturers,lecturer_id',
-            'group_id'      => 'required|integer|exists:student_groups,group_id',
+            'group_id'      => 'nullable|integer|exists:student_groups,group_id',
+            'group_ids'     => 'nullable|array',
+            'group_ids.*'   => 'integer|exists:student_groups,group_id',
             'classroom_id'  => 'required|integer|exists:classrooms,classroom_id',
             'day_id'        => 'required|integer|exists:days,day_id',
             'period_id'     => 'required|integer|exists:periods,period_id',
@@ -192,51 +194,93 @@ class TimetableController extends Controller
         
         $validatedData = $this->normalizeProgramPath($validator->validated());
 
-        // 2. التحقق من التعارضات (باستخدام الدالة الجديدة الشاملة)
-        // نمرر البيانات كاملة لأن الدالة الجديدة تحتاج التواريخ والقاعة والمحاضر
-        $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $validatedData);
+        // استخراج جميع المجموعات المستهدفة (سواء تم إرسال group_id فردي أو مصفوفة group_ids لمجموعات متعددة)
+        $targetGroupIds = [];
+        if (!empty($validatedData['group_ids']) && is_array($validatedData['group_ids'])) {
+            $targetGroupIds = array_values(array_unique(array_map('intval', $validatedData['group_ids'])));
+        } elseif (!empty($validatedData['group_id'])) {
+            $targetGroupIds = [(int)$validatedData['group_id']];
+        }
+
+        if (empty($targetGroupIds)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'يجب تحديد مجموعة طلابية واحدة على الأقل.'
+            ], 422);
+        }
+
+        unset($validatedData['group_ids']);
+
+        // 2. التحقق من التعارضات لكل مجموعة ولكل من القاعة والمحاضر
+        $allConflicts = [];
+        foreach ($targetGroupIds as $gId) {
+            $checkData = array_merge($validatedData, ['group_id' => $gId]);
+            $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $checkData);
+            if (!empty($conflicts)) {
+                $allConflicts = array_merge($allConflicts, $conflicts);
+            }
+        }
         
-        if (!empty($conflicts)) {
-            $hasTrashConflict = collect($conflicts)->contains('in_trash', true);
+        if (!empty($allConflicts)) {
+            $hasTrashConflict = collect($allConflicts)->contains('in_trash', true);
             return response()->json([
                 'status' => false,
                 'has_trash_conflict' => $hasTrashConflict,
                 'message' => $hasTrashConflict
                     ? 'يوجد تعارض مع محاضرة في سلة المحذوفات. يرجى الذهاب إلى سلة المحذوفات وتأكيد الحذف النهائي أولاً لإتاحة القاعة.'
                     : 'يوجد تعارض في الجدول.',
-                'conflicts' => $conflicts
+                'conflicts' => $allConflicts
             ], 409);
         }
         
-        // 3. إنشاء السجل وإنشاء الجلسة التلقائية (كما عدلناها سابقاً)
+        // 3. إنشاء السجلات لكل مجموعة وإنشاء الجلسات المرتبطة
         try {
-            $timetableEntry = Timetable::create($validatedData);
-    
-            // إنشاء جلسة تلقائية إذا كان تاريخ البدء هو نفسه تاريخ الانتهاء
-            if ($validatedData['start_date'] === $validatedData['end_date']) {
-                $period = Period::find($timetableEntry->period_id);
-                $studentGroup = StudentGroup::withCount('students')->find($timetableEntry->group_id);
-    
-                LectureSession::create([
-                    'timetable_id' => $timetableEntry->timetable_id,
-                    'lecturer_id' => $timetableEntry->lecturer_id,
-                    'session_date' => $timetableEntry->start_date,
-                    'start_time' => $period->start_time,
-                    'end_time' => $period->end_time,
-                    'actual_classroom_id' => $timetableEntry->classroom_id,
-                    'session_code' => 'SESS-' . Str::random(10) . '-' . time(),
-                    'status' => 0,
-                    'is_makeup' => 0,
-                ]);
+            DB::beginTransaction();
+
+            $createdEntries = [];
+            $sharedSessionCode = 'SESS-' . Str::random(10) . '-' . time();
+            $period = Period::find($validatedData['period_id']);
+
+            foreach ($targetGroupIds as $gId) {
+                $entryData = array_merge($validatedData, ['group_id' => $gId]);
+                $timetableEntry = Timetable::create($entryData);
+                $createdEntries[] = $timetableEntry;
+
+                // إنشاء جلسة تلقائية إذا كان تاريخ البدء هو نفسه تاريخ الانتهاء
+                if ($validatedData['start_date'] === $validatedData['end_date']) {
+                    LectureSession::create([
+                        'timetable_id' => $timetableEntry->timetable_id,
+                        'lecturer_id' => $timetableEntry->lecturer_id,
+                        'session_date' => $timetableEntry->start_date,
+                        'start_time' => $period ? $period->start_time : '08:00:00',
+                        'end_time' => $period ? $period->end_time : '10:00:00',
+                        'actual_classroom_id' => $timetableEntry->classroom_id,
+                        'session_code' => $sharedSessionCode,
+                        'status' => 0,
+                        'is_makeup' => 0,
+                    ]);
+                }
             }
-    
+
+            DB::commit();
+
             return response()->json([
                 'status' => true,
-                'message' => 'تم إنشاء الجدول بنجاح.',
-                'data' => $timetableEntry
+                'message' => count($createdEntries) > 1
+                    ? 'تم إنشاء الجدول لمحاضرة مشتركة تشمل (' . count($createdEntries) . ') مجموعات بنجاح.'
+                    : 'تم إنشاء الجدول بنجاح.',
+                'data' => $createdEntries[0],
+                'entries' => $createdEntries
             ], 201);
     
         } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => 'فشل إنشاء الجدول: ' . $e->getMessage()
+            ], 500);
+        }
+    }
             return response()->json([
                 'status' => false,
                 'message' => 'حدث خطأ غير متوقع.',
