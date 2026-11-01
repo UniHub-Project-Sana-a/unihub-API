@@ -79,14 +79,11 @@ Route::get('/ping', [HealthController::class, 'ping']);
 // نقطة تهيئة قاعدة البيانات السحابية (Migration & Seed)
 Route::get('/setup-db', function () {
     try {
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        $migrateOutput = \Illuminate\Support\Facades\Artisan::output();
-        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
-        $seedOutput = \Illuminate\Support\Facades\Artisan::output();
+        \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--seed' => true, '--force' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
         return response()->json([
             'status' => 'success',
-            'migrate' => $migrateOutput,
-            'seed' => $seedOutput,
+            'output' => $output,
         ]);
     } catch (\Throwable $e) {
         return response()->json([
