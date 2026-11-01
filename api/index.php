@@ -63,9 +63,16 @@ $envOverrides = [
     'CACHE_STORE' => 'array',
     'SESSION_DRIVER' => 'cookie',
     'LOG_CHANNEL' => 'stderr',
-    'DB_CONNECTION' => 'sqlite',
-    'DB_DATABASE' => $tmpDatabase,
 ];
+
+if (getenv('DATABASE_URL') || getenv('POSTGRES_URL')) {
+    $dbUrl = getenv('DATABASE_URL') ?: getenv('POSTGRES_URL');
+    $envOverrides['DB_CONNECTION'] = 'pgsql';
+    $envOverrides['DATABASE_URL'] = $dbUrl;
+} else {
+    $envOverrides['DB_CONNECTION'] = 'sqlite';
+    $envOverrides['DB_DATABASE'] = $tmpDatabase;
+}
 
 foreach ($envOverrides as $k => $v) {
     putenv("{$k}={$v}");
@@ -75,3 +82,4 @@ foreach ($envOverrides as $k => $v) {
 
 // 5. Delegate request to Laravel's public/index.php
 require __DIR__ . '/../public/index.php';
+
