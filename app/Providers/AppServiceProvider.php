@@ -45,13 +45,14 @@ class AppServiceProvider extends ServiceProvider
             Passport::loadKeysFrom('/tmp');
         }
 
-        // 5. تهيئة جداول Neon Postgres تلقائياً عند أول تشغيل
-        if (env('DB_CONNECTION') === 'pgsql' || config('database.default') === 'pgsql') {
+        // 5. تهيئة جداول Neon Postgres تلقائياً عند أول تشغيل (مرة واحدة لكل حاوية لتفادي تأخير الاستجابة)
+        if ((env('DB_CONNECTION') === 'pgsql' || config('database.default') === 'pgsql') && !file_exists('/tmp/db_initialized')) {
             try {
                 if (!Schema::hasTable('users')) {
                     Artisan::call('migrate', ['--force' => true]);
                     Artisan::call('db:seed', ['--force' => true]);
                 }
+                @touch('/tmp/db_initialized');
             } catch (\Throwable $e) {
                 Log::warning('Neon auto-migration error: ' . $e->getMessage());
             }

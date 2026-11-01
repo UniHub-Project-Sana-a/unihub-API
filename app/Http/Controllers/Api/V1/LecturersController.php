@@ -23,7 +23,7 @@ class LecturersController extends Controller
     {
         $query = Lecturer::query()->with([
             'user:user_id,full_name,email,phone,academic_number',
-            'academicTitle:title_id,title_name,title_code,hourly_price,lecture_price',
+            'academicTitle:title_id,title_name,title_code,hourly_price',
             'department:department_id,department_name,department_code',
             'college:college_id,college_name',
         ]);

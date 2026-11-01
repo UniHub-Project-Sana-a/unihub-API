@@ -65,12 +65,12 @@ $envOverrides = [
     'LOG_CHANNEL' => 'stderr',
 ];
 
-$dbUrl = getenv('DATABASE_URL_UNPOOLED')
-    ?: getenv('STORAGE_DATABASE_URL_UNPOOLED')
-    ?: getenv('DATABASE_URL')
+$dbUrl = getenv('DATABASE_URL')
     ?: getenv('STORAGE_DATABASE_URL')
     ?: getenv('POSTGRES_URL')
     ?: getenv('STORAGE_URL')
+    ?: getenv('DATABASE_URL_UNPOOLED')
+    ?: getenv('STORAGE_DATABASE_URL_UNPOOLED')
     ?: getenv('STORAGE_POSTGRES_URL');
 
 if (!$dbUrl) {

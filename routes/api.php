@@ -133,7 +133,7 @@ Route::prefix('v1')->group(function ()
 
     });
 
-    Route::middleware(['auth:api', 'activity:admin', 'throttle:60,1'])->group(function () {
+    Route::middleware(['auth:api', 'activity:admin', 'throttle:300,1'])->group(function () {
 
 
 
