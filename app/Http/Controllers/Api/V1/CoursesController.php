@@ -377,9 +377,10 @@ class CoursesController extends Controller
     public function destroy(Course $course)
     {
         // ✅ التحقق من وجود جداول مرتبطة
-        if ($course->timetables()->count() > 0) {
+        $activeTimetablesCount = $course->timetables()->count();
+        if ($activeTimetablesCount > 0) {
             return response()->json([
-                'message' => 'لا يمكن حذف المقرر لأنه مرتبط بجدول دراسي'
+                'message' => 'لا يمكن حذف المقرر (' . $course->course_name . ') لأنه مرتبط بجدول دراسي معتمد (' . $activeTimetablesCount . ' محاضرات). يرجى إزالة المحاضرات المرتبطة به من الجدول الدراسي أولاً لإتمام الحذف.'
             ], 422);
         }
 
