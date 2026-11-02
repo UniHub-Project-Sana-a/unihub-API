@@ -80,9 +80,45 @@ class QrCodesController extends Controller
             DB::table('session_topics_covered')->insertOrIgnore($topicsData);
         }
 
-        LectureSession::where('session_id', $request->session_id)->update([
+        // تحديث وقت البدء الفعلي والمواضيع لجميع الجلسات النظيرة المشتركة في نفس المحاضرة
+        $session = LectureSession::with('timetable')->find($request->session_id);
+        $peerSessionIds = [$request->session_id];
+        if ($session && $session->timetable) {
+            $peerSessionIds = LectureSession::where('session_date', $session->session_date)
+                ->where('start_time', $session->start_time)
+                ->where('end_time', $session->end_time)
+                ->whereHas('timetable', function($q) use ($session) {
+                    $q->where('course_id', $session->timetable->course_id)
+                      ->where('lecturer_id', $session->timetable->lecturer_id);
+                })
+                ->pluck('session_id')
+                ->toArray();
+        }
+
+        LectureSession::whereIn('session_id', $peerSessionIds)->update([
             'actual_start_time' => Carbon::now(),
         ]);
+
+        // توثيق المواضيع للجلسات النظيرة أيضاً
+        if (!empty($topicsData) && count($peerSessionIds) > 1) {
+            $peerTopics = [];
+            foreach ($peerSessionIds as $pId) {
+                if ($pId != $request->session_id) {
+                    foreach ($request->topics as $topicId) {
+                        $peerTopics[] = [
+                            'session_id'      => $pId,
+                            'topic_id'        => $topicId,
+                            'coverage_status' => 'fully_covered',
+                            'created_at'      => $now,
+                            'updated_at'      => $now,
+                        ];
+                    }
+                }
+            }
+            if (!empty($peerTopics)) {
+                DB::table('session_topics_covered')->insertOrIgnore($peerTopics);
+            }
+        }
 
         return response()->json([
             'status' => true,

@@ -20,16 +20,15 @@ class StudentAttendanceController extends Controller
      */
         public function index(Request $request)
     {
-        $sessionCode = null;
+        $sessionCodes = [];
 
-        // 1. محاولة العثور على كود الجلسة
+        // 1. محاولة العثور على أكواد الجلسات
         if ($request->filled('session_code')) {
-            // أ) إذا تم إرسال كود الجلسة مباشرة
-            $sessionCode = $request->session_code;
+            $sessionCodes = [$request->session_code];
         } 
         elseif ($request->filled('timetable_id')) {
             
-            $query = LectureSession::where('timetable_id', $request->timetable_id);
+            $query = LectureSession::with('timetable')->where('timetable_id', $request->timetable_id);
 
             // ب) ✅ التحسين: البحث باستخدام التاريخ إذا توفر (وهو ما يرسله الفرونت الآن)
             if ($request->filled('attendance_date')) {
@@ -42,23 +41,37 @@ class StudentAttendanceController extends Controller
             $session = $query->first();
 
             if ($session) {
-                $sessionCode = $session->session_code;
-                
-                // (اختياري) تحديث عداد النظام في جدول الجلسات ليكون متزامن دائماً
-                // نضعه هنا لنضمن أننا نحدث الجلسة الصحيحة
-                $count = StudentAttendance::where('session_code', $sessionCode)->count();
-                $session->update(['system_attendance_count' => $count]);
+                // جلب جميع الجلسات المشتركة لنفس المقرر والمحاضر والوقت
+                $peerSessions = LectureSession::where('session_date', $session->session_date)
+                    ->where('start_time', $session->start_time)
+                    ->where('end_time', $session->end_time)
+                    ->whereHas('timetable', function($q) use ($session) {
+                        $q->where('course_id', $session->timetable->course_id)
+                          ->where('lecturer_id', $session->timetable->lecturer_id);
+                    })
+                    ->get();
+
+                $sessionCodes = $peerSessions->pluck('session_code')->filter()->unique()->toArray();
+                if (empty($sessionCodes)) {
+                    $sessionCodes = [$session->session_code];
+                }
+
+                // تحديث عدادات النظام لجميع الجلسات المشتركة
+                foreach ($peerSessions as $pSession) {
+                    $cnt = StudentAttendance::where('session_code', $pSession->session_code)->count();
+                    $pSession->update(['system_attendance_count' => $cnt]);
+                }
             }
         }
 
         // إذا لم نجد كود جلسة، نرجع مصفوفة فارغة
-        if (!$sessionCode) {
+        if (empty($sessionCodes)) {
             return response()->json(['data' => []]);
         }
 
-        // 2. جلب سجلات الحضور
-        $attendanceRecords = StudentAttendance::where('session_code', $sessionCode)
-                                              ->with('student.user') // Eager Loading
+        // 2. جلب سجلات الحضور لجميع المجموعات المشاركة في الجلسة المشتركة
+        $attendanceRecords = StudentAttendance::whereIn('session_code', $sessionCodes)
+                                              ->with(['student.user', 'student.group', 'timetable.group']) // Eager Loading
                                               ->get();
 
         // 3. تنسيق البيانات (Mapping)
@@ -75,6 +88,8 @@ class StudentAttendanceController extends Controller
                 'studentId'     => $record->student->user->academic_number,
                 'status'        => $record->status,
                 'scanTime'      => $record->created_at ? $record->created_at->format('H:i:s') : 'N/A',
+                'group_id'      => $record->student->group_id ?? $record->timetable->group_id ?? null,
+                'group_name'    => $record->student->group->group_name ?? $record->timetable->group->group_name ?? null,
                 
                 // ✅✅✅ التصحيح هنا: إرجاع القيمة الحقيقية من قاعدة البيانات
                 'attendance_method' => $record->attendance_method, 

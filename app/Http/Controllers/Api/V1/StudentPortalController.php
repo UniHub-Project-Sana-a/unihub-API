@@ -790,6 +790,26 @@ class StudentPortalController extends Controller
             return response()->json(['status' => false, 'message' => 'تعذر العثور على جلسة المحاضرة المرتبطة.'], 404);
         }
 
+        // 2.1 توحيد وتوجيه التحضير للمحاضرة المشتركة بين عدة مجموعات
+        // إذا كان رمز الـ QR يتبع جلسة مجموعة معينة ولكن الطالب ينتمي لمجموعة أخرى مشتركة في نفس المحاضرة
+        $targetSession = $session;
+        if ($session->timetable && $student->group_id && $session->timetable->group_id != $student->group_id) {
+            $peerSession = LectureSession::where('session_date', $session->session_date)
+                ->where('start_time', $session->start_time)
+                ->where('end_time', $session->end_time)
+                ->whereHas('timetable', function($q) use ($session, $student) {
+                    $q->where('course_id', $session->timetable->course_id)
+                      ->where('lecturer_id', $session->timetable->lecturer_id)
+                      ->where('group_id', $student->group_id);
+                })
+                ->with(['actualClassroom', 'timetable.course', 'timetable.lecturer.user'])
+                ->first();
+
+            if ($peerSession) {
+                $targetSession = $peerSession;
+            }
+        }
+
         // 3. التحقق الجغرافي الصارم (Geofencing)
         $targetLat = (float)($qrCode->latitude ?? $session->actualClassroom->latitude ?? 0);
         $targetLon = (float)($qrCode->longitude ?? $session->actualClassroom->longitude ?? 0);
@@ -812,14 +832,28 @@ class StudentPortalController extends Controller
             ], 422);
         }
 
-        // 4. التحقق من عدم التكرار لنفس الجلسة
+        // 4. التحقق من عدم التكرار لنفس الجلسة أو الجلسات المشتركة النظيرة
+        $sharedSessionCodes = LectureSession::where('session_date', $session->session_date)
+            ->where('start_time', $session->start_time)
+            ->where('end_time', $session->end_time)
+            ->whereHas('timetable', function($q) use ($session) {
+                $q->where('course_id', $session->timetable->course_id)
+                  ->where('lecturer_id', $session->timetable->lecturer_id);
+            })
+            ->pluck('session_code')
+            ->toArray();
+
+        if (empty($sharedSessionCodes)) {
+            $sharedSessionCodes = [$session->session_code, $targetSession->session_code];
+        }
+
         $existing = StudentAttendance::where('student_id', $student->student_id)
-            ->where('session_code', $session->session_code)
+            ->whereIn('session_code', $sharedSessionCodes)
             ->first();
 
         $interactiveQuestions = $this->getLectureInteractiveQuestions(
-            $session->timetable->course_id,
-            $session->timetable->course->course_name ?? 'المقرر'
+            $targetSession->timetable->course_id,
+            $targetSession->timetable->course->course_name ?? 'المقرر'
         );
 
         $hasAnsweredQuestions = false;
@@ -827,9 +861,9 @@ class StudentPortalController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasTable('student_lecture_answers')) {
                 $hasAnsweredQuestions = \Illuminate\Support\Facades\DB::table('student_lecture_answers')
                     ->where('student_id', $student->student_id)
-                    ->where('timetable_id', $session->timetable_id)
-                    ->where(function($q) use ($session) {
-                        $q->where('session_id', $session->session_id)
+                    ->where('timetable_id', $targetSession->timetable_id)
+                    ->where(function($q) use ($targetSession) {
+                        $q->where('session_id', $targetSession->session_id)
                           ->orWhereDate('created_at', Carbon::today());
                     })
                     ->exists();
@@ -843,14 +877,14 @@ class StudentPortalController extends Controller
                 'status' => true,
                 'already_recorded' => true,
                 'message' => 'لقد تم التحقق من تسجيل حضورك مسبقاً في هذه الجلسة بنجاح.',
-                'course_name' => $session->timetable->course->course_name ?? 'المقرر',
-                'session_code' => $session->session_code,
+                'course_name' => $targetSession->timetable->course->course_name ?? 'المقرر',
+                'session_code' => $targetSession->session_code,
                 'data' => [
-                    'timetable_id' => $session->timetable_id,
-                    'session_id' => $session->session_id,
-                    'course_name' => $session->timetable->course->course_name ?? 'المقرر',
-                    'lecturer_name' => $session->timetable->lecturer->user->full_name ?? 'المحاضر',
-                    'classroom' => $session->actualClassroom->classroom_name ?? 'القاعة',
+                    'timetable_id' => $targetSession->timetable_id,
+                    'session_id' => $targetSession->session_id,
+                    'course_name' => $targetSession->timetable->course->course_name ?? 'المقرر',
+                    'lecturer_name' => $targetSession->timetable->lecturer->user->full_name ?? 'المحاضر',
+                    'classroom' => $targetSession->actualClassroom->classroom_name ?? 'القاعة',
                     'distance' => round($distance, 1) . ' متر',
                     'interactive_questions' => $interactiveQuestions,
                     'has_answered_questions' => $hasAnsweredQuestions,
@@ -858,30 +892,30 @@ class StudentPortalController extends Controller
             ]);
         }
 
-        // 5. تسجيل الحضور الفعلي في قاعدة البيانات
+        // 5. تسجيل الحضور الفعلي في قاعدة البيانات تحت الجدول والجلسة الخاصة بمجموعة الطالب
         $attendance = StudentAttendance::create([
             'student_id'        => $student->student_id,
-            'timetable_id'      => $session->timetable_id,
-            'level_id'          => $student->level_id ?? 1,
+            'timetable_id'      => $targetSession->timetable_id,
+            'level_id'          => $student->level_id ?? $targetSession->timetable->level_id ?? 1,
             'attendance_date'   => Carbon::today()->toDateString(),
             'status'            => 1, // 1 = حاضر
             'attendance_method' => 0, // 0 = QR
             'college_id'        => $student->college_id ?? 1,
             'department_id'     => $student->department_id ?? 1,
-            'session_code'      => $session->session_code,
+            'session_code'      => $targetSession->session_code,
         ]);
 
-        $session->increment('system_attendance_count');
+        $targetSession->increment('system_attendance_count');
 
         return response()->json([
             'status' => true,
             'message' => 'تم التحقق من وجودك في القاعة بنجاح! تفضل بالإجابة على الأسئلة التفاعلية لاعتماد التحضير.',
             'data' => [
-                'timetable_id' => $session->timetable_id,
-                'session_id' => $session->session_id,
-                'course_name' => $session->timetable->course->course_name ?? 'المقرر',
-                'lecturer_name' => $session->timetable->lecturer->user->full_name ?? 'المحاضر',
-                'classroom' => $session->actualClassroom->classroom_name ?? 'القاعة',
+                'timetable_id' => $targetSession->timetable_id,
+                'session_id' => $targetSession->session_id,
+                'course_name' => $targetSession->timetable->course->course_name ?? 'المقرر',
+                'lecturer_name' => $targetSession->timetable->lecturer->user->full_name ?? 'المحاضر',
+                'classroom' => $targetSession->actualClassroom->classroom_name ?? 'القاعة',
                 'distance' => round($distance, 1) . ' متر',
                 'time' => Carbon::now()->format('H:i:s'),
                 'interactive_questions' => $interactiveQuestions,

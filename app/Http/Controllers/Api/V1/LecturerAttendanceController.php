@@ -128,23 +128,50 @@ class LecturerAttendanceController extends Controller
             $sessionCode = $session->session_code;
             $attendanceDate = $session->session_date;
 
+            // ✅ جلب جميع الجلسات النظيرة المشتركة لنفس المحاضرة (نفس المقرر، المحاضر، والتوقيت)
+            $peerSessions = LectureSession::where('session_date', $session->session_date)
+                ->where('start_time', $session->start_time)
+                ->where('end_time', $session->end_time)
+                ->whereHas('timetable', function($q) use ($timetable) {
+                    $q->where('course_id', $timetable->course_id)
+                      ->where('lecturer_id', $timetable->lecturer_id);
+                })
+                ->with('timetable')
+                ->get();
+
+            if ($peerSessions->isEmpty()) {
+                $peerSessions = collect([$session]);
+            }
+
+            // خريطة لربط كل مجموعة بالجلسة وجدول المحاضرات الخاص بها
+            $groupSessionMap = [];
+            $involvedGroupIds = [];
+            foreach ($peerSessions as $pSession) {
+                if ($pSession->timetable && $pSession->timetable->group_id) {
+                    $gId = $pSession->timetable->group_id;
+                    $groupSessionMap[$gId] = $pSession;
+                    $involvedGroupIds[] = $gId;
+                }
+            }
+            if (empty($involvedGroupIds)) {
+                $involvedGroupIds = [$request->group_id];
+            }
+            $involvedGroupIds = array_unique($involvedGroupIds);
+
             // ---------------------------------------------------------
-            // أولاً: معالجة حضور الطلاب (مع حفظ طريقة الحضور)
+            // أولاً: معالجة حضور الطلاب لجميع المجموعات المشتركة
             // ---------------------------------------------------------
             
-            // أ) جلب جميع معرفات الطلاب في هذه المجموعة (لنعرف الغائبين أيضاً)
+            // أ) جلب جميع معرفات الطلاب في جميع المجموعات المشتركة
             $allGroupMembers = DB::table('student_group_members')
-                                 ->where('group_id', $request->group_id)
+                                 ->whereIn('group_id', $involvedGroupIds)
                                  ->pluck('student_id');
 
             // ب) تحويل البيانات القادمة إلى Collection ليسهل البحث فيها عن طريق student_id
-            // المفتاح هو student_id والقيمة هي كامل الأوبجكت (بما فيه attendance_method)
             $presentStudentsMap = collect($request->students_data)->keyBy('student_id');
 
             foreach ($allGroupMembers as $studentId) {
-                // جلب بيانات الطالب (للكلية والقسم) - يمكن تحسين الأداء بجلبهم دفعة واحدة لكن هذا آمن
                 $student = Student::find($studentId);
-                
                 if (!$student) continue;
 
                 // هل الطالب موجود في قائمة الحاضرين؟
@@ -153,17 +180,20 @@ class LecturerAttendanceController extends Controller
 
                 // تحديد القيم
                 $status = $isPresent ? 1 : 0;
-                // إذا كان حاضر نأخذ طريقته، إذا غائب نضع 0 افتراضياً
                 $method = $isPresent ? $attendanceData['attendance_method'] : 0; 
+
+                // ربط الطالب بجدوله وجلسته المحددة لمجموعته
+                $assignedSession = $groupSessionMap[$student->group_id] ?? $session;
+                $assignedTimetable = $assignedSession->timetable ?? $timetable;
 
                 StudentAttendance::updateOrCreate(
                     [
                         'student_id'   => $studentId,
-                        'session_code' => $sessionCode, // المفتاح الفريد للجلسة
+                        'session_code' => $assignedSession->session_code, // المفتاح الفريد لجلسة مجموعة الطالب
                     ],
                     [
-                        'timetable_id'        => $timetable->timetable_id,
-                        'level_id'            => $timetable->level_id,
+                        'timetable_id'        => $assignedTimetable->timetable_id,
+                        'level_id'            => $assignedTimetable->level_id ?? $student->level_id ?? 1,
                         'attendance_date'     => $attendanceDate,
                         'status'              => $status,
                         'attendance_method'   => $method, // ✅ تم حفظ الطريقة هنا
@@ -175,13 +205,13 @@ class LecturerAttendanceController extends Controller
             }
 
             // ---------------------------------------------------------
-            // ثانياً: معالجة حضور المحاضر والحسابات المالية (كما هي في كودك)
+            // ثانياً: معالجة حضور المحاضر والحسابات المالية
             // ---------------------------------------------------------
             
             $lecturer = $timetable->lecturer;
             
             $hourlyRate = 0;
-            if ($lecturer->academicTitle) {
+            if ($lecturer && $lecturer->academicTitle) {
                 $hourlyRate = $lecturer->academicTitle->hourly_price;
             }
 
@@ -208,18 +238,21 @@ class LecturerAttendanceController extends Controller
             );
 
             // ---------------------------------------------------------
-            // ثالثاً: تحديث حالة الجلسة
+            // ثالثاً: تحديث حالة جميع الجلسات النظيرة المشتركة
             // ---------------------------------------------------------
             
-            $session->update([
-                'status' => 2, // مكتملة
-                'system_attendance_count' => $presentStudentsMap->count(),
-                'actual_attendance_count' => $presentStudentsMap->count()
-            ]);
+            foreach ($peerSessions as $pSession) {
+                $pCount = StudentAttendance::where('session_code', $pSession->session_code)->where('status', 1)->count();
+                $pSession->update([
+                    'status' => 2, // مكتملة
+                    'system_attendance_count' => $pCount,
+                    'actual_attendance_count' => $pCount
+                ]);
+            }
 
             return response()->json([
                 'status' => true, 
-                'message' => 'تمت مصادقة الجلسة وحفظ طريقة الحضور بنجاح.',
+                'message' => 'تمت مصادقة الجلسة وحفظ طريقة الحضور بنجاح لجميع المجموعات المشاركة.',
                 'data' => [
                     'present_count' => $presentStudentsMap->count(),
                     'absent_count'  => $allGroupMembers->count() - $presentStudentsMap->count(),
