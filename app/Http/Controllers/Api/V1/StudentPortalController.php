@@ -191,6 +191,25 @@ class StudentPortalController extends Controller
                     ];
                 }
 
+                // التحقق مما إذا كان الطالب قد مسح رمز الـ QR وحضر هذه المحاضرة اليوم
+                $isAttendedToday = StudentAttendance::where('student_id', $student->student_id)
+                    ->where('timetable_id', $tt->timetable_id)
+                    ->where('attendance_date', Carbon::today()->toDateString())
+                    ->exists();
+
+                // التحقق مما إذا كان الطالب قد أجاب بالفعل على أسئلة هذه المحاضرة
+                $hasAnsweredQuestions = false;
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('student_lecture_answers')) {
+                        $hasAnsweredQuestions = \Illuminate\Support\Facades\DB::table('student_lecture_answers')
+                            ->where('student_id', $student->student_id)
+                            ->where('timetable_id', $tt->timetable_id)
+                            ->exists();
+                    }
+                } catch (\Throwable) {
+                    $hasAnsweredQuestions = false;
+                }
+
                 $todayLectures[] = [
                     'timetable_id' => $tt->timetable_id,
                     'session_id' => $sessionId,
@@ -204,6 +223,8 @@ class StudentPortalController extends Controller
                     'lecture_type' => $tt->lecture_type == 1 ? 'عملي / معمل' : 'نظري',
                     'status_code' => $statusCode,
                     'status_text' => $statusText,
+                    'is_attended' => $isAttendedToday,
+                    'has_answered_questions' => $hasAnsweredQuestions,
                     'attachments' => $attachments,
                     'interactive_questions' => $interactiveQuestions,
                 ];
@@ -811,6 +832,13 @@ class StudentPortalController extends Controller
                 'message' => 'لقد تم تسجيل حضورك مسبقاً في هذه الجلسة بنجاح.',
                 'course_name' => $session->timetable->course->course_name ?? 'المقرر',
                 'session_code' => $session->session_code,
+                'data' => [
+                    'timetable_id' => $session->timetable_id,
+                    'session_id' => $session->session_id,
+                    'course_name' => $session->timetable->course->course_name ?? 'المقرر',
+                    'lecturer_name' => $session->timetable->lecturer->user->full_name ?? 'المحاضر',
+                    'classroom' => $session->actualClassroom->classroom_name ?? 'القاعة',
+                ]
             ]);
         }
 
@@ -833,6 +861,8 @@ class StudentPortalController extends Controller
             'status' => true,
             'message' => 'تم تسجيل حضورك بنجاح عبر التحقق الجغرافي ورمز الـ QR!',
             'data' => [
+                'timetable_id' => $session->timetable_id,
+                'session_id' => $session->session_id,
                 'course_name' => $session->timetable->course->course_name ?? 'المقرر',
                 'lecturer_name' => $session->timetable->lecturer->user->full_name ?? 'المحاضر',
                 'classroom' => $session->actualClassroom->classroom_name ?? 'القاعة',
@@ -916,6 +946,28 @@ class StudentPortalController extends Controller
             'session_id'   => 'nullable|integer',
             'answers'      => 'required|array',
         ]);
+
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('student_lecture_answers')) {
+                foreach ($validated['answers'] as $ans) {
+                    \Illuminate\Support\Facades\DB::table('student_lecture_answers')->updateOrInsert(
+                        [
+                            'student_id' => $student->student_id,
+                            'timetable_id' => $validated['timetable_id'],
+                            'question_id' => $ans['question_id'] ?? 0,
+                        ],
+                        [
+                            'session_id' => $validated['session_id'] ?? null,
+                            'answer_value' => is_array($ans['answer_value'] ?? '') ? json_encode($ans['answer_value']) : (string)($ans['answer_value'] ?? ''),
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now(),
+                        ]
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Error storing student lecture answers: ' . $e->getMessage());
+        }
 
         return response()->json([
             'status' => true,

@@ -241,7 +241,6 @@ class TimetableController extends Controller
             DB::beginTransaction();
 
             $createdEntries = [];
-            $sharedSessionCode = 'SESS-' . Str::random(10) . '-' . time();
             $period = Period::find($validatedData['period_id']);
 
             foreach ($targetGroupIds as $gId) {
@@ -251,6 +250,8 @@ class TimetableController extends Controller
 
                 // إنشاء جلسة تلقائية إذا كان تاريخ البدء هو نفسه تاريخ الانتهاء
                 if ($validatedData['start_date'] === $validatedData['end_date']) {
+                    // رمز جلسة فريد لكل مجموعة لتجنب خرق القيد الفريد session_code
+                    $groupSessionCode = 'SESS-' . Str::random(8) . '-' . time() . '-' . $gId;
                     LectureSession::create([
                         'timetable_id' => $timetableEntry->timetable_id,
                         'lecturer_id' => $timetableEntry->lecturer_id,
@@ -258,7 +259,7 @@ class TimetableController extends Controller
                         'start_time' => $period ? $period->start_time : '08:00:00',
                         'end_time' => $period ? $period->end_time : '10:00:00',
                         'actual_classroom_id' => $timetableEntry->classroom_id,
-                        'session_code' => $sharedSessionCode,
+                        'session_code' => $groupSessionCode,
                         'status' => 0,
                         'is_makeup' => 0,
                     ]);
