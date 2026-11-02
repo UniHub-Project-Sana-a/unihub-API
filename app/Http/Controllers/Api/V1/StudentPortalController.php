@@ -118,19 +118,22 @@ class StudentPortalController extends Controller
                     ->whereDate('session_date', $today)
                     ->first();
 
-                $statusText = 'مجدولة';
-                $statusCode = 0;
+                $nowTime = Carbon::now()->format('H:i:s');
+                $startTime = $tt->period ? substr($tt->period->start_time, 0, 8) : '08:00:00';
+                $endTime = $tt->period ? substr($tt->period->end_time, 0, 8) : '10:00:00';
+
+                $statusText = 'مجدولة (تبدأ ' . substr($startTime, 0, 5) . ')';
+                $statusCode = 0; // 0 = مجدولة لم يحن وقتها، 1 = جارية الآن، 2 = انتهت
                 $sessionId = null;
                 $attachments = [];
-                $interactiveQuestions = [];
 
                 if ($activeSession) {
                     $sessionId = $activeSession->session_id;
                     if ($activeSession->status == 1) {
-                        $statusText = 'جارية الآن (مباشرة)';
+                        $statusText = 'جارية الآن';
                         $statusCode = 1;
                     } elseif ($activeSession->status == 2) {
-                        $statusText = 'انتهت';
+                        $statusText = 'انتهت المحاضرة';
                         $statusCode = 2;
                     }
 
@@ -143,6 +146,20 @@ class StudentPortalController extends Controller
                             'type' => $att->type,
                             'url' => $att->url,
                         ];
+                    }
+                }
+
+                // إذا لم يتم تحديد حالة صريحة من المحاضر، نتحقق بالوقت الفعلي الحالي
+                if ($statusCode === 0) {
+                    if ($nowTime >= $startTime && $nowTime <= $endTime) {
+                        $statusCode = 1;
+                        $statusText = 'جارية الآن';
+                    } elseif ($nowTime > $endTime) {
+                        $statusCode = 2;
+                        $statusText = 'انتهت المحاضرة';
+                    } else {
+                        $statusCode = 0;
+                        $statusText = 'مجدولة (تبدأ ' . substr($startTime, 0, 5) . ')';
                     }
                 }
 
@@ -160,36 +177,10 @@ class StudentPortalController extends Controller
                 }
 
                 // جلب الأسئلة التفاعلية للمحاضرة
-                $topicQuestions = \App\Models\TopicQuestion::whereHas('topic', fn($q) => $q->where('course_id', $tt->course_id))
-                    ->take(3)
-                    ->get();
-
-                if ($topicQuestions->count() > 0) {
-                    foreach ($topicQuestions as $tq) {
-                        $interactiveQuestions[] = [
-                            'id' => $tq->question_id,
-                            'question' => $tq->question_text,
-                            'type' => $tq->question_type ?? 'MCQ',
-                            'options' => is_array($tq->options) ? $tq->options : ['خيار أ', 'خيار ب', 'خيار ج', 'خيار د'],
-                        ];
-                    }
-                } else {
-                    // أسئلة تفاعلية ذكية لقياس استيعاب الطالب فور مسح الـ QR أو أثناء المحاضرة
-                    $interactiveQuestions = [
-                        [
-                            'id' => 101,
-                            'question' => 'ما هو الموضوع الرئيسي المستهدف في محاضرة اليوم لمقرر (' . ($tt->course->course_name ?? 'المقرر') . ')؟',
-                            'type' => 'MCQ',
-                            'options' => ['مقدمة وتأسيس المفاهيم الأساسية', 'التطبيقات العملية والأمثلة', 'مراجعة وحل التدريبات', 'مناقشة أبحاث وتكاليف المقرر'],
-                        ],
-                        [
-                            'id' => 102,
-                            'question' => 'ما مدى وضوح النقاط والمفاهيم المشروحة من قبل أستاذ المقرر؟',
-                            'type' => 'MCQ',
-                            'options' => ['واضحة جداً ومفهومة', 'جيدة مع الحاجة لمزيد من الأمثلة', 'متوسطة وأحتاج إعادة مراجعة', 'تحتاج لتوضيح أكثر في المحاضرة القادمة'],
-                        ]
-                    ];
-                }
+                $interactiveQuestions = $this->getLectureInteractiveQuestions(
+                    $tt->course_id,
+                    $tt->course->course_name ?? 'المقرر'
+                );
 
                 // التحقق مما إذا كان الطالب قد مسح رمز الـ QR وحضر هذه المحاضرة اليوم
                 $isAttendedToday = StudentAttendance::where('student_id', $student->student_id)
@@ -825,11 +816,28 @@ class StudentPortalController extends Controller
             ->where('session_code', $session->session_code)
             ->first();
 
+        $interactiveQuestions = $this->getLectureInteractiveQuestions(
+            $session->timetable->course_id,
+            $session->timetable->course->course_name ?? 'المقرر'
+        );
+
+        $hasAnsweredQuestions = false;
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('student_lecture_answers')) {
+                $hasAnsweredQuestions = \Illuminate\Support\Facades\DB::table('student_lecture_answers')
+                    ->where('student_id', $student->student_id)
+                    ->where('timetable_id', $session->timetable_id)
+                    ->exists();
+            }
+        } catch (\Throwable) {
+            $hasAnsweredQuestions = false;
+        }
+
         if ($existing) {
             return response()->json([
                 'status' => true,
                 'already_recorded' => true,
-                'message' => 'لقد تم تسجيل حضورك مسبقاً في هذه الجلسة بنجاح.',
+                'message' => 'لقد تم التحقق من تسجيل حضورك مسبقاً في هذه الجلسة بنجاح.',
                 'course_name' => $session->timetable->course->course_name ?? 'المقرر',
                 'session_code' => $session->session_code,
                 'data' => [
@@ -838,6 +846,9 @@ class StudentPortalController extends Controller
                     'course_name' => $session->timetable->course->course_name ?? 'المقرر',
                     'lecturer_name' => $session->timetable->lecturer->user->full_name ?? 'المحاضر',
                     'classroom' => $session->actualClassroom->classroom_name ?? 'القاعة',
+                    'distance' => round($distance, 1) . ' متر',
+                    'interactive_questions' => $interactiveQuestions,
+                    'has_answered_questions' => $hasAnsweredQuestions,
                 ]
             ]);
         }
@@ -859,7 +870,7 @@ class StudentPortalController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'تم تسجيل حضورك بنجاح عبر التحقق الجغرافي ورمز الـ QR!',
+            'message' => 'تم التحقق من وجودك في القاعة بنجاح! تفضل بالإجابة على الأسئلة التفاعلية لاعتماد التحضير.',
             'data' => [
                 'timetable_id' => $session->timetable_id,
                 'session_id' => $session->session_id,
@@ -868,6 +879,8 @@ class StudentPortalController extends Controller
                 'classroom' => $session->actualClassroom->classroom_name ?? 'القاعة',
                 'distance' => round($distance, 1) . ' متر',
                 'time' => Carbon::now()->format('H:i:s'),
+                'interactive_questions' => $interactiveQuestions,
+                'has_answered_questions' => false,
             ]
         ]);
     }
@@ -1235,6 +1248,70 @@ class StudentPortalController extends Controller
             'status' => true,
             'message' => 'تم تحديد الإشعار كمقروء بنجاح.',
         ]);
+    }
+
+    /**
+     * جلب أو توليد الأسئلة التفاعلية لجلسة المحاضرة
+     */
+    private function getLectureInteractiveQuestions($courseId, $courseName = 'المقرر'): array
+    {
+        try {
+            $topicQuestions = \App\Models\TopicQuestion::whereHas('topic', fn($q) => $q->where('course_id', $courseId))
+                ->take(3)
+                ->get();
+
+            if ($topicQuestions && $topicQuestions->count() > 0) {
+                $questions = [];
+                foreach ($topicQuestions as $tq) {
+                    $questions[] = [
+                        'id' => $tq->question_id,
+                        'question' => $tq->question_text,
+                        'type' => $tq->question_type ?? 'MCQ',
+                        'options' => is_array($tq->options) ? $tq->options : ['الخيار الأول', 'الخيار الثاني', 'الخيار الثالث', 'الخيار الرابع'],
+                    ];
+                }
+                return $questions;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Error fetching topic questions: ' . $e->getMessage());
+        }
+
+        // أسئلة تفاعلية ذكية لقياس استيعاب الطالب فور مسح الـ QR أو أثناء المحاضرة
+        return [
+            [
+                'id' => 101,
+                'question' => 'ما هو الموضوع والمحور الرئيسي المستهدف في محاضرة اليوم لمقرر (' . $courseName . ')؟',
+                'type' => 'MCQ',
+                'options' => [
+                    'مقدمة وتأسيس المفاهيم الأساسية',
+                    'التطبيقات العملية والأمثلة الواقعية',
+                    'مراجعة وحل المسائل والتدريبات',
+                    'مناقشة أبحاث وتكاليف المقرر'
+                ],
+            ],
+            [
+                'id' => 102,
+                'question' => 'ما مدى وضوح النقاط والمفاهيم المشروحة من قبل أستاذ المقرر في جلسة اليوم؟',
+                'type' => 'MCQ',
+                'options' => [
+                    'واضحة جداً ومفهومة بالكامل',
+                    'جيدة مع الحاجة لمزيد من الأمثلة التوضيحية',
+                    'متوسطة وبحاجة لإعادة مراجعة المراجع',
+                    'تحتاج لتوضيح أكثر في المحاضرة القادمة'
+                ],
+            ],
+            [
+                'id' => 103,
+                'question' => 'هل قمت بالاطلاع على المراجع والملفات المرفقة بالمحاضرة مسبقاً؟',
+                'type' => 'MCQ',
+                'options' => [
+                    'نعم، اطلعت عليها واستفدت منها',
+                    'سأقوم بالاطلاع عليها بعد المحاضرة مباشرة',
+                    'أفضل متابعة شرح المحاضر فقط',
+                    'لم تتوفر ملفات مرفقة بعد'
+                ],
+            ]
+        ];
     }
 }
 
