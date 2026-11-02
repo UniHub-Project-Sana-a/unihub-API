@@ -345,7 +345,7 @@ class StudentPortalController extends Controller
             ->where('group_id', $group->group_id)
             ->get();
 
-        $daysOrder = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+        $daysOrder = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
         $grouped = [];
 
         foreach ($daysOrder as $dayName) {
