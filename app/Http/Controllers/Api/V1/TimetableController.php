@@ -217,7 +217,12 @@ class TimetableController extends Controller
         // 2. التحقق من التعارضات لكل مجموعة ولكل من القاعة والمحاضر
         $allConflicts = [];
         foreach ($targetGroupIds as $gId) {
-            $checkData = array_merge($validatedData, ['group_id' => $gId]);
+            $groupModel = StudentGroup::find($gId);
+            $checkData = array_merge($validatedData, [
+                'group_id'      => $gId,
+                'department_id' => ($groupModel && $groupModel->department_id) ? $groupModel->department_id : $validatedData['department_id'],
+                'program_id'    => ($groupModel && $groupModel->program_id) ? $groupModel->program_id : ($validatedData['program_id'] ?? null),
+            ]);
             $conflicts = $this->checkForConflicts($request->day_id, $request->period_id, $checkData);
             if (!empty($conflicts)) {
                 $allConflicts = array_merge($allConflicts, $conflicts);
@@ -244,7 +249,15 @@ class TimetableController extends Controller
             $period = Period::find($validatedData['period_id']);
 
             foreach ($targetGroupIds as $gId) {
-                $entryData = array_merge($validatedData, ['group_id' => $gId]);
+                // ضبط بيانات القسم والبرنامج والمستوى الخاص بكل مجموعة لضمان ظهور المحاضرة في جداول أقسامها الخاصة
+                $groupModel = StudentGroup::find($gId);
+                $entryData = array_merge($validatedData, [
+                    'group_id'      => $gId,
+                    'department_id' => ($groupModel && $groupModel->department_id) ? $groupModel->department_id : $validatedData['department_id'],
+                    'program_id'    => ($groupModel && $groupModel->program_id) ? $groupModel->program_id : ($validatedData['program_id'] ?? null),
+                    'level_id'      => ($groupModel && $groupModel->level_id) ? $groupModel->level_id : ($validatedData['level_id'] ?? null),
+                    'semester_id'   => ($groupModel && $groupModel->semester_id) ? $groupModel->semester_id : ($validatedData['semester_id'] ?? null),
+                ]);
                 $timetableEntry = Timetable::create($entryData);
                 $createdEntries[] = $timetableEntry;
 
