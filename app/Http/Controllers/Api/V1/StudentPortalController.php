@@ -1263,11 +1263,26 @@ class StudentPortalController extends Controller
             if ($topicQuestions && $topicQuestions->count() > 0) {
                 $questions = [];
                 foreach ($topicQuestions as $tq) {
+                    $rawOptions = $tq->options;
+                    $normalizedOptions = [];
+                    if (is_array($rawOptions)) {
+                        foreach ($rawOptions as $opt) {
+                            if (is_array($opt)) {
+                                $normalizedOptions[] = $opt['text'] ?? $opt['option_text'] ?? $opt['title'] ?? (string)reset($opt);
+                            } elseif (is_string($opt)) {
+                                $normalizedOptions[] = $opt;
+                            }
+                        }
+                    }
+                    if (empty($normalizedOptions)) {
+                        $normalizedOptions = ['الخيار الأول', 'الخيار الثاني', 'الخيار الثالث', 'الخيار الرابع'];
+                    }
+
                     $questions[] = [
                         'id' => $tq->question_id,
                         'question' => $tq->question_text,
                         'type' => $tq->question_type ?? 'MCQ',
-                        'options' => is_array($tq->options) ? $tq->options : ['الخيار الأول', 'الخيار الثاني', 'الخيار الثالث', 'الخيار الرابع'],
+                        'options' => array_values($normalizedOptions),
                     ];
                 }
                 return $questions;

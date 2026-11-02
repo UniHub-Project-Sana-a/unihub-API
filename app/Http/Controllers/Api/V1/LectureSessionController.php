@@ -279,7 +279,7 @@ class LectureSessionController extends Controller
             'start_time' => $startTime,
             'end_time' => $endTime,
             'actual_classroom_id' => $classroomId,
-            'session_code' => uniqid('SESS_'),
+            'session_code' => 'SESS_' . $timetable->timetable_id . '_' . str_replace('-', '', $validated['session_date']) . '_' . uniqid(),
             'status' => 0,
             'is_makeup' => $isMakeup ? 1 : 0,
         ]);
@@ -343,7 +343,7 @@ class LectureSessionController extends Controller
                 'start_time' => $timetable->period->start_time,
                 'end_time' => $timetable->period->end_time,
                 'actual_classroom_id' => $timetable->classroom_id,
-                'session_code' => uniqid('SESS_'),
+                'session_code' => 'SESS_' . $timetable->timetable_id . '_' . str_replace('-', '', $date) . '_' . uniqid(),
                 'status' => 0,
                 'is_makeup' => 0, // الجلسات التلقائية ليست تعويضية
                 'created_at' => $now,
