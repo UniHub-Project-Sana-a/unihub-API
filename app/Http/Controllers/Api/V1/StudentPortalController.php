@@ -227,24 +227,40 @@ class StudentPortalController extends Controller
                 ]);
         }
 
-        // 4. المقررات المسجلة في الفصل
+        // 4. المقررات المسجلة في الفصل مع أساتذة المقرر
         $registeredCourses = [];
         if ($groupId) {
-            $distinctCourses = Timetable::with('course')
+            $timetableEntries = Timetable::with(['course', 'lecturer.user'])
                 ->where('group_id', $groupId)
-                ->get()
-                ->pluck('course')
-                ->filter()
-                ->unique('course_id')
-                ->values();
+                ->get();
 
-            foreach ($distinctCourses as $c) {
+            $grouped = $timetableEntries->groupBy('course_id');
+            foreach ($grouped as $cId => $entries) {
+                $c = $entries->first()->course;
+                if (!$c) continue;
+
+                $lecturers = $entries->map(function ($t) {
+                    if (!$t->lecturer_id) return null;
+                    $name = $t->lecturer?->user?->full_name ?? 'أستاذ المقرر';
+                    $type = ((int)$t->lecture_type === 1) ? 'عملي' : 'نظري';
+                    return [
+                        'lecturer_id' => $t->lecturer_id,
+                        'name' => "{$name} ({$type})",
+                        'raw_name' => $name,
+                        'type' => $type,
+                    ];
+                })->filter()->unique('lecturer_id')->values()->all();
+
+                $primaryLecturer = count($lecturers) > 0 ? $lecturers[0]['raw_name'] : 'أستاذ المقرر';
+
                 $registeredCourses[] = [
                     'course_id' => $c->course_id,
                     'course_name' => $c->course_name,
                     'course_code' => $c->course_code,
                     'credit_hours' => $c->credit_hours,
                     'category' => $c->category,
+                    'lecturer_name' => $primaryLecturer,
+                    'lecturers' => $lecturers,
                 ];
             }
         }
@@ -564,6 +580,7 @@ class StudentPortalController extends Controller
 
         $validated = $request->validate([
             'course_id' => 'required|exists:courses,course_id',
+            'lecturer_id' => 'nullable|integer|exists:lecturers,lecturer_id',
             'request_date' => 'required|date',
             'reason' => 'required|string|min:5|max:1000',
             'excuse_image' => 'nullable|string', // صورة العذر أو مساره أو Base64
@@ -605,15 +622,25 @@ class StudentPortalController extends Controller
             $imagePath = $request->excuse_image;
         }
 
-        // تحديد المحاضر المسؤول عن هذا المقرر للمجموعة
-        $tt = Timetable::where('course_id', $validated['course_id'])
-            ->when($groupId, fn($q) => $q->where('group_id', $groupId))
-            ->first();
-
+        // تحديد المحاضر المسؤول
         $lecturerUserId = null;
-        if ($tt && $tt->lecturer_id) {
-            $lecturer = Lecturer::find($tt->lecturer_id);
-            $lecturerUserId = $lecturer ? $lecturer->user_id : null;
+        if ($request->filled('lecturer_id')) {
+            $specifiedLecturer = Lecturer::find((int) $request->lecturer_id);
+            if ($specifiedLecturer) {
+                $lecturerUserId = $specifiedLecturer->user_id;
+            }
+        }
+
+        if (!$lecturerUserId) {
+            // تحديد المحاضر المسؤول عن هذا المقرر لمجموعة الطالب تلقائياً
+            $tt = Timetable::where('course_id', $validated['course_id'])
+                ->when($groupId, fn($q) => $q->where('group_id', $groupId))
+                ->first();
+
+            if ($tt && $tt->lecturer_id) {
+                $lecturer = Lecturer::find($tt->lecturer_id);
+                $lecturerUserId = $lecturer ? $lecturer->user_id : null;
+            }
         }
 
         if (!$lecturerUserId) {

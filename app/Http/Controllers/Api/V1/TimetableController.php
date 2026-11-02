@@ -284,13 +284,6 @@ class TimetableController extends Controller
             ], 500);
         }
     }
-            return response()->json([
-                'status' => false,
-                'message' => 'حدث خطأ غير متوقع.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
 
     /**
      * Display the specified resource.
