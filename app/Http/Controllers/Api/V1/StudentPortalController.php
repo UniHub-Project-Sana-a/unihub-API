@@ -188,13 +188,14 @@ class StudentPortalController extends Controller
                     ->where('attendance_date', Carbon::today()->toDateString())
                     ->exists();
 
-                // التحقق مما إذا كان الطالب قد أجاب بالفعل على أسئلة هذه المحاضرة
+                // التحقق مما إذا كان الطالب قد أجاب بالفعل على أسئلة هذه المحاضرة اليوم
                 $hasAnsweredQuestions = false;
                 try {
                     if (\Illuminate\Support\Facades\Schema::hasTable('student_lecture_answers')) {
                         $hasAnsweredQuestions = \Illuminate\Support\Facades\DB::table('student_lecture_answers')
                             ->where('student_id', $student->student_id)
                             ->where('timetable_id', $tt->timetable_id)
+                            ->whereDate('created_at', Carbon::today())
                             ->exists();
                     }
                 } catch (\Throwable) {
@@ -827,6 +828,10 @@ class StudentPortalController extends Controller
                 $hasAnsweredQuestions = \Illuminate\Support\Facades\DB::table('student_lecture_answers')
                     ->where('student_id', $student->student_id)
                     ->where('timetable_id', $session->timetable_id)
+                    ->where(function($q) use ($session) {
+                        $q->where('session_id', $session->session_id)
+                          ->orWhereDate('created_at', Carbon::today());
+                    })
                     ->exists();
             }
         } catch (\Throwable) {
