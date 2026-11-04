@@ -92,6 +92,11 @@ class Timetable extends Model
         return $this->belongsTo(\App\Models\Semester::class, 'semester_id', 'semester_id');
     }
 
+    public function level()
+    {
+        return $this->belongsTo(\App\Models\Level::class, 'level_id', 'level_id');
+    }
+
     public function block()
     {
         return $this->belongsTo(\App\Models\Block::class, 'block_id', 'id');
