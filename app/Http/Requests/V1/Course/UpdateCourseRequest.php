@@ -13,6 +13,13 @@ class UpdateCourseRequest extends FormRequest
         return true; 
     }
 
+    protected function prepareForValidation()
+    {
+        if ($this->has('category') && $this->category === 'بنك المتطلبات الجامعية') {
+            $this->merge(['category' => 'متطلب جامعة']);
+        }
+    }
+
     public function rules(): array
     {
         $course = $this->route('course');
@@ -37,8 +44,8 @@ class UpdateCourseRequest extends FormRequest
             'credit_hours' => ['sometimes', 'integer', 'min:1'],
             
             'college_id' => ['sometimes', 'integer', 'exists:colleges,college_id'],
-            'department_id' => ['sometimes', 'integer', 'exists:departments,department_id'],
-            'program_id' => ['sometimes', 'integer', 'exists:programs,program_id'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,department_id'],
+            'program_id' => ['nullable', 'integer', 'exists:programs,program_id'],
             
             'course_parts' => ['sometimes', 'array'],
             'course_parts.*.name' => ['required_with:course_parts', 'string', Rule::in(['نظري', 'عملي', 'تمارين', 'سريري'])],
@@ -50,6 +57,7 @@ class UpdateCourseRequest extends FormRequest
                 'sometimes',
                 Rule::in([
                     'متطلب جامعة',
+                    'بنك المتطلبات الجامعية',
                     'متطلب كلية',
                     'متطلب تخصص إجباري',
                     'متطلب تخصص اختياري'

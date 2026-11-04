@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\v1;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\LectureSession;
@@ -34,9 +34,11 @@ class LectureSessionController extends Controller
     
             // جلب القسم القاعة الفعلية
             'timetable.department:department_id,department_name',
+            'timetable.period:period_id,start_time,end_time',
             
-            // ✅ إضافة هامة: جلب بيانات القاعة الفعلية للجلسة (وليس فقط المجدولة)
-            'actualClassroom.building' 
+            // ✅ إضافة هامة: جلب بيانات القاعة والمحاضر الفعلي للجلسة
+            'actualClassroom.building',
+            'actualLecturer.user:user_id,full_name'
         ]);
         
         // 3. إضافة فلتر نطاق التاريخ للعرض الأسبوعي
@@ -277,7 +279,7 @@ class LectureSessionController extends Controller
             'start_time' => $startTime,
             'end_time' => $endTime,
             'actual_classroom_id' => $classroomId,
-            'session_code' => uniqid('SESS_'),
+            'session_code' => 'SESS_' . $timetable->timetable_id . '_' . str_replace('-', '', $validated['session_date']) . '_' . uniqid(),
             'status' => 0,
             'is_makeup' => $isMakeup ? 1 : 0,
         ]);
@@ -341,7 +343,7 @@ class LectureSessionController extends Controller
                 'start_time' => $timetable->period->start_time,
                 'end_time' => $timetable->period->end_time,
                 'actual_classroom_id' => $timetable->classroom_id,
-                'session_code' => uniqid('SESS_'),
+                'session_code' => 'SESS_' . $timetable->timetable_id . '_' . str_replace('-', '', $date) . '_' . uniqid(),
                 'status' => 0,
                 'is_makeup' => 0, // الجلسات التلقائية ليست تعويضية
                 'created_at' => $now,
@@ -395,14 +397,24 @@ class LectureSessionController extends Controller
 
         $session->update($validated);
 
+        $session->load([
+            'timetable.course:course_id,course_name,course_code',
+            'timetable.lecturer.user:user_id,full_name',
+            'timetable.group:group_id,group_name',
+            'timetable.classroom.building:building_id,building_name',
+            'timetable.period:period_id,start_time,end_time',
+            'actualClassroom.building',
+            'actualLecturer.user:user_id,full_name'
+        ]);
+
         return response()->json([
-            'message' => 'Lecture session updated successfully',
+            'message' => 'تم تحديث بيانات الجلسة بنجاح',
             'data' => $session
         ]);
     }
 
     /**
-     * حذف الجلسة
+     * حذف الجلسة (نقل إلى سلة المحذوفات)
      */
     public function destroy($id)
     {
@@ -410,7 +422,7 @@ class LectureSessionController extends Controller
         $session->delete();
 
         return response()->json([
-            'message' => 'Lecture session deleted successfully'
+            'message' => 'تم نقل جلسة المحاضرة إلى سلة المحذوفات بنجاح'
         ]);
     }
 

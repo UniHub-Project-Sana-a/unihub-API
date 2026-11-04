@@ -109,9 +109,12 @@ class PermissionsSeeder extends Seeder
             // =======================================================
             ['key' => 'groups.view',     'name' => 'عرض المجموعات',     'desc' => 'عرض المجموعات الطلابية'],
             ['key' => 'groups.create',   'name' => 'إنشاء مجموعة',      'desc' => 'إنشاء مجموعة جديدة'],
+            ['key' => 'groups.update',   'name' => 'تعديل مجموعة',      'desc' => 'تعديل اسم أو سعة المجموعة'],
+            ['key' => 'groups.delete',   'name' => 'حذف مجموعة',        'desc' => 'حذف مجموعة طلابية'],
             ['key' => 'students.add',    'name' => 'إضافة طالب',        'desc' => 'تسجيل طالب في النظام'],
             ['key' => 'students.update', 'name' => 'تعديل بيانات طالب', 'desc' => 'تعديل معلومات الطالب'],
             ['key' => 'students.delete', 'name' => 'حذف طالب',          'desc' => 'حذف طالب من النظام'],
+            ['key' => 'students.move',   'name' => 'نقل طالب بين المجموعات', 'desc' => 'نقل الطالب من مجموعة إلى أخرى'],
 
             // =======================================================
             // 11. الفترات الزمنية (Periods)
@@ -160,5 +163,104 @@ class PermissionsSeeder extends Seeder
         }
 
         $this->command->info('✅ Permissions seeded successfully! Total: ' . count($permissions));
+
+        // =======================================================
+        // تعيين الصلاحيات الافتراضية للأدوار (Default Role Permissions)
+        // =======================================================
+        $allPermMap = DB::table('permissions')->pluck('permission_id', 'permission_key')->all();
+        $userTypes = DB::table('user_types')->pluck('user_type_id', 'user_type_code')->all();
+
+        $roleDefaults = [
+            'dean' => [
+                'colleges.view', 'colleges.update',
+                'users.view', 'users.create', 'users.update', 'users.delete',
+                'roles.view', 'roles.assign_permissions', 'roles.assign_user',
+                'study_plan.view', 'study_plan.create', 'study_plan.update', 'study_plan.delete',
+                'locations.view', 'locations.create', 'locations.update', 'locations.delete',
+                'academic_titles.view', 'academic_titles.create', 'academic_titles.update', 'academic_titles.delete',
+                'staff.view', 'staff.create', 'staff.update', 'staff.delete',
+                'timetable.create_table', 'timetable.view_lectures', 'timetable.create_lecture', 'timetable.update_lecture', 'timetable.delete_lecture',
+                'groups.view', 'groups.create', 'groups.update', 'groups.delete', 'students.add', 'students.update', 'students.delete', 'students.move',
+                'periods.view', 'periods.create', 'periods.update', 'periods.delete',
+                'requests.approve_makeup', 'requests.rejected_makeup', 'requests.view_makeup', 'requests.schedule_makeup',
+                'reports.financial_manage', 'reports.lecturer_attendance', 'reports.student_attendance', 'reports.semester_results', 'reports.view_custom',
+                'dashboard.view_college',
+            ],
+            'academic_affairs' => [
+                'users.view', 'users.create', 'users.update',
+                'roles.view', 'roles.assign_user',
+                'staff.view', 'staff.create', 'staff.update',
+                'study_plan.view', 'study_plan.create', 'study_plan.update',
+                'timetable.create_table', 'timetable.view_lectures', 'timetable.create_lecture', 'timetable.update_lecture', 'timetable.delete_lecture',
+                'groups.view', 'groups.create', 'groups.update', 'groups.delete', 'students.add', 'students.update', 'students.move',
+                'periods.view', 'periods.create', 'periods.update',
+                'locations.view',
+                'academic_titles.view',
+                'requests.view_makeup', 'requests.schedule_makeup',
+                'reports.lecturer_attendance', 'reports.student_attendance', 'reports.semester_results',
+                'dashboard.view_college',
+            ],
+            'dept_head' => [
+                'users.view',
+                'study_plan.view', 'study_plan.create', 'study_plan.update',
+                'staff.view', 'staff.create', 'staff.update',
+                'timetable.view_lectures', 'timetable.create_lecture', 'timetable.update_lecture',
+                'groups.view', 'groups.create', 'groups.update', 'students.move',
+                'locations.view',
+                'requests.view_makeup', 'requests.approve_makeup',
+                'reports.lecturer_attendance', 'reports.student_attendance',
+                'dashboard.view_college',
+            ],
+            'classroom_manager' => [
+                'locations.view', 'locations.create', 'locations.update', 'locations.delete',
+                'periods.view', 'periods.create', 'periods.update', 'periods.delete',
+                'timetable.view_lectures',
+                'dashboard.view_college',
+            ],
+            'control' => [
+                'students.add', 'students.update', 'students.move',
+                'groups.view', 'groups.create', 'groups.update',
+                'reports.semester_results', 'reports.student_attendance',
+                'study_plan.view',
+                'dashboard.view_college',
+            ],
+            'lecturer' => [
+                'study_plan.view',
+                'timetable.view_lectures',
+                'requests.view_makeup',
+                'reports.student_attendance',
+            ],
+        ];
+
+        $now = now();
+        $assignedCount = 0;
+        $collegeIds = DB::table('colleges')->pluck('college_id')->all();
+
+        foreach ($collegeIds as $collegeId) {
+            foreach ($roleDefaults as $roleCode => $permKeys) {
+                if (!isset($userTypes[$roleCode])) continue;
+                $typeId = $userTypes[$roleCode];
+
+                foreach ($permKeys as $key) {
+                    if (!isset($allPermMap[$key])) continue;
+                    $permId = $allPermMap[$key];
+
+                    DB::table('user_type_permissions')->updateOrInsert(
+                        [
+                            'user_type_id'  => $typeId,
+                            'permission_id' => $permId,
+                            'college_id'    => $collegeId,
+                        ],
+                        [
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]
+                    );
+                    $assignedCount++;
+                }
+            }
+        }
+
+        $this->command->info("✅ Default role permissions assigned successfully! Total: {$assignedCount}");
     }
 }

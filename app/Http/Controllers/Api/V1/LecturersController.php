@@ -15,43 +15,86 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use App\Models\LecturerPayout;
 use App\Models\FinancialCycle;
+use Illuminate\Support\Facades\Log;
 
 class LecturersController extends Controller
 {
-    // GET /api/v1/lecturers?college_id=...
+    // GET /api/v1/lecturers?college_id=...&q=...
     public function index(Request $request)
     {
-        $query = Lecturer::query()->with([
-            'user:user_id,full_name,email,phone,academic_number',
-            'academicTitle:title_id,title_name,title_code',
-            'department:department_id,department_name,department_code',
-        ]);
+        try {
+            $query = Lecturer::query()->with([
+                'user:user_id,full_name,email,phone,academic_number',
+                'academicTitle:title_id,title_name,title_code,hourly_price',
+                'department:department_id,department_name,department_code',
+                'college:college_id,college_name',
+            ]);
 
-        if ($request->filled('user_id')) {
-            $query->where('user_id', (int)$request->user_id);
+            // ✅ محرك البحث الشامل بالاسم والرقم الوظيفي والبريد والهاتف
+            if ($request->filled('q')) {
+                $q = $request->query('q');
+                $query->where(function ($sub) use ($q) {
+                    $sub->whereHas('user', function ($uq) use ($q) {
+                        $uq->where('full_name', 'like', "%{$q}%")
+                           ->orWhere('academic_number', 'like', "%{$q}%")
+                           ->orWhere('email', 'like', "%{$q}%")
+                           ->orWhere('phone', 'like', "%{$q}%");
+                    })->orWhereHas('department', function ($dq) use ($q) {
+                        $dq->where('department_name', 'like', "%{$q}%");
+                    })->orWhereHas('academicTitle', function ($tq) use ($q) {
+                        $tq->where('title_name', 'like', "%{$q}%");
+                    });
+                });
+            }
+
+            if ($request->filled('user_id')) {
+                $query->where('user_id', (int)$request->user_id);
+            }
+
+            // ✅ فلتر حسب can_teach_externally
+            if ($request->filled('can_teach_externally')) {
+                $canTeach = filter_var($request->query('can_teach_externally'), FILTER_VALIDATE_BOOLEAN);
+                $query->where('can_teach_externally', $canTeach);
+            }
+
+            // ✅ فلتر حسب college_id
+            if ($request->filled('college_id')) {
+                $query->where('college_id', (int)$request->college_id);
+            }
+
+            // ✅ فلتر حسب department_id
+            if ($request->filled('department_id')) {
+                $query->where('department_id', (int)$request->department_id);
+            }
+
+            // ✅ فلتر حسب title_id (الدرجة العلمية)
+            if ($request->filled('title_id')) {
+                $query->where('title_id', (int)$request->title_id);
+            }
+
+            // ✅ فلتر حسب الحالة الوظيفية
+            if ($request->has('status') && $request->query('status') !== '') {
+                $query->where('status', filter_var($request->query('status'), FILTER_VALIDATE_BOOLEAN));
+            }
+            
+            // ✅ فلتر لاستثناء كلية معينة
+            if ($request->filled('exclude_college_id')) {
+                $query->where('college_id', '!=', (int)$request->query('exclude_college_id'));
+            }
+
+            $perPage = (int) $request->query('per_page', 0);
+            if ($perPage > 0 && !$request->boolean('all')) {
+                return response()->json($query->paginate($perPage));
+            }
+
+            return response()->json($query->get());
+        } catch (\Throwable $e) {
+            Log::error('LecturersController index error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'تعذر جلب المحاضرين: ' . $e->getMessage(),
+                'data' => [],
+            ], 500);
         }
-
-        // ✅ فلتر حسب can_teach_externally
-        if ($request->filled('can_teach_externally')) {
-            $canTeach = filter_var($request->query('can_teach_externally'), FILTER_VALIDATE_BOOLEAN);
-            $query->where('can_teach_externally', $canTeach);
-        }
-
-        // ✅ فلتر حسب college_id
-        if ($request->filled('college_id')) {
-            $query->where('college_id', (int)$request->college_id);
-        }
-        
-        // ✅ فلتر لاستثناء كلية معينة
-        if ($request->filled('exclude_college_id')) {
-            $query->where('college_id', '!=', (int)$request->query('exclude_college_id'));
-        }
-
-        // يمكنك إضافة فلاتر أخرى هنا مثل department_id لو احتجت
-
-        // تغيير بسيط: استخدم Resources لتنسيق الاستجابة بشكل أفضل (اختياري ولكن موصى به)
-        // return \App\Http\Resources\V1\LecturerResource::collection($query->get());
-        return response()->json($query->get());
     }
 
     // POST /api/v1/lecturers
@@ -169,12 +212,13 @@ class LecturersController extends Controller
     {
         $request->validate([
             'college_id' => ['required', 'integer', 'exists:colleges,college_id'],
-            'file'       => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+            'file'       => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:20480'],
         ]);
     
         $collegeId = (int) $request->college_id;
         $file = $request->file('file');
         $path = $file->getRealPath();
+        $ext = strtolower($file->getClientOriginalExtension());
     
         $lecturerType = \App\Models\UserType::firstOrCreate(
             ['user_type_code' => 'lecturer'],
@@ -189,50 +233,88 @@ class LecturersController extends Controller
     
         // دالة تحويل الترميز وتنظيف النصوص
         $cleanText = function ($text) {
-            if (empty($text)) return null;
+            if ($text === null || $text === '') return null;
+            $text = (string)$text;
             
             // معالجة ترميز إكسل العربي (Windows-1256)
             if (!mb_check_encoding($text, 'UTF-8')) {
                 $text = @iconv('WINDOWS-1256', 'UTF-8//IGNORE', $text);
             }
     
-            // إزالة علامة BOM (مهم جداً للتعرف على أول عمود)
+            // إزالة علامة BOM
             $text = str_replace("\xEF\xBB\xBF", '', $text);
             
             $trimmed = trim($text);
             return $trimmed === '' ? null : $trimmed;
         };
-    
-        if (($handle = fopen($path, 'r')) === false) {
-            return response()->json(['message' => 'تعذر فتح الملف'], 422);
-        }
-    
-        // 1. تحديد الفاصل وقراءة رأس الصفحة
-        $firstLine = fgets($handle);
-        $delimiter = (str_contains($firstLine, ';')) ? ';' : ',';
-        rewind($handle); // العودة للبداية تماماً
-    
-        // 2. قراءة رؤوس الأعمدة
-        $rawHeader = fgetcsv($handle, 0, $delimiter);
-        if (!$rawHeader) {
+
+        $allRows = [];
+        $rawHeader = null;
+
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
+                return response()->json(['message' => 'مكتبة معالجة الإكسل غير متوفرة'], 500);
+            }
+            $type = \PhpOffice\PhpSpreadsheet\IOFactory::identify($path);
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader($type);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($path);
+            $sheet = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+            if (!$sheet || count($sheet) < 2) {
+                return response()->json(['message' => 'ملف الإكسل فارغ'], 422);
+            }
+            // تحديد سطر الرأس (الأول أو الذي يحتوي على academic_number/الرقم)
+            $headerIndex = 0;
+            foreach ($sheet as $idx => $pRow) {
+                $joined = mb_strtolower(implode(' ', array_filter($pRow)));
+                if (str_contains($joined, 'academic_number') || str_contains($joined, 'academicnumber') || str_contains($joined, 'full_name') || str_contains($joined, 'الرقم') || str_contains($joined, 'الاسم')) {
+                    $headerIndex = $idx;
+                    break;
+                }
+            }
+            $rawHeader = $sheet[$headerIndex];
+            $allRows = array_slice($sheet, $headerIndex + 1);
+        } else {
+            if (($handle = fopen($path, 'r')) === false) {
+                return response()->json(['message' => 'تعذر فتح الملف'], 422);
+            }
+            $firstLine = fgets($handle);
+            $delimiter = (str_contains($firstLine, ';')) ? ';' : ',';
+            rewind($handle);
+            $rawHeader = fgetcsv($handle, 0, $delimiter);
+            if (!$rawHeader) {
+                fclose($handle);
+                return response()->json(['message' => 'الملف فارغ'], 422);
+            }
+            while (($r = fgetcsv($handle, 0, $delimiter)) !== false) {
+                $allRows[] = $r;
+            }
             fclose($handle);
-            return response()->json(['message' => 'الملف فارغ'], 422);
         }
     
-        // تنظيف رؤوس الأعمدة (للبحث عن full_name, email الخ)
+        // تنظيف وتوحيد رؤوس الأعمدة
         $cleanHeader = array_map(function($h) use ($cleanText) {
             $name = $cleanText($h) ?? '';
-            // إزالة أي رموز غير نصية قد تختبئ في الرأس
-            return strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $name));
+            $norm = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $name));
+            return match ($name) {
+                'الرقم الوظيفي', 'الرقم الأكاديمي', 'الرقم' => 'academic_number',
+                'الاسم', 'اسم المحاضر', 'الاسم الكامل' => 'full_name',
+                'البريد', 'البريد الإلكتروني', 'الإيميل' => 'email',
+                'الهاتف', 'الجوال', 'رقم الهاتف' => 'phone',
+                'كود القسم', 'القسم' => 'department_code',
+                'الرتبة', 'اللقب الأكاديمي', 'كود الرتبة' => 'title_code',
+                'تاريخ التعيين', 'التعيين' => 'hire_date',
+                'الجنس', 'النوع' => 'gender',
+                default => $norm,
+            };
         }, $rawHeader);
     
         $headerMap = array_flip($cleanHeader);
-        
-        $rowNum = 1; // السطر الأول هو العنوان
+        $rowNum = 1;
     
         DB::beginTransaction();
         try {
-            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            foreach ($allRows as $row) {
                 $rowNum++;
     
                 // دالة جلب القيمة بناءً على اسم العمود
@@ -327,8 +409,6 @@ class LecturersController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json(['message' => 'خطأ سطر ' . $rowNum . ': ' . $e->getMessage()], 500);
-        } finally {
-            fclose($handle);
         }
     
         return response()->json([

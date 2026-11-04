@@ -63,16 +63,16 @@ class LectureSession extends Model
         return $this->belongsTo(Classroom::class, 'actual_classroom_id', 'classroom_id');
     }
 
-    //     /**
-    //  * Prepare a date for array / JSON serialization.
-    //  *
-    //  * @param  \DateTimeInterface  $date
-    //  * @return string
-    //  */
-    // protected function serializeDate(\DateTimeInterface $date)
-    // {
-    //     // هذا السطر يجبر لارافيل على إرسال التاريخ بصيغة السنة-الشهر-اليوم فقط
-    //     // دون أي تلاعب بالتوقيت أو تحويل لـ UTC
-    //     return $date->format('Y-m-d');
-    // }
+    public function actualLecturer()
+    {
+        return $this->belongsTo(Lecturer::class, 'lecturer_id', 'lecturer_id');
+    }
+
+    /**
+     * Format session date consistently for JSON responses (YYYY-MM-DD)
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 }

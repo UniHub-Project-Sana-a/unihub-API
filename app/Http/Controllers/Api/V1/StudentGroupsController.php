@@ -218,14 +218,16 @@ private function makePlaceholderEmail(?string $academic): string
             DB::table('student_groups')
                 ->where('group_id', $softDup->group_id)
                 ->update([
-                    'deleted_at' => null,
-                    'updated_at' => now(),
+                    'max_students' => $maxStudents,
+                    'deleted_at'   => null,
+                    'updated_at'   => now(),
                 ]);
     
             $restored = DB::table('student_groups')->where('group_id', $softDup->group_id)->first();
     
             return response()->json([
                 'status'  => 'restored',
+                'group_id' => $restored->group_id,
                 'group'   => $restored,
                 'message' => 'Group restored from soft delete',
             ], 200);
@@ -334,7 +336,21 @@ private function makePlaceholderEmail(?string $academic): string
             }
 
             DB::table('student_groups')->where('group_id', (int)$group)->update($data);
-            return response()->json(['message' => 'Updated']);
+            $updated = DB::table('student_groups as g')
+                ->leftJoin(
+                    DB::raw('(SELECT group_id, COUNT(*) as students_count FROM student_group_members GROUP BY group_id) sgm'),
+                    'sgm.group_id',
+                    '=',
+                    'g.group_id'
+                )
+                ->where('g.group_id', (int)$group)
+                ->select('g.*', DB::raw('COALESCE(sgm.students_count,0) as students_count'))
+                ->first();
+
+            return response()->json([
+                'message' => 'Updated',
+                'group'   => $updated,
+            ]);
         } catch (Throwable $e) {
             return response()->json(['message' => 'Duplicate group for this path', 'error' => $e->getMessage()], 409);
         }
@@ -627,7 +643,7 @@ private function makePlaceholderEmail(?string $academic): string
             'student_ids.*' => ['required', 'integer', 'distinct', 'exists:students,student_id'],
         ]);
 
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $request) {
             $group = DB::table('student_groups')
                 ->where('group_id', $data['group_id'])
                 ->whereNull('deleted_at')
@@ -661,10 +677,23 @@ private function makePlaceholderEmail(?string $academic): string
                 ->where('group_id', $group->group_id)
                 ->count();
             if ($currentCount + count($newStudentIds) > (int) $group->max_students) {
-                return response()->json([
-                    'message' => 'عدد الطلاب المحددين يتجاوز السعة المتبقية للمجموعة.',
-                    'remaining_capacity' => max(0, (int) $group->max_students - $currentCount),
-                ], 422);
+                if ($request->boolean('expand_capacity')) {
+                    $newMax = $currentCount + count($newStudentIds);
+                    DB::table('student_groups')
+                        ->where('group_id', $group->group_id)
+                        ->update(['max_students' => $newMax, 'updated_at' => now()]);
+                    $group->max_students = $newMax;
+                } else {
+                    $needed = count($newStudentIds);
+                    $remaining = max(0, (int) $group->max_students - $currentCount);
+                    return response()->json([
+                        'message' => "عدد الطلاب المحددين للإسناد ({$needed}) يتجاوز السعة المتبقية للمجموعة ({$remaining}). سعة المجموعة: {$group->max_students}.",
+                        'remaining_capacity' => $remaining,
+                        'current_count' => $currentCount,
+                        'max_students' => (int) $group->max_students,
+                        'needed_capacity' => $currentCount + $needed,
+                    ], 422);
+                }
             }
 
             $now = now();
@@ -682,6 +711,125 @@ private function makePlaceholderEmail(?string $academic): string
                 'assigned_count' => count($newStudentIds),
                 'already_in_group' => count($alreadyInGroup),
                 'group_id' => (int) $group->group_id,
+            ]);
+        });
+    }
+
+    /**
+     * نقل الطلاب من مجموعة حالية إلى مجموعة أخرى (Transfer Students).
+     * POST /api/v1/student-groups/transfer-students
+     */
+    public function transferStudents(Request $request)
+    {
+        $data = $request->validate([
+            'to_group_id' => ['required', 'integer', 'exists:student_groups,group_id'],
+            'student_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'student_ids.*' => ['required', 'integer', 'distinct', 'exists:students,student_id'],
+            'from_group_id' => ['nullable', 'integer', 'exists:student_groups,group_id'],
+            'expand_capacity' => ['nullable', 'boolean'],
+        ]);
+
+        return DB::transaction(function () use ($data, $request) {
+            $toGroupId = (int) $data['to_group_id'];
+            $fromGroupId = isset($data['from_group_id']) ? (int) $data['from_group_id'] : null;
+            $studentIds = array_map('intval', $data['student_ids']);
+
+            $targetGroup = DB::table('student_groups')
+                ->where('group_id', $toGroupId)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$targetGroup) {
+                return response()->json(['message' => 'المجموعة المستهدفة غير موجودة أو محذوفة.'], 404);
+            }
+
+            // تحقق من وجود الطلاب
+            $studentsCount = DB::table('students')
+                ->whereIn('student_id', $studentIds)
+                ->whereNull('deleted_at')
+                ->count();
+
+            if ($studentsCount !== count($studentIds)) {
+                return response()->json(['message' => 'بعض الطلاب المحددين غير موجودين أو محذوفون.'], 404);
+            }
+
+            // الطلاب المسندون حالياً في المجموعة المستهدفة
+            $alreadyInTarget = DB::table('student_group_members')
+                ->where('group_id', $toGroupId)
+                ->whereIn('student_id', $studentIds)
+                ->pluck('student_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $newToTargetIds = array_values(array_diff($studentIds, $alreadyInTarget));
+
+            // حساب السعة الاستيعابية للمجموعة المستهدفة
+            $currentCountInTarget = DB::table('student_group_members')
+                ->where('group_id', $toGroupId)
+                ->count();
+
+            if ($currentCountInTarget + count($newToTargetIds) > (int) $targetGroup->max_students) {
+                if ($request->boolean('expand_capacity')) {
+                    $newMax = $currentCountInTarget + count($newToTargetIds);
+                    DB::table('student_groups')
+                        ->where('group_id', $toGroupId)
+                        ->update(['max_students' => $newMax, 'updated_at' => now()]);
+                    $targetGroup->max_students = $newMax;
+                } else {
+                    $needed = count($newToTargetIds);
+                    $remaining = max(0, (int) $targetGroup->max_students - $currentCountInTarget);
+                    return response()->json([
+                        'message' => "عدد الطلاب المراد نقلهم ({$needed}) يتجاوز السعة المتبقية للمجموعة الهدف ({$remaining}). سعة المجموعة: {$targetGroup->max_students}.",
+                        'remaining_capacity' => $remaining,
+                        'current_count' => $currentCountInTarget,
+                        'max_students' => (int) $targetGroup->max_students,
+                        'needed_capacity' => $currentCountInTarget + $needed,
+                    ], 422);
+                }
+            }
+
+            // حذف الانتماء من المجموعة السابقة:
+            if ($fromGroupId) {
+                DB::table('student_group_members')
+                    ->where('group_id', $fromGroupId)
+                    ->whereIn('student_id', $studentIds)
+                    ->delete();
+            } else {
+                // إذا لم يتم تحديد from_group_id، نقوم بنقلهم بحذفهم من أي مجموعة أخرى في نفس المسار الأكاديمي
+                $siblingGroupIds = DB::table('student_groups')
+                    ->where('college_id', $targetGroup->college_id)
+                    ->where('department_id', $targetGroup->department_id)
+                    ->when($targetGroup->program_id, fn($q) => $q->where('program_id', $targetGroup->program_id))
+                    ->when($targetGroup->level_id, fn($q) => $q->where('level_id', $targetGroup->level_id))
+                    ->when($targetGroup->semester_id, fn($q) => $q->where('semester_id', $targetGroup->semester_id))
+                    ->when($targetGroup->block_id, fn($q) => $q->where('block_id', $targetGroup->block_id))
+                    ->where('group_id', '!=', $toGroupId)
+                    ->pluck('group_id')
+                    ->all();
+
+                if (!empty($siblingGroupIds)) {
+                    DB::table('student_group_members')
+                        ->whereIn('group_id', $siblingGroupIds)
+                        ->whereIn('student_id', $studentIds)
+                        ->delete();
+                }
+            }
+
+            // إضافة الطلاب للمجموعة الهدف
+            $now = now();
+            foreach ($studentIds as $studentId) {
+                DB::table('student_group_members')->updateOrInsert(
+                    ['student_id' => $studentId, 'group_id' => $toGroupId],
+                    ['created_at' => $now, 'updated_at' => $now]
+                );
+            }
+
+            return response()->json([
+                'message' => 'تم نقل الطلاب بنجاح إلى المجموعة الجديدة.',
+                'transferred_count' => count($studentIds),
+                'to_group_id' => $toGroupId,
+                'from_group_id' => $fromGroupId,
             ]);
         });
     }
@@ -848,8 +996,9 @@ private function makePlaceholderEmail(?string $academic): string
             DB::table('student_groups')
                 ->where('group_id', $soft->group_id)
                 ->update([
-                    'deleted_at' => null,
-                    'updated_at' => now(),
+                    'max_students' => $maxStudents,
+                    'deleted_at'   => null,
+                    'updated_at'   => now(),
                 ]);
     
             $restored = DB::table('student_groups')->where('group_id', $soft->group_id)->first();

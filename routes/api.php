@@ -48,6 +48,8 @@ use App\Http\Controllers\Api\V1\QA\Admin\QaCampaignsController;
 use App\Http\Controllers\Api\V1\QA\Student\QaEvaluationController;
 use App\Http\Controllers\Api\V1\QA\Reports\QaAnalysisController;
 use App\Http\Controllers\Api\V1\QualityAssuranceController;
+use App\Http\Controllers\Api\V1\StudentPortalController;
+use App\Http\Controllers\Api\V1\LecturerInteractionController;
 use App\Http\Controllers\Api\V1\QA\Reports\CourseExecutionReportController;
 use App\Http\Controllers\Api\V1\UniversityReportController;
 use App\Http\Controllers\Api\V1\BlockController;
@@ -73,6 +75,26 @@ use App\Http\Controllers\Api\External\IntegrationController;
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/health/detailed', [HealthController::class, 'detailed']);
 Route::get('/ping', [HealthController::class, 'ping']);
+
+// نقطة تهيئة قاعدة البيانات السحابية (Migration & Seed)
+Route::get('/setup-db', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--seed' => true, '--force' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        return response()->json([
+            'status' => 'success',
+            'output' => $output,
+        ]);
+    } catch (\Throwable $e) {
+        $prev = $e->getPrevious();
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'previous' => $prev ? $prev->getMessage() : null,
+            'output' => \Illuminate\Support\Facades\Artisan::output(),
+        ], 500);
+    }
+});
 
 // ============================================================
 // واجهات التكامل الخارجي (System-to-System) — Data Ingestion
@@ -111,7 +133,7 @@ Route::prefix('v1')->group(function ()
 
     });
 
-    Route::middleware(['auth:api', 'activity:admin', 'throttle:60,1'])->group(function () {
+    Route::middleware(['auth:api', 'activity:admin', 'throttle:300,1'])->group(function () {
 
 
 
@@ -155,6 +177,7 @@ Route::prefix('v1')->group(function ()
 
         Route::apiResource('semesters', SemestersController::class);
 
+        Route::get('courses/university-requirements', [CoursesController::class, 'universityRequirements']);
         Route::apiResource('courses', CoursesController::class);
 
         Route::apiResource('buildings', BuildingsController::class);
@@ -246,7 +269,9 @@ Route::prefix('v1')->group(function ()
 
         Route::controller(StudentGroupsController::class)->prefix('student-groups')->group(function () {
 
-            Route::post('assign-students', 'assignStudentsToGroup')->middleware('permission:groups.create');
+            Route::post('assign-students', 'assignStudentsToGroup')->middleware('permission:groups.create,groups.update,students.add');
+
+            Route::post('transfer-students', 'transferStudents')->middleware('permission:students.move,groups.update,groups.create');
 
             Route::post('upsert-and-attach', 'upsertAndAttach');
 
@@ -272,6 +297,7 @@ Route::prefix('v1')->group(function ()
 
 
         Route::post('timetable/trash', [TimetableController::class, 'trash']);
+        Route::post('lecture-sessions/trash', [TimetableController::class, 'trash']);
         Route::apiResource('timetable', TimetableController::class);
 
 
@@ -307,13 +333,13 @@ Route::prefix('v1')->group(function ()
 
         Route::controller(StudentAttendanceController::class)->prefix('attendance/students')->group(function () {
 
-            Route::post('scan', 'scan');
+            Route::post('scan', [StudentPortalController::class, 'scanQr']);
 
             Route::post('manual', 'manualEntry');
 
         });
 
-        Route::post('attendance/scan', [StudentAttendanceController::class, 'scan']);
+        Route::post('attendance/scan', [StudentPortalController::class, 'scanQr']);
 
         Route::apiResource('student-attendance', StudentAttendanceController::class);
 
@@ -455,6 +481,37 @@ Route::prefix('v1')->group(function ()
                 // 3. جلب أسئلة نموذج معين للبدء في التقييم
                 Route::get('form/{campaign}', 'getEvaluationForm');
             });
+        });
+
+        // ============================================================
+        // بوابة الطالب المتكاملة (Student Portal Endpoints)
+        // ============================================================
+        Route::prefix('student')->controller(StudentPortalController::class)->group(function () {
+            Route::get('portal-summary', 'summary');
+            Route::get('timetable', 'timetable');
+            Route::get('attendance', 'attendance');
+            Route::get('grades', 'grades');
+            Route::get('excuses', 'excuses');
+            Route::post('excuses', 'submitExcuse');
+            Route::get('announcements', 'announcements');
+            Route::post('announcements/mark-read', 'markAnnouncementRead');
+            Route::get('study-plan', 'studyPlan');
+            Route::get('understanding-analytics', 'understandingAnalytics');
+            Route::get('assignments', 'assignments');
+            Route::post('assignments/submit', 'submitAssignment');
+            Route::post('scan-qr', 'scanQr');
+            Route::post('submit-lecture-answers', 'submitLectureAnswers');
+        });
+
+        // ============================================================
+        // تواصل وتفاعل المحاضر مع الطلاب (Lecturer Interactions)
+        // ============================================================
+        Route::prefix('lecturer')->controller(LecturerInteractionController::class)->group(function () {
+            Route::get('my-groups', 'myGroups');
+            Route::get('student-excuses', 'studentExcuses');
+            Route::post('student-excuses/{id}/review', 'reviewExcuse');
+            Route::post('group-announcements', 'postAnnouncement');
+            Route::get('group-announcements', 'getAnnouncements');
         });
 
         // ============================================================

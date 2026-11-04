@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate; // <-- 1. إضافة الاستيراد
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use App\Models\UserDevice; // <-- 2. إضافة الاستيراد
 use App\Policies\UserDevicePolicy; // <-- 3. إضافة الاستيراد
 use Laravel\Passport\Passport;
@@ -36,8 +39,23 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute($perMinute)->by(\App\Support\ClientIp::resolve($request));
         });
 
-        // 4. تسجيل الـ Policy يدويًا
+        // 4. تسجيل الـ Policy يدويًا وتحديد مسار مفاتيح Passport
         Gate::policy(UserDevice::class, UserDevicePolicy::class);
-        // Passport::routes();
+        if (file_exists('/tmp/oauth-private.key')) {
+            Passport::loadKeysFrom('/tmp');
+        }
+
+        // 5. تهيئة وتشغيل الترحيلات غير المنفذة تلقائياً على Neon Postgres لضمان تحديث الجداول والأعمدة الجديدة
+        if ((env('DB_CONNECTION') === 'pgsql' || config('database.default') === 'pgsql') && !file_exists('/tmp/db_migrated_v4')) {
+            try {
+                Artisan::call('migrate', ['--force' => true]);
+                if (!Schema::hasTable('users') || \App\Models\User::count() === 0) {
+                    Artisan::call('db:seed', ['--force' => true]);
+                }
+                @touch('/tmp/db_migrated_v4');
+            } catch (\Throwable $e) {
+                Log::warning('Neon auto-migration error: ' . $e->getMessage());
+            }
+        }
     }
 }

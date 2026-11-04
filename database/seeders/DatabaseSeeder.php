@@ -19,11 +19,17 @@ class DatabaseSeeder extends Seeder
             DaysSeeder::class,
         ]);
 
-        // 2. إنشاء عميل Passport
-        Artisan::call('passport:client', [
-            '--personal' => true,
-            '--name' => 'UniHub API Personal Access Client'
-        ]);
+        // 2. إنشاء عميل Passport بشكل آمن ومتوافق مع Passport v13
+        try {
+            $clientRepo = app(\Laravel\Passport\ClientRepository::class);
+            if (method_exists($clientRepo, 'createPersonalAccessGrantClient')) {
+                $clientRepo->createPersonalAccessGrantClient('UniHub API Personal Access Client', 'users');
+            } elseif (method_exists($clientRepo, 'createPersonalAccessClient')) {
+                $clientRepo->createPersonalAccessClient(null, 'UniHub API Personal Access Client', 'http://localhost');
+            }
+        } catch (\Throwable $e) {
+            // تجاهل إن كان منشأ مسبقاً
+        }
 
         // 3. جلب نوع المستخدم أو إنشائه إن لم يكن موجوداً
         $adminType = UserType::firstOrCreate(
@@ -36,7 +42,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'Admin@unitshub.com'],
             [
                 'academic_number' => 'ADM0001',
-                'full_name'       => 'Alaa Hussein',
+                'full_name'       => 'Saad Mouad',
                 'phone'           => '734637112',
                 'password'        => Hash::make('Admin@12345'),
                 'gender'          => 0,
@@ -45,7 +51,10 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 5. إنشاء الكلية الأولى وربط كل الصلاحيات
+        // 5. إنشاء الكلية الأولى وربط كل الصلاحيات للمشرف العام
         $this->call(InitialCollegeSeeder::class);
+
+        // 6. زرع البيانات التجريبية الشاملة (معطلة للإنتاج الفعلي لضمان نظافة قاعدة البيانات وعدم وجود بيانات وهمية)
+        // $this->call(ComprehensiveDemoSeeder::class);
     }
 }
