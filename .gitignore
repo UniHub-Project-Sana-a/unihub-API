@@ -1,24 +1,44 @@
-node_modules
-vendor
-.git
-.env
-.env.*
-.env.example
-storage/logs/*
-!storage/logs/.gitkeep
-storage/framework/cache/*
-!storage/framework/cache/.gitkeep
-storage/framework/sessions/*
-!storage/framework/sessions/.gitkeep
-storage/framework/views/*
-!storage/framework/views/.gitkeep
-storage/logs/laravel.log
-.gitignore
-tests
-.phpunit.result.cache
-*.log
+# Dependencies
+/node_modules/
+/vendor/
+
+# Local environment files
+/.env
+/.env.*
+!/.env.example
+
+# Laravel generated files
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+/storage/framework/testing/*
+
+# Tests
+/tests/
+
+# Build output
+/public/build/
+/public/hot
+/public/storage
+
+# Local databases and backups
+/database/*.sqlite
+*.backup
+
+# Test and tool output
+/.phpunit.cache/
+/.phpunit.result.cache
+npm-debug.log*
+
+# OS files
 .DS_Store
 Thumbs.db
-*.sqlite*
-*.backup
-/storage/logs/*.log
+*.log
