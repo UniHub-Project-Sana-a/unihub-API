@@ -205,7 +205,7 @@ class LecturerAttendanceController extends Controller
             }
 
             // ---------------------------------------------------------
-            // ثانياً: معالجة حضور المحاضر والحسابات المالية
+            // ثانياً: احتساب مستحقات المحاضر
             // ---------------------------------------------------------
             
             $lecturer = $timetable->lecturer;
@@ -217,25 +217,6 @@ class LecturerAttendanceController extends Controller
 
             $lectureHours = $timetable->lecture_hours ?? 0;
             $totalSessionRate = $lectureHours * $hourlyRate;
-
-            LecturerAttendance::updateOrCreate(
-                [
-                    'lecturer_id'  => $lecturer->lecturer_id,
-                    'session_code' => $sessionCode,
-                ],
-                [
-                    'timetable_id'        => $timetable->timetable_id,
-                    'attendance_date'     => $attendanceDate,
-                    'status'              => 1,
-                    'notification_status' => 0,
-                    'college_id'          => $timetable->college_id,
-                    
-                    // البيانات المالية
-                    'lecture_hours'              => $lectureHours,
-                    'hourly_rate_at_attendance'  => $hourlyRate,
-                    'lecture_rate_at_attendance' => $totalSessionRate,
-                ]
-            );
 
             // ---------------------------------------------------------
             // ثالثاً: تحديث حالة جميع الجلسات النظيرة المشتركة

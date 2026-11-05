@@ -312,6 +312,8 @@ Route::prefix('v1')->group(function ()
 
         Route::get('/schedulable-lectures', [LectureSessionsController::class, 'getSchedulableLectures']);
 
+        Route::get('lecture-sessions/{sessionId}/attendance-report-details', [LectureSessionsController::class, 'attendanceReportDetails']);
+
         Route::apiResource('lecture-sessions', LectureSessionsController::class);
         Route::post('sessions/{id}/finish', [LectureSessionsController::class, 'finishLecture']);
 

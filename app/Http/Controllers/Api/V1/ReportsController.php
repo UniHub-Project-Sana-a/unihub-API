@@ -644,6 +644,18 @@ class ReportsController extends Controller
                 ->where('status', 1)
                 ->count();
 
+            $correctAnswersByStudent = DB::table('student_lecture_answers')
+                ->join('lecture_sessions', 'student_lecture_answers.session_id', '=', 'lecture_sessions.session_id')
+                ->whereIn('lecture_sessions.timetable_id', $timetableIds)
+                ->where('lecture_sessions.status', 1)
+                ->select('student_lecture_answers.student_id')
+                ->selectRaw('SUM(CASE WHEN student_lecture_answers.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers')
+                ->groupBy('student_lecture_answers.student_id')
+                ->get()
+                ->mapWithKeys(function ($row) {
+                    return [$row->student_id => (int) $row->correct_answers];
+                });
+
             // 3. جلب الطلاب وإحصائياتهم
             $students = DB::table('student_group_members')
                 ->join('students', 'student_group_members.student_id', '=', 'students.student_id')
@@ -656,7 +668,7 @@ class ReportsController extends Controller
                 )
                 ->orderBy('users.full_name')
                 ->get()
-                ->map(function ($student) use ($timetableIds, $executedSessionsCount, $approvedSessionsCount) {
+                ->map(function ($student) use ($timetableIds, $executedSessionsCount, $approvedSessionsCount, $correctAnswersByStudent) {
                     
                     // جلب سجلات الحضور لهذا الطالب في هذه الجلسات
                     $attendanceStats = DB::table('student_attendance')
@@ -685,7 +697,8 @@ class ReportsController extends Controller
                         'total_sessions_executed' => $executedSessionsCount, // المنفذة فعلياً
                         'present_count' => $presentCount,
                         'absent_count' => $absentCount,
-                        'attendance_percentage' => round($percentage, 1)
+                        'attendance_percentage' => round($percentage, 1),
+                        'correct_answers_count' => (int) ($correctAnswersByStudent[$student->student_id] ?? 0),
                     ];
                 });
 

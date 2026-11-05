@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\LectureSession;
+use App\Models\LecturerAttendance;
+use App\Models\StudentAttendance;
 use App\Models\Timetable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -379,6 +381,44 @@ class LectureSessionController extends Controller
         return response()->json($session);
     }
 
+    public function attendanceReportDetails($id)
+    {
+        $session = LectureSession::with('timetable.lecturer.academicTitle')->findOrFail($id);
+
+        $topics = DB::table('session_topics_covered')
+            ->join('course_topics', 'session_topics_covered.topic_id', '=', 'course_topics.topic_id')
+            ->where('session_topics_covered.session_id', $session->session_id)
+            ->orderBy('course_topics.order')
+            ->pluck('course_topics.unit_name');
+
+        $studentAnswers = DB::table('student_lecture_answers')
+            ->where('session_id', $session->session_id)
+            ->select('student_id')
+            ->selectRaw('SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers')
+            ->groupBy('student_id')
+            ->get();
+
+        $attachments = DB::table('lecture_attachments')
+            ->where('session_id', $session->session_id)
+            ->orderBy('attachment_id')
+            ->get(['attachment_id', 'type', 'title', 'url', 'file_size']);
+
+        return response()->json([
+            'session_id' => $session->session_id,
+            'start_time' => $session->start_time,
+            'end_time' => $session->end_time,
+            'lecturer_title' => data_get($session, 'timetable.lecturer.academicTitle.title_name'),
+            'topics' => $topics,
+            'question_count' => DB::table('student_lecture_answers')
+                ->where('session_id', $session->session_id)
+                ->distinct()
+                ->count('question_id'),
+            'student_answers' => $studentAnswers,
+            'early_exit_reason' => $session->early_exit_reason,
+            'attachments' => $attachments,
+        ]);
+    }
+
     /**
      * تعديل بيانات الجلسة
      */
@@ -431,60 +471,62 @@ class LectureSessionController extends Controller
     */
     public function finishLecture(Request $request, $id)
     {
-        $session = LectureSession::findOrFail($id);
-
         $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
             'early_exit_reason' => 'nullable|string|max:255',
         ]);
 
-        // 1. التحقق من الموقع (Is Remote?)
-        // نستخدم دالة مساعدة لحساب المسافة (Haversine Formula)
-        // أو نقارن ببساطة إذا لم تكن الدقة حرجة جداً، لكن الأفضل حساب المسافة
-        $isRemote = $this->calculateDistance(
-            $request->latitude, $request->longitude,
-            $session->actualClassroom->latitude, $session->actualClassroom->longitude
-        ) > $session->actualClassroom->allowed_distance;
+        return DB::transaction(function () use ($request, $id) {
+            $session = LectureSession::lockForUpdate()->findOrFail($id);
 
-        // 2. تحديث الجلسة
-        $session->update([
-            'status' => 1, // 1 = Completed
-            'actual_end_time' => Carbon::now(),
-            'end_latitude' => $request->latitude,
-            'end_longitude' => $request->longitude,
-            'is_ended_remotely' => $isRemote,
-            'early_exit_reason' => $request->early_exit_reason
-        ]);
+            $qrPresentCount = StudentAttendance::where('session_code', $session->session_code)
+                ->where('status', 1)
+                ->where('attendance_method', 0)
+                ->count();
 
-        // 3. إغلاق أي QR مفتوح لهذه الجلسة تلقائياً (تنظيف)
-        QrCode::where('session_id', $session->session_id)
-            ->where('is_active', true)
-            ->update(['is_active' => false, 'expires_at' => Carbon::now()]);
+            if ($qrPresentCount < 1) {
+                return response()->json([
+                    'message' => 'لا يمكن إنهاء المحاضرة قبل تسجيل حضور طالب واحد على الأقل باستخدام QR.',
+                ], 422);
+            }
 
-        return response()->json([
-            'message' => 'تم إنهاء المحاضرة وتوثيق الوقت والموقع بنجاح.',
-            'session' => $session
-        ]);
-    }
+            $timetable = Timetable::with(['lecturer.academicTitle'])
+                ->findOrFail($session->timetable_id);
+            $lecturer = $timetable->lecturer;
+            $hourlyRate = $lecturer->academicTitle->hourly_price ?? 0;
+            $lectureHours = $timetable->lecture_hours ?? 0;
 
-    /**
-     * دالة مساعدة لحساب المسافة بالمتر (Haversine)
-     */
-    private function calculateDistance($lat1, $lon1, $lat2, $lon2) {
-        $earthRadius = 6371000; // نصف قطر الأرض بالمتر
+            LecturerAttendance::updateOrCreate(
+                [
+                    'lecturer_id' => $lecturer->lecturer_id,
+                    'session_code' => $session->session_code,
+                ],
+                [
+                    'timetable_id' => $timetable->timetable_id,
+                    'attendance_date' => $session->session_date,
+                    'status' => 1,
+                    'notification_status' => 0,
+                    'college_id' => $timetable->college_id,
+                    'lecture_hours' => $lectureHours,
+                    'hourly_rate_at_attendance' => $hourlyRate,
+                    'lecture_rate_at_attendance' => $lectureHours * $hourlyRate,
+                ]
+            );
 
-        $latFrom = deg2rad($lat1);
-        $lonFrom = deg2rad($lon1);
-        $latTo = deg2rad($lat2);
-        $lonTo = deg2rad($lon2);
+            $session->update([
+                'status' => 1,
+                'actual_end_time' => Carbon::now(),
+                'early_exit_reason' => $request->early_exit_reason,
+            ]);
 
-        $latDelta = $latTo - $latFrom;
-        $lonDelta = $lonTo - $lonFrom;
+            QrCode::where('session_id', $session->session_id)
+                ->where('is_active', true)
+                ->update(['is_active' => false, 'expires_at' => Carbon::now()]);
 
-        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
-            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
-            
-        return $angle * $earthRadius;
+            return response()->json([
+                'message' => 'تم إنهاء المحاضرة واعتماد حضور المحاضر بنجاح.',
+                'session' => $session,
+                'qr_present_count' => $qrPresentCount,
+            ]);
+        });
     }
 }
