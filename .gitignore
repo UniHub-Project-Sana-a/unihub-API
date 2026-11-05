@@ -21,3 +21,4 @@ tests
 Thumbs.db
 *.sqlite*
 *.backup
+/storage/logs/*.log
